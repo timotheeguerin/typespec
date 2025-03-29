@@ -19,7 +19,7 @@ export async function $onEmit(context: EmitContext) {
       <SourceDirectory path="src">
         <ts.SourceFile path="index.ts">
           <For each={events}>{(event) => <EventInterface event={event} />}</For>
-          <ef.UnionDeclaration type={unionOfEvents} />
+          <ef.UnionDeclaration type={unionOfEvents} export />
         </ts.SourceFile>
       </SourceDirectory>
     </Output>,
