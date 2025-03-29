@@ -2174,6 +2174,9 @@ importers:
       '@types/node':
         specifier: ^20.14.12
         version: 20.17.28
+      '@typespec/tspd':
+        specifier: workspace:^
+        version: link:../tspd
       concurrently:
         specifier: ^8.2.2
         version: 8.2.2

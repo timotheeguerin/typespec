@@ -17,6 +17,7 @@
     "@babel/preset-typescript": "^7.24.7",
     "@rollup/plugin-babel": "^6.0.4",
     "@rollup/plugin-typescript": "^11.1.6",
+    "@typespec/tspd": "workspace:^",
     "@types/node": "^20.14.12",
     "concurrently": "^8.2.2",
     "typescript": "^5.7.3",
@@ -24,13 +25,14 @@
   },
   "scripts": {
     "build-src": "babel src -d dist/src --extensions .ts,.tsx",
-    "check": "tsc --noEmit",
-    "build": "pnpm check && pnpm build-src",
+    "build-tsc": "tsc",
+    "build": "pnpm gen-extern-signature && pnpm build-tsc && pnpm build-src",
     "clean": "rimraf dist/ .temp/",
+    "gen-extern-signature": "tspd --enable-experimental gen-extern-signature .",
     "test": "vitest run",
     "test:watch": "vitest -w",
     "watch-src": "babel src -d dist/src --extensions '.ts,.tsx' --watch",
-    "watch-check": "tsc --noEmit --watch",
+    "watch-check": "tsc --watch",
     "watch": "concurrently --kill-others \"pnpm watch-check\" \"pnpm watch-src\""
   },
   "exports": {
