@@ -1,1 +1,1 @@
-export * from "./components/index.js";
+export { $onEmit } from "./emitter.js";
