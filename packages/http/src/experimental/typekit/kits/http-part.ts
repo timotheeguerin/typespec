@@ -24,8 +24,15 @@ export interface HttpPartKit {
   unpack(type: Type): Type;
 }
 
+/**
+ * Some doc tag2
+ * @typekit
+ */
 export interface TypekitExtension {
   httpPart: HttpPartKit;
+  bar: {
+    nested: () => void;
+  };
 }
 
 declare module "@typespec/compiler/experimental/typekit" {
@@ -33,6 +40,7 @@ declare module "@typespec/compiler/experimental/typekit" {
 }
 
 defineKit<TypekitExtension>({
+  bar: { nested: () => {} },
   httpPart: {
     is(type) {
       return this.model.is(type) && this.httpPart.get(type) !== undefined;

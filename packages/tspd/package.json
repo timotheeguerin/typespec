@@ -55,13 +55,18 @@
     "!dist/test/**"
   ],
   "dependencies": {
+    "@microsoft/api-extractor": "^7.52.1",
+    "@microsoft/api-extractor-model": "^7.30.5",
+    "@microsoft/tsdoc": "^0.15.1",
+    "@microsoft/tsdoc-config": "^0.17.1",
     "@typespec/compiler": "workspace:^",
+    "pathe": "^2.0.3",
     "picocolors": "~1.1.1",
     "prettier": "~3.5.3",
-    "yaml": "~2.7.0",
-    "yargs": "~17.7.2",
     "typedoc": "^0.28.1",
-    "typedoc-plugin-markdown": "^4.5.2"
+    "typedoc-plugin-markdown": "^4.5.2",
+    "yaml": "~2.7.0",
+    "yargs": "~17.7.2"
   },
   "devDependencies": {
     "@types/node": "~22.13.11",

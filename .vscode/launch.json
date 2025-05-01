@@ -143,9 +143,11 @@
       "type": "node",
       "request": "launch",
       "name": "Debug Docs Generation",
-      "program": "${workspaceFolder}/packages/website/.scripts/regen-ref-docs.mjs",
+      "program": "${workspaceFolder}/packages/tspd/dist/src/cli.js",
+      "args": ["--enable-experimental", "doc", "."],
       "smartStep": true,
       "sourceMaps": true,
+      "cwd": "${workspaceFolder}/packages/http",
       "skipFiles": ["<node_internals>/**/*.js"]
     },
     {

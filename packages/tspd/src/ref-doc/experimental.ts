@@ -6,12 +6,10 @@ import {
   NodeHost,
   type PackageJson,
 } from "@typespec/compiler";
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { readFile } from "fs/promises";
 import prettier from "prettier";
-import { generateJsApiDocs } from "./api-docs.js";
-import { renderReadme } from "./emitters/markdown.js";
-import { renderToAstroStarlightMarkdown } from "./emitters/starlight.js";
-import { extractLibraryRefDocs, ExtractRefDocOptions, extractRefDocs } from "./extractor.js";
+import { ExtractRefDocOptions, extractRefDocs } from "./extractor.js";
+import { createTypekitDocs } from "./typekit.js";
 import { TypeSpecRefDocBase } from "./types.js";
 
 export interface GenerateLibraryDocsOptions {
@@ -27,23 +25,24 @@ export async function generateLibraryDocs(
 ): Promise<readonly Diagnostic[]> {
   const diagnostics = createDiagnosticCollector();
   const pkgJson = await readPackageJson(libraryPath);
-  const refDoc = diagnostics.pipe(await extractLibraryRefDocs(libraryPath));
-  const files = renderToAstroStarlightMarkdown(refDoc);
-  await mkdir(outputDir, { recursive: true });
-  const config = await prettier.resolveConfig(libraryPath);
-  for (const [name, content] of Object.entries(files)) {
-    const formatted = await formatMarkdown(name, content, config);
-    await writeFile(joinPaths(outputDir, name), formatted);
-  }
-  const readme = await formatMarkdown(
-    joinPaths(libraryPath, "README.md"),
-    await renderReadme(refDoc, libraryPath),
-    config ?? {},
-  );
-  await writeFile(joinPaths(libraryPath, "README.md"), readme);
-  if (pkgJson.main && !options.skipJSApi) {
-    await generateJsApiDocs(libraryPath, joinPaths(outputDir, "js-api"));
-  }
+  await createTypekitDocs(libraryPath, pkgJson, outputDir);
+  // const refDoc = diagnostics.pipe(await extractLibraryRefDocs(libraryPath));
+  // const files = renderToAstroStarlightMarkdown(refDoc);
+  // await mkdir(outputDir, { recursive: true });
+  // const config = await prettier.resolveConfig(libraryPath);
+  // for (const [name, content] of Object.entries(files)) {
+  //   const formatted = await formatMarkdown(name, content, config);
+  //   await writeFile(joinPaths(outputDir, name), formatted);
+  // }
+  // const readme = await formatMarkdown(
+  //   joinPaths(libraryPath, "README.md"),
+  //   await renderReadme(refDoc, libraryPath),
+  //   config ?? {},
+  // );
+  // await writeFile(joinPaths(libraryPath, "README.md"), readme);
+  // if (pkgJson.main && !options.skipJSApi) {
+  //   await generateJsApiDocs(libraryPath, joinPaths(outputDir, "js-api"));
+  // }
   return diagnostics.diagnostics;
 }
 
