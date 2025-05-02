@@ -2174,9 +2174,24 @@ importers:
 
   packages/tspd:
     dependencies:
+      '@microsoft/api-extractor':
+        specifier: ^7.52.1
+        version: 7.52.7(@types/node@22.13.17)
+      '@microsoft/api-extractor-model':
+        specifier: ^7.30.5
+        version: 7.30.6(@types/node@22.13.17)
+      '@microsoft/tsdoc':
+        specifier: ^0.15.1
+        version: 0.15.1
+      '@microsoft/tsdoc-config':
+        specifier: ^0.17.1
+        version: 0.17.1
       '@typespec/compiler':
         specifier: workspace:^
         version: link:../compiler
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       picocolors:
         specifier: ~1.1.1
         version: 1.1.1
