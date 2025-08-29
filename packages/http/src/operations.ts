@@ -1,25 +1,22 @@
 import {
-  $visibility,
   createDiagnosticCollector,
   Diagnostic,
   DiagnosticCollector,
   getOverloadedOperation,
   getOverloads,
-  getVisibility,
   listOperationsIn,
   listServices,
-  ModelProperty,
   Namespace,
   navigateProgram,
   Operation,
   Program,
-  SyntaxKind,
 } from "@typespec/compiler";
 import { getAuthenticationForOperation } from "./auth.js";
 import { getAuthentication } from "./decorators.js";
+import { isSharedRoute } from "./decorators/shared-route.js";
 import { createDiagnostic, reportDiagnostic } from "./lib.js";
 import { getResponsesForOperation } from "./responses.js";
-import { isSharedRoute, resolvePathAndParameters } from "./route.js";
+import { resolvePathAndParameters } from "./route.js";
 import {
   HttpOperation,
   HttpService,
@@ -36,7 +33,7 @@ import {
 export function getHttpOperation(
   program: Program,
   operation: Operation,
-  options?: RouteResolutionOptions
+  options?: RouteResolutionOptions,
 ): [HttpOperation, readonly Diagnostic[]] {
   return getHttpOperationInternal(program, operation, options, new Map());
 }
@@ -51,13 +48,13 @@ export function getHttpOperation(
 export function listHttpOperationsIn(
   program: Program,
   container: OperationContainer,
-  options?: RouteResolutionOptions
+  options?: RouteResolutionOptions,
 ): [HttpOperation[], readonly Diagnostic[]] {
   const diagnostics = createDiagnosticCollector();
   const operations = listOperationsIn(container, options?.listOptions);
   const cache = new Map();
   const httpOperations = operations.map((x) =>
-    diagnostics.pipe(getHttpOperationInternal(program, x, options, cache))
+    diagnostics.pipe(getHttpOperationInternal(program, x, options, cache)),
   );
   return diagnostics.wrap(httpOperations);
 }
@@ -67,17 +64,17 @@ export function listHttpOperationsIn(
  */
 export function getAllHttpServices(
   program: Program,
-  options?: RouteResolutionOptions
+  options?: RouteResolutionOptions,
 ): [HttpService[], readonly Diagnostic[]] {
   const diagnostics = createDiagnosticCollector();
   const serviceNamespaces = listServices(program);
 
   const services: HttpService[] = serviceNamespaces.map((x) =>
-    diagnostics.pipe(getHttpService(program, x.type, options))
+    diagnostics.pipe(getHttpService(program, x.type, options)),
   );
   if (serviceNamespaces.length === 0) {
     services.push(
-      diagnostics.pipe(getHttpService(program, program.getGlobalNamespaceType(), options))
+      diagnostics.pipe(getHttpService(program, program.getGlobalNamespaceType(), options)),
     );
   }
   return diagnostics.wrap(services);
@@ -86,7 +83,7 @@ export function getAllHttpServices(
 export function getHttpService(
   program: Program,
   serviceNamespace: Namespace,
-  options?: RouteResolutionOptions
+  options?: RouteResolutionOptions,
 ): [HttpService, readonly Diagnostic[]] {
   const diagnostics = createDiagnosticCollector();
   const httpOperations = diagnostics.pipe(
@@ -95,11 +92,10 @@ export function getHttpService(
       listOptions: {
         recursive: serviceNamespace !== program.getGlobalNamespaceType(),
       },
-    })
+    }),
   );
   const authentication = getAuthentication(program, serviceNamespace);
 
-  validateProgram(program, diagnostics);
   validateRouteUnique(program, diagnostics, httpOperations);
 
   const service: HttpService = {
@@ -108,17 +104,6 @@ export function getHttpService(
     authentication: authentication,
   };
   return diagnostics.wrap(service);
-}
-
-/**
- * @deprecated use `getAllHttpServices` instead
- */
-export function getAllRoutes(
-  program: Program,
-  options?: RouteResolutionOptions
-): [HttpOperation[], readonly Diagnostic[]] {
-  const [services, diagnostics] = getAllHttpServices(program, options);
-  return [services[0].operations, diagnostics];
 }
 
 export function reportIfNoRoutes(program: Program, routes: HttpOperation[]) {
@@ -142,7 +127,7 @@ export function reportIfNoRoutes(program: Program, routes: HttpOperation[]) {
 export function validateRouteUnique(
   program: Program,
   diagnostics: DiagnosticCollector,
-  operations: HttpOperation[]
+  operations: HttpOperation[],
 ) {
   const grouped = new Map<string, Map<HttpVerb, HttpOperation[]>>();
 
@@ -179,7 +164,7 @@ export function validateRouteUnique(
               code: "duplicate-operation",
               format: { path, verb, operationName: route.operation.name },
               target: route.operation,
-            })
+            }),
           );
         }
       }
@@ -195,7 +180,7 @@ function getHttpOperationInternal(
   program: Program,
   operation: Operation,
   options: RouteResolutionOptions | undefined,
-  cache: Map<Operation, HttpOperation>
+  cache: Map<Operation, HttpOperation>,
 ): [HttpOperation, readonly Diagnostic[]] {
   const existing = cache.get(operation);
   if (existing) {
@@ -209,19 +194,19 @@ function getHttpOperationInternal(
   let overloading;
   if (overloadBase) {
     overloading = httpOperationRef.overloading = diagnostics.pipe(
-      getHttpOperationInternal(program, overloadBase, options, cache)
+      getHttpOperationInternal(program, overloadBase, options, cache),
     );
   }
 
   const route = diagnostics.pipe(
-    resolvePathAndParameters(program, operation, overloading, options ?? {})
+    resolvePathAndParameters(program, operation, overloading, options ?? {}),
   );
   const responses = diagnostics.pipe(getResponsesForOperation(program, operation));
   const authentication = getAuthenticationForOperation(program, operation);
 
   const httpOperation: HttpOperation = {
     path: route.path,
-    pathSegments: route.pathSegments,
+    uriTemplate: route.uriTemplate,
     verb: route.parameters.verb,
     container: operation.interface ?? operation.namespace ?? program.getGlobalNamespaceType(),
     parameters: route.parameters,
@@ -234,33 +219,9 @@ function getHttpOperationInternal(
   const overloads = getOverloads(program, operation);
   if (overloads) {
     httpOperationRef.overloads = overloads.map((x) =>
-      diagnostics.pipe(getHttpOperationInternal(program, x, options, cache))
+      diagnostics.pipe(getHttpOperationInternal(program, x, options, cache)),
     );
   }
 
   return diagnostics.wrap(httpOperationRef);
-}
-
-function validateProgram(program: Program, diagnostics: DiagnosticCollector) {
-  navigateProgram(program, {
-    modelProperty(property) {
-      checkForUnsupportedVisibility(property);
-    },
-  });
-
-  // NOTE: This is intentionally not checked in the visibility decorator
-  // itself as that would be a layering violation, putting a REST
-  // interpretation of visibility into the core.
-  function checkForUnsupportedVisibility(property: ModelProperty) {
-    if (getVisibility(program, property)?.includes("write")) {
-      // NOTE: Check for name equality instead of function equality
-      // to deal with multiple copies of core being used.
-      const decorator = property.decorators.find((d) => d.decorator.name === $visibility.name);
-      const arg = decorator?.args.find(
-        (a) => a.node?.kind === SyntaxKind.StringLiteral && a.node.value === "write"
-      );
-      const target = arg?.node ?? property;
-      diagnostics.add(createDiagnostic({ code: "write-visibility-not-supported", target }));
-    }
-  }
 }

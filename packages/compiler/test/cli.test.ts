@@ -29,7 +29,7 @@ describe("compiler: cli", () => {
         "ws/main.tsp",
         cwd,
         args,
-        env
+        env,
       );
       expectDiagnosticEmpty(diagnostics);
       ok(options, "Options should have been set.");
@@ -45,6 +45,23 @@ describe("compiler: cli", () => {
       });
     });
 
+    it("error if option doesn't have =", async () => {
+      const [_, diagnostics] = await getCompilerOptions(
+        host.compilerHost,
+        "ws/main.tsp",
+        cwd,
+        {
+          options: [`my-emitter.bar`],
+        },
+        {},
+      );
+
+      expectDiagnostics(diagnostics, {
+        code: "invalid-option-flag",
+        message: `The --option parameter value "my-emitter.bar" must be in the format: <emitterName>.some-options=value`,
+      });
+    });
+
     it("--option without an emitter are moved to miscOptions", async () => {
       const options = await resolveCompilerOptions({
         options: [`test-debug=true`],
@@ -52,6 +69,26 @@ describe("compiler: cli", () => {
 
       deepStrictEqual(options?.miscOptions, { "test-debug": "true" });
       deepStrictEqual(options?.options, {});
+    });
+
+    it("--option allows root level options", async () => {
+      const options = await resolveCompilerOptions({
+        options: [`my-emitter.foo=abc`],
+      });
+
+      deepStrictEqual(options?.options, {
+        "my-emitter": { foo: "abc" },
+      });
+    });
+
+    it("--option allows nested options", async () => {
+      const options = await resolveCompilerOptions({
+        options: [`my-emitter.foo.bar=abc`],
+      });
+
+      deepStrictEqual(options?.options, {
+        "my-emitter": { foo: { bar: "abc" } },
+      });
     });
 
     describe("config file with emitters", () => {
@@ -73,7 +110,7 @@ describe("compiler: cli", () => {
                 "emitter-output-dir": "{custom-arg}/custom",
               },
             },
-          })
+          }),
         );
       });
 
@@ -82,7 +119,7 @@ describe("compiler: cli", () => {
 
         strictEqual(
           options?.options?.["@typespec/openapi3"]?.["emitter-output-dir"],
-          `${cwd}/tsp-output/custom`
+          `${cwd}/tsp-output/custom`,
         );
       });
 
@@ -91,7 +128,7 @@ describe("compiler: cli", () => {
 
         strictEqual(
           options?.options?.["@typespec/openapi3"]?.["emitter-output-dir"],
-          `${cwd}/my-output-dir/custom`
+          `${cwd}/my-output-dir/custom`,
         );
       });
 
@@ -102,18 +139,7 @@ describe("compiler: cli", () => {
 
         strictEqual(
           options?.options?.["@typespec/openapi3"]?.["emitter-output-dir"],
-          `${cwd}/relative-to-cwd`
-        );
-      });
-
-      it("override emitter-output-dir from cli args using path to emitter with extension", async () => {
-        const options = await resolveCompilerOptions({
-          options: [`path/to/emitter.js.emitter-output-dir={cwd}/relative-to-cwd`],
-        });
-
-        strictEqual(
-          options?.options?.["path/to/emitter.js"]?.["emitter-output-dir"],
-          `${cwd}/relative-to-cwd`
+          `${cwd}/relative-to-cwd`,
         );
       });
 
@@ -123,7 +149,7 @@ describe("compiler: cli", () => {
 
           strictEqual(
             options?.options?.["@typespec/with-args"]?.["emitter-output-dir"],
-            `/default-arg-value/custom`
+            `/default-arg-value/custom`,
           );
         });
 
@@ -134,7 +160,7 @@ describe("compiler: cli", () => {
 
           strictEqual(
             options?.options?.["@typespec/with-args"]?.["emitter-output-dir"],
-            `/my-updated-arg-value/custom`
+            `/my-updated-arg-value/custom`,
           );
         });
       });
@@ -147,7 +173,7 @@ describe("compiler: cli", () => {
           {
             args: ["not-defined-arg=my-value"],
           },
-          {}
+          {},
         );
 
         expectDiagnostics(diagnostics, {
@@ -161,14 +187,14 @@ describe("compiler: cli", () => {
           "ws/tspconfig.yaml",
           stringify({
             "output-dir": "./my-output",
-          })
+          }),
         );
         const [_, diagnostics] = await getCompilerOptions(
           host.compilerHost,
           "ws/main.tsp",
           cwd,
           {},
-          {}
+          {},
         );
 
         expectDiagnostics(diagnostics, {

@@ -1,13 +1,15 @@
 import { resolve } from "path";
 import { stringify } from "yaml";
 import { CheckOptions, syncFile } from "../utils/common.js";
+import { expandFolder } from "../utils/find-area-changed.js";
 import {
   PolicyServiceConfig,
   and,
   eventResponderTask,
-  filesMatchPattern,
   hasLabel,
+  includesModifiedFiles,
   isAction,
+  isActivitySender,
   labelAdded,
   labelRemoved,
   not,
@@ -108,20 +110,19 @@ function createPrTriageConfig(config: RepoConfig): PolicyServiceConfig {
       resourceManagementConfiguration: {
         eventResponderTasks: [
           eventResponderTask({
-            if: [payloadType("Pull_Request")],
-            then: Object.entries(config.areaPaths).flatMap(([label, files]) => {
-              return files.map((file) => {
-                return {
-                  if: [filesMatchPattern(`${file}.*`)],
-                  then: [
-                    {
-                      addLabel: {
-                        label,
-                      },
+            if: [payloadType("Pull_Request"), not(isActivitySender({ user: "Copilot" }))], // exclude Copilot as it create empty PRs initially which breaks the bot https://github.com/GitOps-microsoft/GitOps.PullRequestIssueManagement/issues/267
+            then: Object.entries(config.areaPaths).map(([label, files]) => {
+              const globs = files.map(expandFolder);
+              return {
+                if: [includesModifiedFiles(globs)],
+                then: [
+                  {
+                    addLabel: {
+                      label,
                     },
-                  ],
-                };
-              });
+                  },
+                ],
+              };
             }),
           }),
         ],

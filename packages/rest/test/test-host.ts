@@ -1,30 +1,19 @@
-import { Diagnostic } from "@typespec/compiler";
-import {
-  BasicTestRunner,
-  createTestHost,
-  createTestWrapper,
-  expectDiagnosticEmpty,
-  TestHost,
-} from "@typespec/compiler/testing";
+import type { Diagnostic } from "@typespec/compiler";
+import { resolvePath } from "@typespec/compiler";
+import { createTester, expectDiagnosticEmpty } from "@typespec/compiler/testing";
 import {
   getAllHttpServices,
   HttpOperation,
   HttpOperationParameter,
   HttpVerb,
-  RouteResolutionOptions,
 } from "@typespec/http";
-import { HttpTestLibrary } from "@typespec/http/testing";
-import { RestTestLibrary } from "../src/testing/index.js";
+import { unsafe_RouteResolutionOptions as RouteResolutionOptions } from "@typespec/http/experimental";
 
-export async function createRestTestHost(): Promise<TestHost> {
-  return createTestHost({
-    libraries: [HttpTestLibrary, RestTestLibrary],
-  });
-}
-export async function createRestTestRunner(): Promise<BasicTestRunner> {
-  const host = await createRestTestHost();
-  return createTestWrapper(host, { autoUsings: ["TypeSpec.Http", "TypeSpec.Rest"] });
-}
+export const Tester = createTester(resolvePath(import.meta.dirname, ".."), {
+  libraries: ["@typespec/http", "@typespec/rest"],
+})
+  .importLibraries()
+  .using("Http", "Rest");
 
 export interface RouteDetails {
   path: string;
@@ -34,7 +23,7 @@ export interface RouteDetails {
 
 export async function getRoutesFor(
   code: string,
-  routeOptions?: RouteResolutionOptions
+  routeOptions?: RouteResolutionOptions,
 ): Promise<RouteDetails[]> {
   const [routes, diagnostics] = await compileOperations(code, routeOptions);
   expectDiagnosticEmpty(diagnostics);
@@ -51,16 +40,13 @@ export interface SimpleOperationDetails {
   path: string;
   params: {
     params: Array<{ name: string; type: HttpOperationParameter["type"] }>;
-    /**
-     * name of explicit `@body` parameter or array of unannotated parameter names that make up the body.
-     */
     body?: string | string[];
   };
 }
 
 export async function compileOperations(
   code: string,
-  routeOptions?: RouteResolutionOptions
+  routeOptions?: RouteResolutionOptions,
 ): Promise<[SimpleOperationDetails[], readonly Diagnostic[]]> {
   const [routes, diagnostics] = await getOperationsWithServiceNamespace(code, routeOptions);
 
@@ -84,24 +70,19 @@ export async function compileOperations(
 
 export async function getOperationsWithServiceNamespace(
   code: string,
-  routeOptions?: RouteResolutionOptions
+  routeOptions?: RouteResolutionOptions,
 ): Promise<[HttpOperation[], readonly Diagnostic[]]> {
-  const runner = await createRestTestRunner();
-  await runner.compileAndDiagnose(
-    `@service({title: "Test Service"}) namespace TestService;
+  const [result, diagnostics] = await Tester.compileAndDiagnose(
+    `@service(#{title: "Test Service"}) namespace TestService;
     ${code}`,
-    {
-      noEmit: true,
-    }
   );
-  const [services] = getAllHttpServices(runner.program, routeOptions);
-  return [services[0].operations, runner.program.diagnostics];
+  const [services] = getAllHttpServices(result.program, routeOptions);
+  return [services[0].operations, diagnostics];
 }
 
 export async function getOperations(code: string): Promise<HttpOperation[]> {
-  const runner = await createRestTestRunner();
-  await runner.compile(code);
-  const [services, diagnostics] = getAllHttpServices(runner.program);
+  const { program } = await Tester.compile(code);
+  const [services, diagnostics] = getAllHttpServices(program);
 
   expectDiagnosticEmpty(diagnostics);
   return services[0].operations;

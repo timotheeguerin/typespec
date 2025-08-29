@@ -1,4 +1,4 @@
-import { strictEqual } from "assert";
+import { ok, strictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
 import {
   BasicTestRunner,
@@ -21,7 +21,7 @@ describe("compiler: resolveTypeReference", () => {
     }
     const [resolved, diagnostics] = runner.program.resolveTypeReference(reference);
     expectDiagnosticEmpty(diagnostics);
-    strictEqual(resolved, target);
+    ok(resolved === target, `Exected to resolve ${reference} to same type as ${code}`);
   }
 
   async function diagnoseResolution(reference: string, code: string) {
@@ -36,7 +36,7 @@ describe("compiler: resolveTypeReference", () => {
       "MyService",
       `
       @test("target") namespace MyService {}
-    `
+    `,
     );
   });
 
@@ -59,7 +59,7 @@ describe("compiler: resolveTypeReference", () => {
       "MyOrg.MyService",
       `
       @test("target") namespace MyOrg.MyService {}
-    `
+    `,
     );
   });
 
@@ -68,7 +68,7 @@ describe("compiler: resolveTypeReference", () => {
       "Pet",
       `
       @test("target") model Pet {}
-    `
+    `,
     );
   });
 
@@ -78,7 +78,7 @@ describe("compiler: resolveTypeReference", () => {
       `
       namespace MyOrg.MyService;
       @test("target") model Pet {}
-    `
+    `,
     );
   });
 
@@ -87,7 +87,17 @@ describe("compiler: resolveTypeReference", () => {
       "Pet.name",
       `
       model Pet { @test("target") name: string}
-    `
+    `,
+    );
+  });
+
+  it("resolve model property from base class", async () => {
+    await expectResolve(
+      "Pet.name",
+      `
+      model Animal { @test("target") name: string}
+      model Pet extends Animal { }
+    `,
     );
   });
 
@@ -96,7 +106,7 @@ describe("compiler: resolveTypeReference", () => {
       "Pet.home::type.street",
       `
       model Pet { home: { @test("target") street: string}}
-    `
+    `,
     );
   });
 
@@ -110,7 +120,17 @@ describe("compiler: resolveTypeReference", () => {
       "Direction.up",
       `
       enum Direction { @test("target") up}
-    `
+    `,
+    );
+  });
+
+  it("resolve enum member with spread", async () => {
+    await expectResolve(
+      "Direction.up",
+      `
+      enum Foo { @test("target") up }
+      enum Direction { ... Foo }
+    `,
     );
   });
 
@@ -121,14 +141,14 @@ describe("compiler: resolveTypeReference", () => {
       model Pet { @test("target") name: string}
 
       alias PetName = Pet.name;
-    `
+    `,
     );
   });
 
   it("emit diagnostic if not found", async () => {
     const diagnostics = await diagnoseResolution("Direction.up", "");
     expectDiagnostics(diagnostics, {
-      code: "unknown-identifier",
+      code: "invalid-ref",
       message: "Unknown identifier Direction",
     });
   });

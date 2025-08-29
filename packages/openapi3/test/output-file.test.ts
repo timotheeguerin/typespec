@@ -1,13 +1,13 @@
 import { resolvePath } from "@typespec/compiler";
 import {
-  BasicTestRunner,
   expectDiagnosticEmpty,
   resolveVirtualPath,
+  TesterInstance,
 } from "@typespec/compiler/testing";
 import { ok, strictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
 import { OpenAPI3EmitterOptions } from "../src/lib.js";
-import { createOpenAPITestRunner } from "./test-host.js";
+import { ApiTester } from "./test-host.js";
 
 describe("openapi3: output file", () => {
   const expectedJsonEmptySpec = [
@@ -36,15 +36,16 @@ describe("openapi3: output file", () => {
   ];
 
   const outputDir = resolveVirtualPath("test-output");
-  let runner: BasicTestRunner;
+  let runner: TesterInstance;
   beforeEach(async () => {
-    runner = await createOpenAPITestRunner();
+    runner = await ApiTester.importLibraries().createInstance();
   });
   async function compileOpenAPI(options: OpenAPI3EmitterOptions, code: string = ""): Promise<void> {
     const diagnostics = await runner.diagnose(code, {
-      noEmit: false,
-      emit: ["@typespec/openapi3"],
-      options: { "@typespec/openapi3": { ...options, "emitter-output-dir": outputDir } },
+      compilerOptions: {
+        emit: ["@typespec/openapi3"],
+        options: { "@typespec/openapi3": { ...options, "emitter-output-dir": outputDir } },
+      },
     });
 
     expectDiagnosticEmpty(diagnostics);
@@ -53,17 +54,17 @@ describe("openapi3: output file", () => {
   function expectOutput(
     filename: string,
     lines: string[] = expectedYamlEmptySpec,
-    newLine: "\n" | "\r\n" = "\n"
+    newLine: "\n" | "\r\n" = "\n",
   ) {
     const outPath = resolvePath(outputDir, filename);
-    const content = runner.fs.get(outPath);
+    const content = runner.fs.fs.get(outPath);
     ok(content, `Expected ${outPath} to exist.`);
     strictEqual(content, lines.join(newLine));
   }
 
   function expectHasOutput(filename: string) {
     const outPath = resolvePath(outputDir, filename);
-    const content = runner.fs.get(outPath);
+    const content = runner.fs.fs.get(outPath);
     ok(content, `Expected ${outPath} to exist.`);
   }
 
@@ -104,37 +105,90 @@ describe("openapi3: output file", () => {
   describe("multiple outputs", () => {
     (["json", "yaml"] as const).forEach((fileType) => {
       describe(`when file-type is ${fileType}`, () => {
-        it("create distinct files for distinct services", () => {
-          async () => {
-            await compileOpenAPI(
-              { "file-type": fileType },
-              `
+        it("create distinct files for distinct services", async () => {
+          await compileOpenAPI(
+            { "file-type": fileType },
+            `
           @service namespace Service1 {}
           @service namespace Service2 {}
-        `
-            );
-
-            expectHasOutput(`custom.Service1.${fileType}`);
-            expectHasOutput(`custom.Service2.${fileType}`);
-          };
+        `,
+          );
+          expectHasOutput(`openapi.Service1.${fileType}`);
+          expectHasOutput(`openapi.Service2.${fileType}`);
         });
 
-        it("create distinct files for distinct versions", () => {
-          async () => {
-            await compileOpenAPI(
-              {},
-              `
-          @versioned(Versions) namespace Service1 {
+        it("create distinct files for distinct versions", async () => {
+          await compileOpenAPI(
+            { "file-type": fileType },
+            `
+            using Versioning;
+
+          @versioned(Versions) @service namespace Service1 {
             enum Versions {v1, v2}
           }
-        `
-            );
+        `,
+          );
 
-            expectHasOutput(`custom.v1.${fileType}`);
-            expectHasOutput(`custom.v2.${fileType}`);
-          };
+          expectHasOutput(`openapi.v1.${fileType}`);
+          expectHasOutput(`openapi.v2.${fileType}`);
         });
       });
+    });
+  });
+
+  describe("Predefined variable name behavior", () => {
+    interface ServiceNameCase {
+      description: string;
+      code: string;
+      outputFilePattern: string;
+      expectedOutputFiles: string[];
+    }
+    it.each([
+      // {service-name} cases
+      {
+        description: "{service-name} for one service",
+        code: "@service namespace AAA { model M {a: string} }",
+        outputFilePattern: "{service-name}.yaml",
+        expectedOutputFiles: ["AAA.yaml"],
+      },
+      {
+        description: "{service-name} for multiple services",
+        code:
+          "@service namespace AAA { model M {a: string} }" +
+          "@service namespace BBB { model N {b: string} }",
+        outputFilePattern: "{service-name}.yaml",
+        expectedOutputFiles: ["AAA.yaml", "BBB.yaml"],
+      },
+      // {service-name-if-multiple} cases
+      {
+        description: "{service-name-if-multiple} for one service",
+        code: "@service namespace AAA { model M {a: string} }",
+        outputFilePattern: "{service-name-if-multiple}.yaml",
+        expectedOutputFiles: ["yaml"],
+      },
+      {
+        description: "{service-name-if-multiple} for multiple services",
+        code:
+          "@service namespace AAA { model M {a: string} }" +
+          "@service namespace BBB { model N {b: string} }",
+        outputFilePattern: "{service-name-if-multiple}.yaml",
+        expectedOutputFiles: ["AAA.yaml", "BBB.yaml"],
+      },
+      // fixed name cases
+      {
+        description: "fixed name for one service",
+        code: "@service namespace AAA { model M {a: string} }",
+        outputFilePattern: "fixed-name.yaml",
+        expectedOutputFiles: ["fixed-name.yaml"],
+      },
+    ])("$description", async (c: ServiceNameCase) => {
+      await compileOpenAPI(
+        {
+          "output-file": c.outputFilePattern,
+        },
+        c.code,
+      );
+      for (const outputFile of c.expectedOutputFiles) expectHasOutput(outputFile);
     });
   });
 });

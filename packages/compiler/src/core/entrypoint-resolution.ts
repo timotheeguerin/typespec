@@ -1,4 +1,5 @@
-import { doIO, loadFile, resolveTspMain } from "../utils/misc.js";
+import { doIO, loadFile } from "../utils/io.js";
+import { resolveTspMain } from "../utils/misc.js";
 import { DiagnosticHandler } from "./diagnostics.js";
 import { resolvePath } from "./path-utils.js";
 import { CompilerHost } from "./types.js";
@@ -11,7 +12,7 @@ import { CompilerHost } from "./types.js";
 export async function resolveTypeSpecEntrypoint(
   host: CompilerHost,
   path: string,
-  reportDiagnostic: DiagnosticHandler
+  reportDiagnostic: DiagnosticHandler,
 ): Promise<string | undefined> {
   const resolvedPath = resolvePath(path);
   const mainStat = await doIO(host.stat, resolvedPath, reportDiagnostic);
@@ -29,7 +30,7 @@ export async function resolveTypeSpecEntrypoint(
 export async function resolveTypeSpecEntrypointForDir(
   host: CompilerHost,
   dir: string,
-  reportDiagnostic: DiagnosticHandler
+  reportDiagnostic: DiagnosticHandler,
 ): Promise<string> {
   const pkgJsonPath = resolvePath(dir, "package.json");
   const [pkg] = await loadFile(host, pkgJsonPath, JSON.parse, reportDiagnostic, {
@@ -40,17 +41,5 @@ export async function resolveTypeSpecEntrypointForDir(
     return resolvePath(dir, tspMain);
   }
 
-  // Back Compat: if main.cadl exist, return main.cadl
-  let mainFile = resolvePath(dir, "main.cadl");
-  const stat = await doIO(
-    () => host.stat(mainFile),
-    mainFile,
-    () => {}
-  );
-  // if not found, use the normal resolution.
-  if (stat?.isFile() !== true) {
-    mainFile = resolvePath(dir, "main.tsp");
-  }
-
-  return mainFile;
+  return resolvePath(dir, "main.tsp");
 }

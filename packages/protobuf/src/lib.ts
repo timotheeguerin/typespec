@@ -52,6 +52,9 @@ const PACKAGE_NAME = "@typespec/protobuf";
 
 export const TypeSpecProtobufLibrary = createTypeSpecLibrary({
   name: PACKAGE_NAME,
+  capabilities: {
+    dryRun: true,
+  },
   requireImports: [PACKAGE_NAME],
   diagnostics: {
     "field-index": {
@@ -226,7 +229,7 @@ const keys = [
 ] as const;
 
 export const state = Object.fromEntries(
-  keys.map((k) => [k, TypeSpecProtobufLibrary.createStateSymbol(k)])
+  keys.map((k) => [k, TypeSpecProtobufLibrary.createStateSymbol(k)]),
 ) as {
   [K in (typeof keys)[number]]: symbol;
 };

@@ -1,15 +1,15 @@
 import { expectDiagnosticEmpty, expectDiagnostics } from "@typespec/compiler/testing";
-import { describe, it } from "vitest";
-import { diagnoseOpenApiFor } from "./test-host.js";
+import { it } from "vitest";
+import { worksFor } from "./works-for.js";
 
-describe("openapi3: no-service-found diagnostic", () => {
+worksFor(["3.0.0", "3.1.0"], ({ diagnoseOpenApiFor }) => {
   it("does not emit warning if a non-service namespace has no routes", async () => {
     const diagnostics = await diagnoseOpenApiFor(
       `
     namespace Test {
       model Foo {};
     }
-    `
+    `,
     );
     expectDiagnosticEmpty(diagnostics);
   });
@@ -23,7 +23,7 @@ describe("openapi3: no-service-found diagnostic", () => {
       @route("/foo")
       op get(): Foo;
     }
-    `
+    `,
     );
     expectDiagnostics(diagnostics, [
       {
@@ -39,7 +39,7 @@ describe("openapi3: no-service-found diagnostic", () => {
     namespace Test {
       model Foo {};
     }
-    `
+    `,
     );
     expectDiagnosticEmpty(diagnostics);
   });
@@ -58,7 +58,7 @@ describe("openapi3: no-service-found diagnostic", () => {
     namespace Library {
       op ping(): void;
     }
-    `
+    `,
     );
     expectDiagnosticEmpty(diagnostics);
   });

@@ -1,12 +1,16 @@
 import { DiagnosticCollector, compilerAssert, createDiagnosticCollector } from "./diagnostics.js";
 import { getLocationContext } from "./helpers/location-context.js";
+import { defineLinter } from "./library.js";
+import { createUnusedTemplateParameterLinterRule } from "./linter-rules/unused-template-parameter.rule.js";
+import { createUnusedUsingLinterRule } from "./linter-rules/unused-using.rule.js";
 import { createDiagnostic } from "./messages.js";
+import { NameResolver } from "./name-resolver.js";
 import type { Program } from "./program.js";
 import { EventEmitter, mapEventEmitterToNodeListener, navigateProgram } from "./semantic-walker.js";
+import { startTimer, time } from "./stats.js";
 import {
   Diagnostic,
   DiagnosticMessages,
-  LibraryInstance,
   LinterDefinition,
   LinterResolvedDefinition,
   LinterRule,
@@ -18,9 +22,23 @@ import {
   SemanticNodeListener,
 } from "./types.js";
 
+type LinterLibraryInstance = { linter: LinterResolvedDefinition };
+
 export interface Linter {
   extendRuleSet(ruleSet: LinterRuleSet): Promise<readonly Diagnostic[]>;
-  lint(): readonly Diagnostic[];
+  registerLinterLibrary(name: string, lib?: LinterLibraryInstance): void;
+  lint(): LinterResult;
+}
+
+export interface LinterStats {
+  runtime: {
+    total: number;
+    rules: Record<string, number>;
+  };
+}
+export interface LinterResult {
+  readonly diagnostics: readonly Diagnostic[];
+  readonly stats: LinterStats;
 }
 
 /**
@@ -28,7 +46,7 @@ export interface Linter {
  */
 export function resolveLinterDefinition(
   libName: string,
-  linter: LinterDefinition
+  linter: LinterDefinition,
 ): LinterResolvedDefinition {
   const rules: LinterRule<string, any>[] = linter.rules.map((rule) => {
     return { ...rule, id: `${libName}/${rule.name}` };
@@ -53,16 +71,17 @@ export function resolveLinterDefinition(
 
 export function createLinter(
   program: Program,
-  loadLibrary: (name: string) => Promise<LibraryInstance | undefined>
+  loadLibrary: (name: string) => Promise<LinterLibraryInstance | undefined>,
 ): Linter {
   const tracer = program.tracer.sub("linter");
 
   const ruleMap = new Map<string, LinterRule<string, any>>();
   const enabledRules = new Map<string, LinterRule<string, any>>();
-  const linterLibraries = new Map<string, LibraryInstance | undefined>();
+  const linterLibraries = new Map<string, LinterLibraryInstance | undefined>();
 
   return {
     extendRuleSet,
+    registerLinterLibrary,
     lint,
   };
 
@@ -84,7 +103,7 @@ export function createLinter(
                 code: "unknown-rule-set",
                 format: { libraryName: ref.libraryName, ruleSetName: ref.name },
                 target: NoTarget,
-              })
+              }),
             );
           }
         }
@@ -110,7 +129,7 @@ export function createLinter(
                 code: "unknown-rule",
                 format: { libraryName: ref.libraryName, ruleName: ref.name },
                 target: NoTarget,
-              })
+              }),
             );
           }
         }
@@ -125,7 +144,7 @@ export function createLinter(
               code: "rule-enabled-disabled",
               format: { ruleName },
               target: NoTarget,
-            })
+            }),
           );
         }
         enabledRules.delete(ruleName);
@@ -133,32 +152,46 @@ export function createLinter(
     }
     tracer.trace(
       "extend-rule-set.end",
-      "Rules enabled: \n" + [...enabledRules.keys()].map((x) => ` - ${x}`).join("\n")
+      "Rules enabled: \n" + [...enabledRules.keys()].map((x) => ` - ${x}`).join("\n"),
     );
 
     return diagnostics.diagnostics;
   }
 
-  function lint(): readonly Diagnostic[] {
+  function lint(): LinterResult {
     const diagnostics = createDiagnosticCollector();
     const eventEmitter = new EventEmitter<SemanticNodeListener>();
+    const stats: LinterStats = {
+      runtime: {
+        total: 0,
+        rules: {},
+      },
+    };
     tracer.trace(
       "lint",
       `Running linter with following rules:\n` +
-        [...enabledRules.keys()].map((x) => ` - ${x}`).join("\n")
+        [...enabledRules.keys()].map((x) => ` - ${x}`).join("\n"),
     );
 
+    const timer = startTimer();
     for (const rule of enabledRules.values()) {
+      const createTiming = startTimer();
       const listener = rule.create(createLinterRuleContext(program, rule, diagnostics));
+      stats.runtime.rules[rule.id] = createTiming.end();
       for (const [name, cb] of Object.entries(listener)) {
-        eventEmitter.on(name as any, cb as any);
+        const timedCb = (...args: any[]) => {
+          const duration = time(() => (cb as any)(...args));
+          stats.runtime.rules[rule.id] += duration;
+        };
+        eventEmitter.on(name as any, timedCb);
       }
     }
     navigateProgram(program, mapEventEmitterToNodeListener(eventEmitter));
-    return diagnostics.diagnostics;
+    stats.runtime.total = timer.end();
+    return { diagnostics: diagnostics.diagnostics, stats };
   }
 
-  async function resolveLibrary(name: string): Promise<LibraryInstance | undefined> {
+  async function resolveLibrary(name: string): Promise<LinterLibraryInstance | undefined> {
     const loadedLibrary = linterLibraries.get(name);
     if (loadedLibrary === undefined) {
       return registerLinterLibrary(name);
@@ -166,16 +199,19 @@ export function createLinter(
     return loadedLibrary;
   }
 
-  async function registerLinterLibrary(name: string): Promise<LibraryInstance | undefined> {
+  async function registerLinterLibrary(
+    name: string,
+    lib?: LinterLibraryInstance,
+  ): Promise<LinterLibraryInstance | undefined> {
     tracer.trace("register-library", name);
 
-    const library = await loadLibrary(name);
+    const library = lib ?? (await loadLibrary(name));
     const linter = library?.linter;
     if (linter?.rules) {
       for (const rule of linter.rules) {
         tracer.trace(
           "register-library.rule",
-          `Registering rule "${rule.id}" for library "${name}".`
+          `Registering rule "${rule.id}" for library "${name}".`,
         );
         if (ruleMap.has(rule.id)) {
           compilerAssert(false, `Unexpected duplicate linter rule: "${rule.id}"`);
@@ -190,7 +226,7 @@ export function createLinter(
   }
 
   function parseRuleReference(
-    ref: RuleRef
+    ref: RuleRef,
   ): [{ libraryName: string; name: string } | undefined, readonly Diagnostic[]] {
     const segments = ref.split("/");
     const name = segments.pop();
@@ -208,7 +244,7 @@ export function createLinter(
 export function createLinterRuleContext<N extends string, DM extends DiagnosticMessages>(
   program: Program,
   rule: LinterRule<N, DM>,
-  diagnosticCollector: DiagnosticCollector
+  diagnosticCollector: DiagnosticCollector,
 ): LinterRuleContext<DM> {
   return {
     program,
@@ -216,7 +252,7 @@ export function createLinterRuleContext<N extends string, DM extends DiagnosticM
   };
 
   function createDiagnostic<M extends keyof DM>(
-    diag: LinterRuleDiagnosticReport<DM, M>
+    diag: LinterRuleDiagnosticReport<DM, M>,
   ): Diagnostic {
     const message = rule.messages[diag.messageId ?? "default"];
     if (!message) {
@@ -225,7 +261,7 @@ export function createLinterRuleContext<N extends string, DM extends DiagnosticM
         .join("\n");
       const messageId = String(diag.messageId);
       throw new Error(
-        `Unexpected message id '${messageId}' for rule '${rule.name}'. Defined messages:\n${messageString}`
+        `Unexpected message id '${messageId}' for rule '${rule.name}'. Defined messages:\n${messageString}`,
       );
     }
 
@@ -236,6 +272,7 @@ export function createLinterRuleContext<N extends string, DM extends DiagnosticM
       severity: rule.severity,
       message: messageStr,
       target: diag.target,
+      url: rule.url,
       codefixes: diag.codefixes,
     };
   }
@@ -251,4 +288,22 @@ export function createLinterRuleContext<N extends string, DM extends DiagnosticM
       }
     }
   }
+}
+
+export const builtInLinterLibraryName = `@typespec/compiler`;
+export function createBuiltInLinterLibrary(nameResolver: NameResolver): LinterLibraryInstance {
+  const builtInLinter: LinterResolvedDefinition = resolveLinterDefinition(
+    builtInLinterLibraryName,
+    createBuiltInLinter(nameResolver),
+  );
+  return { linter: builtInLinter };
+}
+function createBuiltInLinter(nameResolver: NameResolver): LinterDefinition {
+  const unusedUsingLinterRule = createUnusedUsingLinterRule(nameResolver);
+
+  const unusedTemplateParameterLinterRule = createUnusedTemplateParameterLinterRule();
+
+  return defineLinter({
+    rules: [unusedUsingLinterRule, unusedTemplateParameterLinterRule],
+  });
 }

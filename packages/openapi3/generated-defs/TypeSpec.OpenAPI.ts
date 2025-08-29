@@ -13,5 +13,10 @@ export type OneOfDecorator = (context: DecoratorContext, target: Union | ModelPr
 export type UseRefDecorator = (
   context: DecoratorContext,
   target: Model | ModelProperty,
-  ref: string
+  ref: string,
 ) => void;
+
+export type TypeSpecOpenAPIDecorators = {
+  oneOf: OneOfDecorator;
+  useRef: UseRefDecorator;
+};

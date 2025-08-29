@@ -1,6 +1,6 @@
 import { ok, strictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
-import { Model, Type, Union } from "../../src/core/types.js";
+import { Model, Namespace, Type, Union } from "../../src/core/types.js";
 import {
   TestHost,
   createTestHost,
@@ -29,7 +29,7 @@ describe("compiler: aliases", () => {
       @test model A {
         prop: FooBar
       }
-      `
+      `,
     );
     const { A } = (await testHost.compile("./")) as {
       A: Model;
@@ -56,7 +56,7 @@ describe("compiler: aliases", () => {
       @test model A {
         prop: FooBar
       }
-      `
+      `,
     );
     const { A } = (await testHost.compile("./")) as {
       A: Model;
@@ -76,12 +76,12 @@ describe("compiler: aliases", () => {
     testHost.addTypeSpecFile(
       "main.tsp",
       `
-      alias Foo<T> = int32 | T;
+      alias Foo<TEST> = int32 | TEST;
       
       @test model A {
         prop: Foo<"hi">
       }
-      `
+      `,
     );
 
     const { A } = (await testHost.compile("./")) as {
@@ -105,7 +105,7 @@ describe("compiler: aliases", () => {
       @test model A {
         prop: Bar<"hi", 42>
       }
-      `
+      `,
     );
 
     const { A } = (await testHost.compile("./")) as {
@@ -132,7 +132,7 @@ describe("compiler: aliases", () => {
       @test model A {
         prop: FooBar
       }
-      `
+      `,
     );
     const { A } = (await testHost.compile("./")) as {
       A: Model;
@@ -158,7 +158,7 @@ describe("compiler: aliases", () => {
       @test model A extends Alias { };
       @test model B { ... Alias };
       @test model C { c: Alias };
-      `
+      `,
     );
     const { Test, A, B, C } = (await testHost.compile("./")) as {
       Test: Model;
@@ -183,7 +183,7 @@ describe("compiler: aliases", () => {
       alias AliasFoo = Foo;
 
       @test model Baz { x: AliasFoo.Bar };
-      `
+      `,
     );
 
     const { Bar, Baz } = (await testHost.compile("./")) as {
@@ -194,12 +194,34 @@ describe("compiler: aliases", () => {
     strictEqual(Baz.properties.get("x")!.type, Bar);
   });
 
+  it("model expression defined in alias use containing namespace", async () => {
+    testHost.addTypeSpecFile(
+      "main.tsp",
+      `
+      @test namespace Foo {
+        alias B = {a: string};
+      }
+      @test model Test {
+        prop: Foo.B;
+      }
+      `,
+    );
+
+    const { Test, Foo } = (await testHost.compile("./")) as {
+      Foo: Namespace;
+      Test: Model;
+    };
+
+    const expr = Test.properties.get("prop")!.type as Model;
+    strictEqual(expr.namespace, Foo);
+  });
+
   it("emit diagnostics if assign itself", async () => {
     testHost.addTypeSpecFile(
       "main.tsp",
       `
       alias A = A;
-      `
+      `,
     );
     const diagnostics = await testHost.diagnose("main.tsp");
     expectDiagnostics(diagnostics, {
@@ -232,7 +254,7 @@ describe("compiler: aliases", () => {
       alias A<T> = A<T>;
 
       model Foo {a: A<string>}
-      `
+      `,
     );
     const diagnostics = await testHost.diagnose("main.tsp");
     expectDiagnostics(diagnostics, {
@@ -246,7 +268,7 @@ describe("compiler: aliases", () => {
       "main.tsp",
       `
       alias A = "string" | A;
-      `
+      `,
     );
     const diagnostics = await testHost.diagnose("main.tsp");
     expectDiagnostics(diagnostics, {
@@ -270,7 +292,7 @@ describe("compiler: aliases", () => {
       alias Aliased = Foo.Bar;
       op getSmurf is Aliased.abc;
 
-      `
+      `,
     );
     const diagnostics = await testHost.diagnose("main.tsp");
     expectDiagnosticEmpty(diagnostics);
@@ -285,7 +307,7 @@ describe("compiler: aliases", () => {
 
       alias Aliased = A.prop;
 
-      `
+      `,
     );
     const diagnostics = await testHost.diagnose("main.tsp");
     expectDiagnostics(diagnostics, {
@@ -293,7 +315,7 @@ describe("compiler: aliases", () => {
       message: `Cannot resolve 'prop' in node AliasStatement since it has no members. Did you mean to use "::" instead of "."?`,
     });
   });
-  it("trying to access member of aliased model expression shouldn't crash", async () => {
+  it("trying to access unknown member of aliased model expression shouldn't crash", async () => {
     testHost.addTypeSpecFile(
       "main.tsp",
       `
@@ -301,12 +323,12 @@ describe("compiler: aliases", () => {
 
       alias Aliased = A.prop;
 
-      `
+      `,
     );
     const diagnostics = await testHost.diagnose("main.tsp");
     expectDiagnostics(diagnostics, {
       code: "invalid-ref",
-      message: `Cannot resolve 'prop' in node AliasStatement since it has no members. Did you mean to use "::" instead of "."?`,
+      message: `Model doesn't have member prop`,
     });
   });
 });

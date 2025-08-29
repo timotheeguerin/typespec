@@ -1,4 +1,6 @@
 import {
+  $invisible,
+  $removeVisibility,
   $visibility,
   DecoratorContext,
   getKeyName,
@@ -9,7 +11,6 @@ import {
   Program,
   setTypeSpecNamespace,
   Type,
-  validateDecoratorTarget,
 } from "@typespec/compiler";
 import { $path } from "@typespec/http";
 import { ParentResourceDecorator } from "../generated-defs/TypeSpec.Rest.js";
@@ -26,7 +27,7 @@ const resourceTypeForKeyParamKey = createStateSymbol("resourceTypeForKeyParam");
 export function setResourceTypeKey(
   program: Program,
   resourceType: Model,
-  keyProperty: ModelProperty
+  keyProperty: ModelProperty,
 ): void {
   program.stateMap(resourceKeysKey).set(resourceType, {
     resourceType,
@@ -80,12 +81,8 @@ export function getResourceTypeKey(program: Program, resourceType: Model): Resou
 export function $resourceTypeForKeyParam(
   context: DecoratorContext,
   entity: Type,
-  resourceType: Type
+  resourceType: Type,
 ) {
-  if (!validateDecoratorTarget(context, entity, "@resourceTypeForKeyParam", "ModelProperty")) {
-    return;
-  }
-
   context.program.stateMap(resourceTypeForKeyParamKey).set(entity, resourceType);
 }
 
@@ -93,10 +90,12 @@ setTypeSpecNamespace("Private", $resourceTypeForKeyParam);
 
 export function getResourceTypeForKeyParam(
   program: Program,
-  param: ModelProperty
+  param: ModelProperty,
 ): Model | undefined {
   return program.stateMap(resourceTypeForKeyParamKey).get(param);
 }
+
+const VISIBILITY_DECORATORS = [$visibility, $invisible, $removeVisibility];
 
 function cloneKeyProperties(context: DecoratorContext, target: Model, resourceType: Model) {
   const { program } = context;
@@ -109,22 +108,27 @@ function cloneKeyProperties(context: DecoratorContext, target: Model, resourceTy
   const resourceKey = getResourceTypeKey(program, resourceType);
   if (resourceKey) {
     const { keyProperty } = resourceKey;
-    const keyName = getKeyName(program, keyProperty);
+    const keyName = getKeyName(program, keyProperty)!;
 
     const decorators = [
-      // Filter out the @visibility decorator because it might affect metadata
+      // Filter out all visibility decorators because they affect metadata
       // filtering. NOTE: Check for name equality instead of function equality
       // to deal with multiple copies of core being used.
-      ...keyProperty.decorators.filter((d) => d.decorator.name !== $visibility.name),
-      {
-        decorator: $path,
-        args: [],
-      },
+      ...keyProperty.decorators.filter((d) =>
+        VISIBILITY_DECORATORS.every((visDec) => d.decorator.name !== visDec.name),
+      ),
       {
         decorator: $resourceTypeForKeyParam,
         args: [{ node: target.node, value: resourceType, jsValue: resourceType }],
       },
     ];
+
+    if (!keyProperty.decorators.some((d) => d.decorator.name === $path.name)) {
+      decorators.push({
+        decorator: $path,
+        args: [],
+      });
+    }
 
     // Clone the key property and ensure that an optional key property doesn't
     // become an optional path parameter
@@ -144,7 +148,7 @@ function cloneKeyProperties(context: DecoratorContext, target: Model, resourceTy
 export function $copyResourceKeyParameters(
   context: DecoratorContext,
   entity: Model,
-  filter?: string
+  filter?: string,
 ) {
   const reportNoKeyError = () =>
     reportDiagnostic(context.program, {
@@ -194,7 +198,7 @@ export function getParentResource(program: Program, resourceType: Model): Model 
 export const $parentResource: ParentResourceDecorator = (
   context: DecoratorContext,
   entity: Type,
-  parentType: Model
+  parentType: Model,
 ) => {
   const { program } = context;
 

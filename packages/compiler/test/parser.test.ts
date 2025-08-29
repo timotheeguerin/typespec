@@ -1,7 +1,8 @@
 import assert, { deepStrictEqual, ok, strictEqual } from "assert";
 import { describe, it } from "vitest";
 import { CharCode } from "../src/core/charcode.js";
-import { formatDiagnostic, logVerboseTestOutput } from "../src/core/diagnostics.js";
+import { logVerboseTestOutput } from "../src/core/diagnostics.js";
+import { formatDiagnostic } from "../src/core/logger/console-sink.js";
 import { hasParseError, parse, visitChildren } from "../src/core/parser.js";
 import {
   IdentifierNode,
@@ -21,6 +22,35 @@ import {
 import { dumpAST } from "./ast-test-utils.js";
 
 describe("compiler: parser", () => {
+  describe("future reserved keywords", () => {
+    const reserved = ["statemachine"];
+    // Allowed as members
+    parseEach(reserved.map((x) => `model Foo { ${x}: string}`));
+    parseEach(reserved.map((x) => `enum Foo { ${x} }`));
+    parseEach(reserved.map((x) => `union Foo { ${x}: string }`));
+    parseEach(reserved.map((x) => `const a = #{ ${x}: string };`));
+
+    // Allowed in decorator calls
+    parseEach(reserved.map((x) => `@${x} model Foo {}`));
+    parseEach(reserved.map((x) => `@@${x}(Foo);`));
+
+    // Allowed in member reference
+    parseEach(reserved.map((x) => `alias T = Base.${x};`));
+
+    // Error when used in declaration name
+    parseErrorEach(
+      reserved.map((x) => [`model ${x} {}`, [{ message: `${x} is a reserved keyword` }]]),
+    );
+
+    // Error when used as base or identifier reference
+    parseErrorEach(
+      reserved.map((x) => [`alias T = ${x};`, [{ message: `${x} is a reserved keyword` }]]),
+    );
+    parseErrorEach(
+      reserved.map((x) => [`alias T = ${x}.prop;`, [{ message: `${x} is a reserved keyword` }]]),
+    );
+  });
+
   describe("import statements", () => {
     parseEach(['import "x";']);
 
@@ -168,9 +198,16 @@ describe("compiler: parser", () => {
       `scalar bar extends uuid {
         init fromOther(abc: string)
       }`,
+      `scalar bar extends uuid {
+        init trailingComma(abc: string, def: string,)
+      }`,
     ]);
 
     parseErrorEach([["scalar uuid is string;", [{ message: "'{' expected." }]]]);
+  });
+
+  describe("operation statements", () => {
+    parseEach(["op foo(): int32;", "op trailingCommas(a: string,b: other,): int32;"]);
   });
 
   describe("interface statements", () => {
@@ -202,6 +239,7 @@ describe("compiler: parser", () => {
       'namespace A { op b(param: [number, string]): [1, "hi"]; }',
       "alias EmptyTuple =  [];",
       "model Template<T=[]> { }",
+      "alias TrailingComma = [1, 2,];",
     ]);
   });
 
@@ -245,6 +283,7 @@ describe("compiler: parser", () => {
       `const a = int8(123);`,
       `const a = utcDateTime.fromISO("abc");`,
       `const a = utcDateTime.fromISO("abc", "def");`,
+      `const trailingComma = utcDateTime.fromISO("abc", "def",);`,
     ]);
     parseErrorEach([
       [`const a = int8(123;`, [{ message: "')' expected." }]],
@@ -266,6 +305,7 @@ describe("compiler: parser", () => {
       `const A = #["abc"];`,
       `const A = #["abc", 123];`,
       `const A = #["abc", 123, #{nested: true}];`,
+      `const Trailing = #["abc", 123,];`,
     ]);
   });
 
@@ -433,7 +473,7 @@ describe("compiler: parser", () => {
           assert(value.kind === SyntaxKind.StringLiteral, "string literal expected");
           assert.strictEqual(value.value, "banana");
         },
-      ])
+      ]),
     );
   });
 
@@ -572,7 +612,7 @@ describe("compiler: parser", () => {
             assert.strictEqual(statement.id.sv, expected);
           },
         ];
-      })
+      }),
     );
 
     parseErrorEach(bad.map((e) => [`model ${e[0]} {}`, [e[1]]]));
@@ -610,7 +650,7 @@ describe("compiler: parser", () => {
 
       it("parse a single line template with a multi line model expression inside", () => {
         const astNode = parseSuccessWithLog(
-          `alias T = "Start \${{ foo: "one",\nbar: "two" }} end";`
+          `alias T = "Start \${{ foo: "one",\nbar: "two" }} end";`,
         );
         const node = getStringTemplateNode(astNode);
         strictEqual(node.head.value, "Start ");
@@ -636,7 +676,7 @@ describe("compiler: parser", () => {
 
       it("can nest string templates", () => {
         const astNode = parseSuccessWithLog(
-          'alias T = "Start ${"nested-start ${"hi"} nested-end"} end";'
+          'alias T = "Start ${"nested-start ${"hi"} nested-end"} end";',
         );
         const node = getStringTemplateNode(astNode);
         strictEqual(node.head.value, "Start ");
@@ -763,7 +803,7 @@ describe("compiler: parser", () => {
           ["#suppress foo 123\nmodel Foo {}", [/Unexpected token NumericLiteral/]],
           ["#deprecated 321\nop doFoo(): string;", [/Unexpected token NumericLiteral/]],
         ],
-        { strict: true }
+        { strict: true },
       );
     });
 
@@ -814,6 +854,7 @@ describe("compiler: parser", () => {
       "extern dec myDec(target: Type, optional?: StringLiteral);",
       "extern dec myDec(target: Type, ...rest: StringLiteral[]);",
       "extern dec myDec(target, arg1, ...rest);",
+      "extern dec trailingComma(target, arg1: other, arg2: string,);",
     ]);
 
     parseErrorEach([
@@ -861,6 +902,7 @@ describe("compiler: parser", () => {
       "extern fn myDec(optional?: StringLiteral): void;",
       "extern fn myDec(...rest: StringLiteral[]): void;",
       "extern fn myDec(arg1, ...rest): void;",
+      "extern fn trailingComma(arg1: other, arg2: string,);",
     ]);
 
     parseErrorEach([
@@ -893,98 +935,6 @@ describe("compiler: parser", () => {
         ],
       ],
     ]);
-  });
-
-  describe("projections", () => {
-    describe("selectors", () => {
-      const selectors = ["model", "op", "interface", "union", "scalar", "someId"];
-      const codes = selectors.map((s) => `projection ${s}#tag { }`);
-      parseEach(codes);
-    });
-
-    describe("direction", () => {
-      parseEach([`projection model#tag { to { } }`, `projection model #tag { from { } }`]);
-    });
-
-    describe("projection parameters", () => {
-      parseEach([
-        `projection model#v { to(version) { } }`,
-        `projection model#foo{ from(bar, baz) { } }`,
-        `projection model#v { pre to(version) { } }`,
-        `projection model#foo{ pre from(bar, baz) { } }`,
-      ]);
-    });
-    describe("projection expressions", () => {
-      const exprs = [
-        `x || y`,
-        `x > 10 || y < 20`,
-        `x || y || z`,
-        `x && y`,
-        `x > 10 && y < 20`,
-        `x && y && z`,
-        `x && y || z && q`,
-        `x || y && z || q`,
-        `x * y`,
-        `x + y`,
-        `x / y`,
-        `x - y`,
-        `x + y * z / a + b - c`,
-        `x <= y`,
-        `x >= y`,
-        `x > y`,
-        `x < y`,
-        `!x`,
-        `x()`,
-        `x(a, b, c)`,
-        `x.y`,
-        `x().y`,
-        `x().y()`,
-        `x()()`,
-        `x()(T)`,
-        `x(T)()`,
-        `x(T).y()(T)`,
-        `self`,
-        `if x { }`,
-        `if x { a; b; } else { c; }`,
-        `if x > 1 { }`,
-        `if if x > 1 { a; } else { b; } { c; } else { d; }`,
-        `(x) => { x + 1; }`,
-        `(x) => { if x { x; } else { y; }; }`,
-        `1`,
-        `"string"`,
-        `{ x: 1 }`,
-        `{ x: if 1 { Foo; } else { Bar; } }`,
-        `[a, b]`,
-        `[]`,
-        `(a)`,
-        `(a + 1)`,
-      ];
-      const codes = exprs.map((exp) => `projection foo#tag { to { ${exp}; } }`);
-      parseEach(codes);
-    });
-
-    describe("recovery", () => {
-      parseErrorEach([
-        [
-          `projection `,
-          [/identifier, 'model', 'op', 'interface', 'union', 'enum', or 'scalar' expected./],
-        ],
-        [`projection x `, [/'#' expected/]],
-        [`projection x#`, [/Identifier expected/]],
-        [`projection x#f`, [/'{' expected/]],
-        [`projection x#f {`, [/'}' expected/]],
-        [`projection x#f { asdf`, [/from or to expected/]],
-        [`projection x#f { pre asdf`, [/from or to expected/]],
-        [`projection x#f { to (`, [/'\)' expected/]],
-        [`projection x#f { to @`, [/'{' expected/]],
-        [`projection x#f { to {`, [/} expected/]],
-        [`projection x#f { to {}`, [/'}' expected/]],
-        [`projection x#f { pre to (`, [/'\)' expected/]],
-        [`projection x#f { pre to @`, [/'{' expected/]],
-        [`projection x#f { pre to {`, [/} expected/]],
-        [`projection x#f { pre to {}`, [/'}' expected/]],
-      ]);
-    });
   });
 
   describe("invalid statement", () => {
@@ -1069,7 +1019,7 @@ describe("compiler: parser", () => {
                 "```\n\n" +
                 "`This is not a @tag either because we're in a code span`.\n" +
                 "\n" +
-                "This is not a @tag because it is escaped."
+                "This is not a @tag because it is escaped.",
             );
             strictEqual(docs[0].tags.length, 6);
             const [xParam, yParam, tTemplate, uTemplate, returns, pretend] = docs[0].tags;
@@ -1119,12 +1069,12 @@ describe("compiler: parser", () => {
             strictEqual(docs[0].content.length, 1);
             strictEqual(
               docs[0].content[0].text,
-              "Lines that end with \\\ndon't create an extra star."
+              "Lines that end with \\\ndon't create an extra star.",
             );
           },
         ],
       ],
-      { docs: true }
+      { docs: true },
     );
 
     describe("relation with comments", () => {
@@ -1134,7 +1084,7 @@ describe("compiler: parser", () => {
         /** One-liner */
         model M {}
       `,
-          { docs: true, comments: true }
+          { docs: true, comments: true },
         );
         const comments = script.comments;
         strictEqual(comments[0].kind, SyntaxKind.BlockComment);
@@ -1147,7 +1097,7 @@ describe("compiler: parser", () => {
         /* One-liner */
         model M {}
       `,
-          { docs: true, comments: true }
+          { docs: true, comments: true },
         );
         const comments = script.comments;
         strictEqual(comments[0].kind, SyntaxKind.BlockComment);
@@ -1159,7 +1109,7 @@ describe("compiler: parser", () => {
           `
         /** One-liner */
       `,
-          { docs: true, comments: true }
+          { docs: true, comments: true },
         );
         const comments = script.comments;
         strictEqual(comments[0].kind, SyntaxKind.BlockComment);
@@ -1233,8 +1183,16 @@ describe("compiler: parser", () => {
       {
         docs: true,
         strict: true,
-      }
+      },
     );
+  });
+
+  describe("template parameters", () => {
+    parseEach(["model Foo<T> {}", "model TrailingComma<A, B,> {}"]);
+  });
+
+  describe("template arguments", () => {
+    parseEach(["alias Test = Foo<T>;", "alias TrailingComma = Foo<A, B,>;"]);
   });
 
   describe("annotations order", () => {
@@ -1248,8 +1206,8 @@ describe("compiler: parser", () => {
       ok(
         directives?.some((x) => x.target.sv === id),
         `Should have found a directive with id ${id} but only has ${directives?.map(
-          (x) => x.target.sv
-        )}`
+          (x) => x.target.sv,
+        )}`,
       );
     }
 
@@ -1258,8 +1216,8 @@ describe("compiler: parser", () => {
       ok(
         decorators?.some((x) => (x.target as IdentifierNode).sv === id),
         `Should have found a directive with id ${id} but only has ${decorators?.map(
-          (x) => (x.target as IdentifierNode).sv
-        )}`
+          (x) => (x.target as IdentifierNode).sv,
+        )}`,
       );
     }
 
@@ -1399,7 +1357,7 @@ ${">>>>>>>"} theirs`,
           ],
         ],
       ],
-      { strict: true }
+      { strict: true },
     );
   });
 });
@@ -1423,13 +1381,13 @@ function parseEach(cases: (string | [string, Callback])[], options?: ParseOption
 
       logVerboseTestOutput("\n=== Diagnostics ===");
       if (astNode.parseDiagnostics.length > 0) {
-        const diagnostics = astNode.parseDiagnostics.map(formatDiagnostic).join("\n");
+        const diagnostics = astNode.parseDiagnostics.map((x) => formatDiagnostic(x)).join("\n");
         assert.strictEqual(
           hasParseError(astNode),
           astNode.parseDiagnostics.some((e) => e.severity === "error"),
           "root node claims to have no parse errors, but these were reported:\n" +
             diagnostics +
-            "\n(If you've added new AST nodes or properties, make sure you implemented the new visitors)"
+            "\n(If you've added new AST nodes or properties, make sure you implemented the new visitors)",
         );
 
         assert.fail("Unexpected parse errors in test:\n" + diagnostics);
@@ -1474,7 +1432,7 @@ function checkVisitChildren(node: Node, file: SourceFile) {
   deepStrictEqual(
     Array.from(visited.values()),
     [],
-    `Nodes not visited by visitChildren of ${SyntaxKind[node.kind]}`
+    `Nodes not visited by visitChildren of ${SyntaxKind[node.kind]}`,
   );
 
   visitChildren(node, (child) => checkVisitChildren(child, file));
@@ -1529,7 +1487,7 @@ function parseSuccessWithLog(code: string, options?: ParseOptions): TypeSpecScri
  */
 function parseErrorEach(
   cases: [string, (RegExp | DiagnosticMatch)[], Callback?][],
-  options: ParseOptions & { strict: boolean } = { strict: false }
+  options: ParseOptions & { strict: boolean } = { strict: false },
 ) {
   for (const [code, matches, callback] of cases) {
     it(`doesn't parse '${shorten(code)}'`, () => {
@@ -1548,25 +1506,25 @@ function parseErrorEach(
         assert.strictEqual(
           astNode.parseDiagnostics.length,
           matches.length,
-          "More diagnostics reported than expected."
+          "More diagnostics reported than expected.",
         );
       }
 
       const expected = matches.map<DiagnosticMatch>((m) =>
-        m instanceof RegExp ? { message: m } : m
+        m instanceof RegExp ? { message: m } : m,
       );
       expectDiagnostics(astNode.parseDiagnostics, expected, options);
 
       if (astNode.parseDiagnostics.some((e) => e.severity !== "warning")) {
         assert(
           hasParseError(astNode),
-          "node claims to have no parse errors, but above were reported."
+          "node claims to have no parse errors, but above were reported.",
         );
 
         assert(
           !astNode.printable ||
             !astNode.parseDiagnostics.some((d) => !/^'[,;:{}()]' expected\.$/.test(d.message)),
-          "parse tree with errors other than missing punctuation should not be printable"
+          "parse tree with errors other than missing punctuation should not be printable",
         );
       }
 

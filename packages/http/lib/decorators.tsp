@@ -12,9 +12,15 @@ model HeaderOptions {
   name?: string;
 
   /**
-   * Determines the format of the array if type array is used.
+   * Equivalent of adding `*` in the path parameter as per [RFC-6570](https://datatracker.ietf.org/doc/html/rfc6570#section-3.2.3)
+   *
+   *  | Style  | Explode | Primitive value = 5 | Array = [3, 4, 5] | Object = {"role": "admin", "firstName": "Alex"} |
+   *  | ------ | ------- | ------------------- | ----------------- | ----------------------------------------------- |
+   *  | simple | false   | `5   `              | `3,4,5`           | `role,admin,firstName,Alex`                     |
+   *  | simple | true    | `5`                 | `3,4,5`           | `role=admin,firstName=Alex`                     |
+   *
    */
-  format?: "csv" | "multi" | "tsv" | "ssv" | "pipes" | "simple" | "form";
+  explode?: boolean;
 }
 
 /**
@@ -37,7 +43,39 @@ model HeaderOptions {
  * op update(@header ifMatch: string): void; // headerName: if-match
  * ```
  */
-extern dec header(target: ModelProperty, headerNameOrOptions?: string | HeaderOptions);
+extern dec header(target: ModelProperty, headerNameOrOptions?: valueof string | HeaderOptions);
+
+/**
+ * Cookie Options.
+ */
+model CookieOptions {
+  /**
+   * Name in the cookie.
+   */
+  name?: string;
+}
+
+/**
+ * Specify this property is to be sent or received in the cookie.
+ *
+ * @param cookieNameOrOptions Optional name of the cookie in the cookie or cookie options.
+ *  By default the cookie name will be the property name converted from camelCase to snake_case. (e.g. `authToken` -> `auth_token`)
+ *
+ * @example
+ *
+ * ```typespec
+ * op read(@cookie token: string): {data: string[]};
+ * op create(@cookie({name: "auth_token"}) data: string[]): void;
+ * ```
+ *
+ * @example Implicit header name
+ *
+ * ```typespec
+ * op read(): {@cookie authToken: string}; // headerName: auth_token
+ * op update(@cookie AuthToken: string): void; // headerName: auth_token
+ * ```
+ */
+extern dec cookie(target: ModelProperty, cookieNameOrOptions?: valueof string | CookieOptions);
 
 /**
  * Query parameter options.
@@ -49,9 +87,16 @@ model QueryOptions {
   name?: string;
 
   /**
-   * Determines the format of the array if type array is used.
+   * If true send each value in the array/object as a separate query parameter.
+   * Equivalent of adding `*` in the path parameter as per [RFC-6570](https://datatracker.ietf.org/doc/html/rfc6570#section-3.2.3)
+   *
+   *  | Style  | Explode | Uri Template   | Primitive value id = 5 | Array id = [3, 4, 5]    | Object id = {"role": "admin", "firstName": "Alex"} |
+   *  | ------ | ------- | -------------- | ---------------------- | ----------------------- | -------------------------------------------------- |
+   *  | simple | false   | `/users{?id}`  | `/users?id=5`          | `/users?id=3,4,5`       | `/users?id=role,admin,firstName,Alex`              |
+   *  | simple | true    | `/users{?id*}` | `/users?id=5`          | `/users?id=3&id=4&id=5` | `/users?role=admin&firstName=Alex`                 |
+   *
    */
-  format?: "multi" | "csv" | "ssv" | "tsv" | "simple" | "form" | "pipes";
+  explode?: boolean;
 }
 
 /**
@@ -63,15 +108,42 @@ model QueryOptions {
  *
  * ```typespec
  * op read(@query select: string, @query("order-by") orderBy: string): void;
- * op list(@query({name: "id", format: "multi"}) ids: string[]): void;
+ * op list(@query(#{name: "id", explode: true}) ids: string[]): void;
  * ```
  */
-extern dec query(target: ModelProperty, queryNameOrOptions?: string | QueryOptions);
+extern dec query(target: ModelProperty, queryNameOrOptions?: valueof string | QueryOptions);
+
+model PathOptions {
+  /** Name of the parameter in the uri template. */
+  name?: string;
+
+  /**
+   * When interpolating this parameter in the case of array or object expand each value using the given style.
+   * Equivalent of adding `*` in the path parameter as per [RFC-6570](https://datatracker.ietf.org/doc/html/rfc6570#section-3.2.3)
+   */
+  explode?: boolean;
+
+  /**
+   * Different interpolating styles for the path parameter.
+   * - `simple`: No special encoding.
+   * - `label`: Using `.` separator.
+   * - `matrix`: `;` as separator.
+   * - `fragment`: `#` as separator.
+   * - `path`: `/` as separator.
+   */
+  style?: "simple" | "label" | "matrix" | "fragment" | "path";
+
+  /**
+   * When interpolating this parameter do not encode reserved characters.
+   * Equivalent of adding `+` in the path parameter as per [RFC-6570](https://datatracker.ietf.org/doc/html/rfc6570#section-3.2.3)
+   */
+  allowReserved?: boolean;
+}
 
 /**
  * Explicitly specify that this property is to be interpolated as a path parameter.
  *
- * @param paramName Optional name of the parameter in the url template.
+ * @param paramNameOrOptions Optional name of the parameter in the uri template or options.
  *
  * @example
  *
@@ -80,7 +152,7 @@ extern dec query(target: ModelProperty, queryNameOrOptions?: string | QueryOptio
  * op read(@path explicit: string, implicit: string): void;
  * ```
  */
-extern dec path(target: ModelProperty, paramName?: valueof string);
+extern dec path(target: ModelProperty, paramNameOrOptions?: valueof string | PathOptions);
 
 /**
  * Explicitly specify that this property type will be exactly the HTTP body.
@@ -188,15 +260,36 @@ extern dec put(target: Operation);
 extern dec post(target: Operation);
 
 /**
+ * Options for PATCH operations.
+ */
+model PatchOptions {
+  /**
+   * If set to `false`, disables the implicit transform that makes the body of a
+   * PATCH operation deeply optional.
+   */
+  implicitOptionality?: boolean;
+}
+
+/**
  * Specify the HTTP verb for the target operation to be `PATCH`.
+ *
+ * @param options Options for the PATCH operation.
  *
  * @example
  *
  * ```typespec
- * @patch op update(pet: Pet): void
+ * @patch op update(pet: Pet): void;
+ * ```
+ *
+ * @example
+ * ```typespec
+ * // Disable implicit optionality, making the body of the PATCH operation use the
+ * // optionality as defined in the `Pet` model.
+ * @patch(#{ implicitOptionality: false })
+ * op update(pet: Pet): void;
  * ```
  */
-extern dec patch(target: Operation);
+extern dec patch(target: Operation, options?: valueof PatchOptions);
 
 /**
  * Specify the HTTP verb for the target operation to be `DELETE`.
@@ -230,6 +323,14 @@ extern dec head(target: Operation);
  *
  * ```typespec
  * @service
+ * @server("https://example.com")
+ * namespace PetStore;
+ * ```
+ *
+ * @example With a description
+ *
+ * ```typespec
+ * @service
  * @server("https://example.com", "Single server endpoint")
  * namespace PetStore;
  * ```
@@ -257,7 +358,7 @@ extern dec head(target: Operation);
 extern dec server(
   target: Namespace,
   url: valueof string,
-  description: valueof string,
+  description?: valueof string,
   parameters?: Record<unknown>
 );
 
@@ -276,37 +377,30 @@ extern dec server(
 extern dec useAuth(target: Namespace | Interface | Operation, auth: {} | Union | {}[]);
 
 /**
- * Specify if inapplicable metadata should be included in the payload for the given entity.
- * @param value If true, inapplicable metadata will be included in the payload.
- */
-extern dec includeInapplicableMetadataInPayload(target: unknown, value: valueof boolean);
-
-/**
- * Defines the relative route URI for the target operation
- *
- * The first argument should be a URI fragment that may contain one or more path parameter fields.
- * If the namespace or interface that contains the operation is also marked with a `@route` decorator,
- * it will be used as a prefix to the route URI of the operation.
+ * Defines the relative route URI template for the target operation as defined by [RFC 6570](https://datatracker.ietf.org/doc/html/rfc6570#section-3.2.3)
  *
  * `@route` can only be applied to operations, namespaces, and interfaces.
  *
- * @param path Relative route path. Cannot include query parameters.
- * @param options Set of parameters used to configure the route. Supports `{shared: true}` which indicates that the route may be shared by several operations.
+ * @param uriTemplate Uri template for this operation.
  *
- * @example
+ * @example Simple path parameter
  *
  * ```typespec
- * @route("/widgets")
- * op getWidget(@path id: string): Widget;
+ * @route("/widgets/{id}") op getWidget(@path id: string): Widget;
+ * ```
+ *
+ * @example Reserved characters
+ * ```typespec
+ * @route("/files{+path}") op getFile(@path path: string): bytes;
+ * ```
+ *
+ * @example Query parameter
+ * ```typespec
+ * @route("/files") op list(select?: string, filter?: string): Files[];
+ * @route("/files{?select,filter}") op listFullUriTemplate(select?: string, filter?: string): Files[];
  * ```
  */
-extern dec route(
-  target: Namespace | Interface | Operation,
-  path: valueof string,
-  options?: {
-    shared?: boolean,
-  }
-);
+extern dec route(target: Namespace | Interface | Operation, path: valueof string);
 
 /**
  * `@sharedRoute` marks the operation as sharing a route path with other operations.

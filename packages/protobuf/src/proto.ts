@@ -23,6 +23,7 @@ import {
   ReserveDecorator,
   StreamDecorator,
 } from "../generated-defs/TypeSpec.Protobuf.js";
+import { ExternRefDecorator } from "../generated-defs/TypeSpec.Protobuf.Private.js";
 import { StreamingMode } from "./ast.js";
 import { ProtobufEmitterOptions, reportDiagnostic, state, TypeSpecProtobufLibrary } from "./lib.js";
 import { createProtobufEmitter } from "./transform/index.js";
@@ -74,7 +75,7 @@ export interface PackageDetails {
 export const $package: PackageDecorator = (
   ctx: DecoratorContext,
   target: Namespace,
-  details?: Type
+  details?: Type,
 ) => {
   ctx.program.stateMap(state.package).set(target, details);
 };
@@ -100,14 +101,16 @@ export function $_map(ctx: DecoratorContext, target: Model) {
   ctx.program.stateSet(state._map).add(target);
 }
 
-export function $externRef(
+export const $externRef: ExternRefDecorator = (
   ctx: DecoratorContext,
   target: Model,
-  path: StringLiteral,
-  name: StringLiteral
-) {
-  ctx.program.stateMap(state.externRef).set(target, [path.value, name.value]);
-}
+  path: Type,
+  name: Type,
+) => {
+  ctx.program
+    .stateMap(state.externRef)
+    .set(target, [(path as StringLiteral).value, (name as StringLiteral).value]);
+};
 
 export const $stream: StreamDecorator = (ctx: DecoratorContext, target: Operation, mode: Type) => {
   const emitStreamingMode = {
@@ -146,7 +149,7 @@ export const $message: MessageDecorator = (ctx: DecoratorContext, target: Type) 
 export const $field: FieldDecorator = (
   ctx: DecoratorContext,
   target: ModelProperty,
-  fieldIndex: number
+  fieldIndex: number,
 ) => {
   if (!Number.isInteger(fieldIndex) || fieldIndex <= 0) {
     reportDiagnostic(ctx.program, {
@@ -203,7 +206,7 @@ export async function $onEmit(ctx: EmitContext<EmitOptionsFor<TypeSpecProtobufLi
 export async function $onValidate(program: Program) {
   // Is this correct? See https://github.com/microsoft/typespec/issues/1859
   /* c8 ignore next 6 */
-  if (program.compilerOptions.noEmit) {
+  if (program.compilerOptions.dryRun) {
     const options = program.emitters.find((e) => e.emitFunction === $onEmit)
       ?.options as ProtobufEmitterOptions;
     const emitter = createProtobufEmitter(program);

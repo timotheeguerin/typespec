@@ -1,10 +1,15 @@
 import {
+  Diagnostic,
+  DiagnosticTarget,
   getFriendlyName,
+  getLifecycleVisibilityEnum,
+  getProperty,
   getTypeName,
-  getVisibility,
+  getVisibilityForClass,
   isGlobalNamespace,
   isService,
   isTemplateInstance,
+  Model,
   ModelProperty,
   Operation,
   Program,
@@ -12,7 +17,8 @@ import {
   TypeNameOptions,
 } from "@typespec/compiler";
 import { getOperationId } from "./decorators.js";
-import { reportDiagnostic } from "./lib.js";
+import { createDiagnostic, reportDiagnostic } from "./lib.js";
+import { ExtensionKey } from "./types.js";
 
 /**
  * Determines whether a type will be inlined in OpenAPI rather than defined
@@ -56,7 +62,7 @@ export function getOpenAPITypeName(
   program: Program,
   type: Type,
   options: TypeNameOptions,
-  existing?: Record<string, any>
+  existing?: Record<string, any>,
 ): string {
   const name = getFriendlyName(program, type) ?? getTypeName(type, options);
 
@@ -64,11 +70,18 @@ export function getOpenAPITypeName(
   return name;
 }
 
+/**
+ * Check the given name is not already specific in the existing map. Report a diagnostic if it is.
+ * @param program  Program
+ * @param type Type with the name to check
+ * @param name Name to check
+ * @param existing Existing map of name
+ */
 export function checkDuplicateTypeName(
   program: Program,
   type: Type,
   name: string,
-  existing: Record<string, unknown> | undefined
+  existing: Record<string, unknown> | undefined,
 ) {
   if (existing && existing[name]) {
     reportDiagnostic(program, {
@@ -89,7 +102,7 @@ export function getParameterKey(
   property: ModelProperty,
   newParam: unknown,
   existingParams: Record<string, unknown>,
-  options: TypeNameOptions
+  options: TypeNameOptions,
 ): string {
   const parent = property.model!;
   let key = getOpenAPITypeName(program, parent, options);
@@ -114,7 +127,7 @@ export function getParameterKey(
 
 /**
  * Resolve the OpenAPI operation ID for the given operation using the following logic:
- * - If @operationId was specified use that value
+ * - If `@operationId` was specified use that value
  * - If operation is defined at the root or under the service namespace return `<operation.name>`
  * - Otherwise(operation is under another namespace or interface) return `<namespace/interface.name>_<operation.name>`
  *
@@ -144,16 +157,126 @@ export function resolveOperationId(program: Program, operation: Operation) {
 }
 
 /**
- * Determines if a property is read-only, which is defined as being
- * decorated `@visibility("read")`.
+ * Determines if a property is read-only, which is defined as having the
+ * only the `Lifecycle.Read` modifier.
  *
- * If there is more than 1 `@visibility` argument, then the property is not
- * read-only. For example, `@visibility("read", "update")` does not
- * designate a read-only property.
+ * If there is more than one Lifecycle visibility modifier active on the property,
+ * then the property is not read-only. For example, `@visibility(Lifecycle.Read, Lifecycle.Update)`
+ * does not designate a read-only property.
  */
 export function isReadonlyProperty(program: Program, property: ModelProperty) {
-  const visibility = getVisibility(program, property);
+  const Lifecycle = getLifecycleVisibilityEnum(program);
+  const visibility = getVisibilityForClass(program, property, getLifecycleVisibilityEnum(program));
   // note: multiple visibilities that include read are not handled using
   // readonly: true, but using separate schemas.
-  return visibility?.length === 1 && visibility[0] === "read";
+  return visibility.size === 1 && visibility.has(Lifecycle.members.get("Read")!);
+}
+
+/**
+ * Determines if a OpenAPIExtensionKey is start with `x-`.
+ */
+export function isOpenAPIExtensionKey(key: string): key is ExtensionKey {
+  return key.startsWith("x-");
+}
+
+/**
+ * Validate that the given string is a valid URL.
+ * @param program  Program
+ * @param target Diagnostic target for any diagnostics that are reported
+ * @param url The URL to validate
+ * @param propertyName The name of the property that the URL is associated with
+ * @returns true if the URL is valid, false otherwise
+ */
+export function validateIsUri(
+  program: Program,
+  target: DiagnosticTarget,
+  url: string,
+  propertyName: string,
+): boolean {
+  try {
+    // Attempt to create a URL object from the given string. If
+    // successful, the URL is valid.
+    new URL(url);
+    return true;
+  } catch {
+    // If the URL is invalid, report a diagnostic with the given
+    // target, property name and value.
+    reportDiagnostic(program, {
+      code: "not-url",
+      target: target,
+      format: { property: propertyName, value: url },
+    });
+    return false;
+  }
+}
+
+/**
+ * Validate the AdditionalInfo model against a reference.
+ *
+ * This function checks that the properties of the given AdditionalInfo object
+ * are a subset of the properties defined in the AdditionalInfo model.
+ *
+ * @param program - The TypeSpec Program instance
+ * @param target - Diagnostic target for reporting any diagnostics
+ * @param jsonObject - The AdditionalInfo object to validate
+ * @param reference - The reference string to resolve the model
+ * @returns true if the AdditionalInfo object is valid, false otherwise
+ */
+export function validateAdditionalInfoModel(
+  program: Program,
+  target: DiagnosticTarget,
+  jsonObject: object,
+  reference: string,
+): boolean {
+  // Resolve the reference to get the corresponding model
+  const propertyModel = program.resolveTypeReference(reference)[0]! as Model;
+
+  // Check if jsonObject and propertyModel are defined
+  if (jsonObject && propertyModel) {
+    // Validate that the properties of typespecType do not exceed those in propertyModel
+    const diagnostics = checkNoAdditionalProperties(jsonObject, target, propertyModel);
+    program.reportDiagnostics(diagnostics);
+    // Return false if any diagnostics were reported, indicating a validation failure
+    if (diagnostics.length > 0) {
+      return false;
+    }
+  }
+
+  // Return true if validation is successful
+  return true;
+}
+
+/**
+ * Check Additional Properties
+ */
+function checkNoAdditionalProperties(
+  jsonObject: any,
+  target: DiagnosticTarget,
+  source: Model,
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  for (const name of Object.keys(jsonObject)) {
+    const sourceProperty = getProperty(source, name);
+    if (sourceProperty) {
+      if (sourceProperty.type.kind === "Model") {
+        const nestedDiagnostics = checkNoAdditionalProperties(
+          jsonObject[name],
+          target,
+          sourceProperty.type,
+        );
+        diagnostics.push(...nestedDiagnostics);
+      }
+    } else if (!isOpenAPIExtensionKey(name)) {
+      diagnostics.push(
+        createDiagnostic({
+          code: "invalid-extension-key",
+          format: { value: name },
+          target,
+        }),
+      );
+    }
+  }
+
+  return diagnostics;
 }

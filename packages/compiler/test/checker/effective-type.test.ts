@@ -2,7 +2,7 @@ import { strictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
 import { filterModelProperties, getEffectiveModelType } from "../../src/core/checker.js";
 import { DecoratorContext, Model, ModelProperty, Type } from "../../src/core/types.js";
-import { TestHost, createTestHost, expectIdenticalTypes } from "../../src/testing/index.js";
+import { TestHost, createTestHost, expectTypeEquals } from "../../src/testing/index.js";
 
 describe("compiler: effective type", () => {
   let testHost: TestHost;
@@ -31,7 +31,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         prop: { ...Source };
       }
-      `
+      `,
     );
     const { Source, Test } = await testHost.compile("./");
     strictEqual(Source.kind, "Model" as const);
@@ -39,7 +39,7 @@ describe("compiler: effective type", () => {
 
     const propType = Test.properties.get("prop")?.type as Model;
     const effective = getEffectiveModelType(testHost.program, propType);
-    expectIdenticalTypes(effective, Source);
+    expectTypeEquals(effective, Source);
   });
 
   it("indirect spread", async () => {
@@ -58,7 +58,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: {...Spread };
       }
-      `
+      `,
     );
     const { Source, Test } = await testHost.compile("./");
     strictEqual(Source.kind, "Model" as const);
@@ -68,7 +68,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, propType);
-    expectIdenticalTypes(effective, Source);
+    expectTypeEquals(effective, Source);
   });
 
   it("indirect spread, intersect, and filter", async () => {
@@ -89,7 +89,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: { @remove prop3: string; } & Source;
       }
-      `
+      `,
     );
     const { Source, Test } = await testHost.compile("./");
     strictEqual(Source.kind, "Model" as const);
@@ -99,7 +99,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, propType, removeFilter);
-    expectIdenticalTypes(effective, Source);
+    expectTypeEquals(effective, Source);
   });
 
   it("intersect", async () => {
@@ -113,7 +113,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: Source & {}
       }
-      `
+      `,
     );
     const { Source, Test } = await testHost.compile("./");
     strictEqual(Source.kind, "Model" as const);
@@ -123,7 +123,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, propType);
-    expectIdenticalTypes(effective, Source);
+    expectTypeEquals(effective, Source);
   });
 
   it("extends", async () => {
@@ -141,7 +141,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: { ...Derived };
       }
-      `
+      `,
     );
     const { Test, Derived } = await testHost.compile("./");
     strictEqual(Test.kind, "Model" as const);
@@ -150,7 +150,7 @@ describe("compiler: effective type", () => {
     const propType = Test.properties.get("test")?.type;
     strictEqual(propType?.kind, "Model" as const);
     const effective = getEffectiveModelType(testHost.program, propType);
-    expectIdenticalTypes(effective, Derived);
+    expectTypeEquals(effective, Derived);
   });
 
   it("intersect and filter", async () => {
@@ -166,7 +166,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: Source & { @remove something: string; };
       }
-      `
+      `,
     );
     const { Source, Test } = await testHost.compile("./");
     strictEqual(Source.kind, "Model" as const);
@@ -175,7 +175,7 @@ describe("compiler: effective type", () => {
     const propType = Test.properties.get("test")?.type;
     strictEqual(propType?.kind, "Model" as const);
     const effective = getEffectiveModelType(testHost.program, propType, removeFilter);
-    expectIdenticalTypes(effective, Source);
+    expectTypeEquals(effective, Source);
   });
 
   it("extend and filter", async () => {
@@ -191,7 +191,7 @@ describe("compiler: effective type", () => {
       @test model Derived extends Base {
         @remove test: string;
       }
-      `
+      `,
     );
     const { Base, Derived } = await testHost.compile("./");
     strictEqual(Base.kind, "Model" as const);
@@ -201,7 +201,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Scalar" as const);
 
     const effective = getEffectiveModelType(testHost.program, Derived, removeFilter);
-    expectIdenticalTypes(effective, Base);
+    expectTypeEquals(effective, Base);
   });
 
   it("extend and filter two levels", async () => {
@@ -221,7 +221,7 @@ describe("compiler: effective type", () => {
       @test model Derived extends Middle {
         @remove test: string;
       }
-      `
+      `,
     );
     const { Base, Derived } = await testHost.compile("./");
     strictEqual(Base.kind, "Model" as const);
@@ -231,7 +231,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Scalar" as const);
 
     const effective = getEffectiveModelType(testHost.program, Derived, removeFilter);
-    expectIdenticalTypes(effective, Base);
+    expectTypeEquals(effective, Base);
   });
 
   it("extend and filter two levels with override", async () => {
@@ -254,7 +254,7 @@ describe("compiler: effective type", () => {
       @test model Derived extends Middle {
         @remove test: string;
       }
-      `
+      `,
     );
     const { Middle, Derived } = await testHost.compile("./");
     strictEqual(Middle.kind, "Model" as const);
@@ -264,7 +264,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Scalar" as const);
 
     const effective = getEffectiveModelType(testHost.program, Derived, removeFilter);
-    expectIdenticalTypes(effective, Middle);
+    expectTypeEquals(effective, Middle);
   });
 
   it("extend, intersect, and filter", async () => {
@@ -284,7 +284,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: Derived & { @remove something: string; };
       }
-      `
+      `,
     );
     const { Derived, Test } = await testHost.compile("./");
     strictEqual(Derived.kind, "Model" as const);
@@ -294,7 +294,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, propType, removeFilter);
-    expectIdenticalTypes(effective, Derived);
+    expectTypeEquals(effective, Derived);
   });
 
   it("extend templated base with spread and filter", async () => {
@@ -315,7 +315,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: Base<Thing>;
       }
-      `
+      `,
     );
     const { Thing, Test } = await testHost.compile("./");
     strictEqual(Thing.kind, "Model" as const);
@@ -325,7 +325,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, propType, removeFilter);
-    expectIdenticalTypes(effective, Thing);
+    expectTypeEquals(effective, Thing);
   });
 
   it("empty model", async () => {
@@ -335,7 +335,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: {};
       }
-      `
+      `,
     );
     const { Test } = await testHost.compile("./");
     strictEqual(Test.kind, "Model" as const);
@@ -344,7 +344,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, propType);
-    expectIdenticalTypes(effective, propType);
+    expectTypeEquals(effective, propType);
   });
 
   it("unsourced property", async () => {
@@ -358,7 +358,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: { notRemoved: string, ...Source };
       }
-      `
+      `,
     );
     const { Test } = await testHost.compile("./");
     strictEqual(Test.kind, "Model" as const);
@@ -367,7 +367,7 @@ describe("compiler: effective type", () => {
     strictEqual(propType?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, propType);
-    expectIdenticalTypes(effective, propType);
+    expectTypeEquals(effective, propType);
   });
 
   it("different sources", async () => {
@@ -386,7 +386,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: SourceOne & SourceTwo;
       }
-      `
+      `,
     );
 
     const { Test } = await testHost.compile("./");
@@ -396,7 +396,7 @@ describe("compiler: effective type", () => {
     strictEqual(SourceOneAndSourceTwo?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, SourceOneAndSourceTwo);
-    expectIdenticalTypes(effective, SourceOneAndSourceTwo);
+    expectTypeEquals(effective, SourceOneAndSourceTwo);
   });
 
   it("only part of source with separate filter", async () => {
@@ -414,7 +414,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: Source;
       }
-      `
+      `,
     );
 
     const { Test } = await testHost.compile("./");
@@ -426,7 +426,7 @@ describe("compiler: effective type", () => {
     const filtered = filterModelProperties(testHost.program, Source, removeFilter);
     const effective = getEffectiveModelType(testHost.program, filtered);
     strictEqual(effective.name, "", "Result should be anonymous");
-    expectIdenticalTypes(effective, filtered);
+    expectTypeEquals(effective, filtered);
   });
 
   it("only parts of base and spread sources with separate filter", async () => {
@@ -450,7 +450,7 @@ describe("compiler: effective type", () => {
       @test model Derived extends Base {
         ...Source;
       }
-      `
+      `,
     );
     const { Derived } = await testHost.compile("./");
     strictEqual(Derived.kind, "Model" as const);
@@ -458,7 +458,7 @@ describe("compiler: effective type", () => {
     const filtered = filterModelProperties(testHost.program, Derived, removeFilter);
     const effective = getEffectiveModelType(testHost.program, filtered);
     strictEqual(effective.name, "", "result should be anonymous");
-    expectIdenticalTypes(filtered, effective);
+    expectTypeEquals(filtered, effective);
   });
 
   it("only part of source with filter", async () => {
@@ -476,7 +476,7 @@ describe("compiler: effective type", () => {
       @test model Test {
         test: Source;
       }
-      `
+      `,
     );
 
     const { Test } = await testHost.compile("./");
@@ -486,6 +486,6 @@ describe("compiler: effective type", () => {
     strictEqual(Source?.kind, "Model" as const);
 
     const effective = getEffectiveModelType(testHost.program, Source, removeFilter);
-    expectIdenticalTypes(effective, Source);
+    expectTypeEquals(effective, Source);
   });
 });

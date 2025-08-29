@@ -1,5 +1,168 @@
 # Change Log - @typespec/versioning
 
+## 0.73.0
+
+### Features
+
+- [#7999](https://github.com/microsoft/typespec/pull/7999) Use of `@useDependency` is now optional when referencing types from a versioned library. By default the latest version of the library will be used.
+
+### Bump dependencies
+
+- [#7978](https://github.com/microsoft/typespec/pull/7978) Upgrade dependencies
+
+
+## 0.72.0
+
+### Bump dependencies
+
+- [#7674](https://github.com/microsoft/typespec/pull/7674) Upgrade dependencies
+
+
+## 0.71.0
+
+### Bug Fixes
+
+- [#7473](https://github.com/microsoft/typespec/pull/7473) Fix tuples not correctly versioned
+
+
+## 0.70.0
+
+No changes, version bump only.
+
+## 0.69.0
+
+### Bug Fixes
+
+- [#7022](https://github.com/microsoft/typespec/pull/7022) Fix issue where the incompatible-versioned-reference diagnostic was incorrectly triggered when a model had a `@removed` decorator and one of its properties had an `@added` decorator, even if the versions were compatible.
+  
+  Example:
+  ```tsp
+  @removed(Versions.v3)
+  model Widget {
+    @added(Versions.v2)
+     name: string;
+  }
+  ```
+
+
+## 0.68.0
+
+### Bump dependencies
+
+- [#6595](https://github.com/microsoft/typespec/pull/6595) Upgrade dependencies
+
+
+## 0.67.0
+
+### Breaking Changes
+
+- [#5977](https://github.com/microsoft/typespec/pull/5977) Minimum node version is now 20
+- [#6327](https://github.com/microsoft/typespec/pull/6327) Remove deprecated versioning projection, switch to the mutator approach
+
+  ```diff lang="tsp"
+  // Step 1: Update to retrieve the mutation instead of projections
+  -const versions = buildVersionProjections(program, service.type);
+  +const versions = getVersioningMutators(program, service.type);
+  
+  // Step 2: call mutator instead of projection api
+  -const projectedProgram = projectProgram(originalProgram, versionRecord.projections);
+  +const subgraph = unsafe_mutateSubgraphWithNamespace(program, [mutator], service.type);
+  +subgraph.type // this is the mutated service namespace
+  ```
+
+### Bump dependencies
+
+- [#6266](https://github.com/microsoft/typespec/pull/6266) Update dependencies
+
+
+## 0.66.0
+
+No changes, version bump only.
+
+## 0.65.0
+
+### Bump dependencies
+
+- [#5690](https://github.com/microsoft/typespec/pull/5690) Upgrade dependencies
+
+### Features
+
+- [#5459](https://github.com/microsoft/typespec/pull/5459) add code fixes for incompatible version errors
+- [#4931](https://github.com/microsoft/typespec/pull/4931) Provide new mutator based way of getting version snapshot
+
+### Deprecations
+
+- [#4931](https://github.com/microsoft/typespec/pull/4931) Deprecate versioning projection, switch to the mutator approach
+
+```diff lang="tsp"
+// Step 1: Update to retrieve the mutation instead of projections
+-const versions = buildVersionProjections(program, service.type);
++const versions = getVersioningMutators(program, service.type);
+
+// Step 2: call mutator instead of projection api
+-const projectedProgram = projectProgram(originalProgram, versionRecord.projections);
++const subgraph = unsafe_mutateSubgraphWithNamespace(program, [mutator], service.type);
++subgraph.type // this is the mutated service namespace
+```
+
+
+## 0.64.0
+
+No changes, version bump only.
+
+## 0.63.0
+
+### Bug Fixes
+
+- [#5262](https://github.com/microsoft/typespec/pull/5262) Fixes diagnostics for @typeChangedFrom to properly detect when an incompatible version is referenced inside of a template, union, or tuple.
+
+
+## 0.62.0
+
+### Bump dependencies
+
+- [#4679](https://github.com/microsoft/typespec/pull/4679) Upgrade dependencies - October 2024
+
+
+## 0.61.0
+
+### Bump dependencies
+
+- [#4424](https://github.com/microsoft/typespec/pull/4424) Bump dependencies
+
+
+## 0.60.1
+
+### Bug Fixes
+
+- [#4408](https://github.com/microsoft/typespec/pull/4408) Fixes versioning when using versioned named union variants
+
+
+## 0.60.0
+
+### Bug Fixes
+
+- [#4145](https://github.com/microsoft/typespec/pull/4145) Fix error when trying to reference types from another sub namespace of a versioned namespace
+- [#4179](https://github.com/microsoft/typespec/pull/4179) Add validation to make sure operation params reference models available in the current version
+- [#4179](https://github.com/microsoft/typespec/pull/4179) Add validation to make sure types referencing array in union types have compatible versioning.
+
+### Features
+
+- [#4139](https://github.com/microsoft/typespec/pull/4139) Internals: Migrate to new api for declaring decorator implementation
+
+
+## 0.59.0
+
+### Bug Fixes
+
+- [#3911](https://github.com/microsoft/typespec/pull/3911) Allow spreading a model that has props added in previous version
+- [#3951](https://github.com/microsoft/typespec/pull/3951) Fixes issue where spreading a versioned model as a parameter to an incompatible versioned operation would cause the compiler to crash.
+
+### Bump dependencies
+
+- [#3948](https://github.com/microsoft/typespec/pull/3948) Update dependencies
+
+
 ## 0.58.0
 
 ### Bump dependencies

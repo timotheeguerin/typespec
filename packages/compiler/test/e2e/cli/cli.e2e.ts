@@ -44,7 +44,7 @@ export interface ExecResult {
 export async function execAsync(
   command: string,
   args: string[],
-  options: SpawnOptions
+  options: SpawnOptions,
 ): Promise<ExecResult> {
   const child = spawn(command, args, options);
 
@@ -80,7 +80,8 @@ async function cleanOutputDir(scenarioName: string) {
   const dir = resolvePath(getScenarioDir(scenarioName), "tsp-output");
   await rm(dir, { recursive: true, force: true });
 }
-describe("cli", () => {
+
+describe("help", () => {
   it("shows help", async () => {
     const { stdout } = await execCliSuccess(["--help"], {
       cwd: getScenarioDir("simple"),
@@ -89,7 +90,28 @@ describe("cli", () => {
     expect(stdout).toContain("tsp compile <path>       Compile TypeSpec source.");
     expect(stdout).toContain("tsp format <include...>  Format given list of TypeSpec files.");
   });
+});
 
+describe("info", () => {
+  it("shows information about the current", async () => {
+    const { stdout } = await execCliSuccess(["info"], {
+      cwd: getScenarioDir("with-config"),
+    });
+    expect(stdout).toContain(`User Config:`);
+    expect(stdout).toContain(`outputDir: "{project-root}/tsp-output/{custom-dir}"`);
+  });
+});
+
+describe("format", () => {
+  it("--check returns non zero exit code for unformatted files", async () => {
+    const { stderr } = await execCliFail(["format", "--check", "."], {
+      cwd: getScenarioDir("unformatted"),
+    });
+    expect(stderr).toContain(`⚠ 1 need format`);
+  });
+});
+
+describe("compile", () => {
   describe("compiling spec with warning", () => {
     it("logs warning and succeed", async () => {
       const { stdout } = await execCliSuccess(["compile", ".", "--pretty", "false"], {
@@ -107,7 +129,7 @@ describe("cli", () => {
         ["compile", ".", "--warn-as-error", "--pretty", "false"],
         {
           cwd: getScenarioDir("warn"),
-        }
+        },
       );
       // eslint-disable-next-line no-console
       console.log("Stdout", stdout);
@@ -127,7 +149,7 @@ describe("cli", () => {
       });
       expect(stdout).toContain("Compilation completed successfully.");
       const file = await readFile(
-        resolvePath(getScenarioDir("with-emitter"), "tsp-output/out.txt")
+        resolvePath(getScenarioDir("with-emitter"), "tsp-output/out.txt"),
       );
       expect(file.toString()).toEqual("Hello, world!");
     });
@@ -137,11 +159,11 @@ describe("cli", () => {
         ["compile", ".", "--emit", "./emitter.js", "--no-emit"],
         {
           cwd: getScenarioDir("with-emitter"),
-        }
+        },
       );
       expect(stdout).toContain("Compilation completed successfully.");
       await expect(() =>
-        access(resolvePath(getScenarioDir("with-emitter"), "tsp-output/out.txt"))
+        access(resolvePath(getScenarioDir("with-emitter"), "tsp-output/out.txt")),
       ).rejects.toEqual(expect.any(Error));
     });
   });
@@ -152,7 +174,7 @@ describe("cli", () => {
         cwd: getScenarioDir("simple"),
       });
       expect(stdout).toContain(
-        "No emitter was configured, no output was generated. Use `--emit <emitterName>` to pick emitter or specify it in the TypeSpec config."
+        "No emitter was configured, no output was generated. Use `--emit <emitterName>` to pick emitter or specify it in the TypeSpec config.",
       );
     });
 
@@ -161,7 +183,7 @@ describe("cli", () => {
         cwd: getScenarioDir("simple"),
       });
       expect(stdout).not.toContain(
-        "No emitter was configured, no output was generated. Use `--emit <emitterName>` to pick emitter or specify it in the TypeSpec config."
+        "No emitter was configured, no output was generated. Use `--emit <emitterName>` to pick emitter or specify it in the TypeSpec config.",
       );
     });
   });
@@ -171,7 +193,7 @@ describe("cli", () => {
       ["compile", ".", "--emit", "./emitter.js", "--option", "test-emitter.text=foo"],
       {
         cwd: getScenarioDir("with-emitter"),
-      }
+      },
     );
     expect(stdout).toContain("Compilation completed successfully.");
     const file = await readFile(resolvePath(getScenarioDir("with-emitter"), "tsp-output/out.txt"));
@@ -185,9 +207,41 @@ describe("cli", () => {
       ["compile", ".", "--emit", "./emitter.js", "--arg", "custom-dir=custom-dir-name"],
       {
         cwd: getScenarioDir("with-config"),
-      }
+      },
     );
     expect(stdout).toContain("Compilation completed successfully.");
     await access(resolvePath(getScenarioDir("with-config"), "tsp-output/custom-dir-name/out.txt"));
+  });
+
+  it("set config parameter with --option", async () => {
+    await cleanOutputDir("with-option");
+    const { stdout } = await execCliSuccess(
+      [
+        "compile",
+        ".",
+        "--emit",
+        "./emitter.js",
+        "--arg",
+        "custom-dir=custom-dir-name",
+        "--arg",
+        "owner=TypeSpec",
+        "--option",
+        "emitter1.name=TypeSpec with options",
+        "--option",
+        "emitter1.by.owners.secondary=Co-owner is defined by this test",
+      ],
+      {
+        cwd: getScenarioDir("with-option"),
+      },
+    );
+    expect(stdout).toContain("Compilation completed successfully.");
+    const file = await readFile(
+      resolvePath(getScenarioDir("with-option"), "tsp-output/custom-dir-name/out.txt"),
+    );
+    expect(file.toString()).toContain(`By Owner: TypeSpec
+TypeSpec with options
+Succeeded: TypeSpec with options by TypeSpec
+Owner: TypeSpec
+Co-owner is defined by this test`);
   });
 });

@@ -1,5 +1,120 @@
 # Change Log - @typespec/html-program-viewer
 
+## 0.73.0
+
+### Features
+
+- [#8013](https://github.com/microsoft/typespec/pull/8013) Add button to bookmark types in the type graph into `window.vars`
+
+### Bump dependencies
+
+- [#7978](https://github.com/microsoft/typespec/pull/7978) Upgrade dependencies
+
+### Bug Fixes
+
+- [#7899](https://github.com/microsoft/typespec/pull/7899) Handle new `creating` property
+
+
+## 0.72.0
+
+### Features
+
+- [#7620](https://github.com/microsoft/typespec/pull/7620) Render `indexer` property on model
+- [#7836](https://github.com/microsoft/typespec/pull/7836) Expose program viewer navigation in TypGraph props
+
+### Bump dependencies
+
+- [#7674](https://github.com/microsoft/typespec/pull/7674) Upgrade dependencies
+
+### Bug Fixes
+
+- [#7834](https://github.com/microsoft/typespec/pull/7834) Fix type state not showing in program viewer
+
+
+## 0.71.0
+
+### Bump dependencies
+
+- [#7323](https://github.com/microsoft/typespec/pull/7323) Upgrade dependencies
+
+
+## 0.70.0
+
+No changes, version bump only.
+
+## 0.69.0
+
+No changes, version bump only.
+
+## 0.68.0
+
+### Bump dependencies
+
+- [#6595](https://github.com/microsoft/typespec/pull/6595) Upgrade dependencies
+
+
+## 0.67.0
+
+### Features
+
+- [#6327](https://github.com/microsoft/typespec/pull/6327) Remove reference to delete projection feature
+
+### Bump dependencies
+
+- [#6266](https://github.com/microsoft/typespec/pull/6266) Update dependencies
+
+
+## 0.66.0
+
+### Features
+
+- [#5996](https://github.com/microsoft/typespec/pull/5996) Emitter Framework V2
+
+
+## 0.65.0
+
+### Bump dependencies
+
+- [#5690](https://github.com/microsoft/typespec/pull/5690) Upgrade dependencies
+
+
+## 0.64.0
+
+No changes, version bump only.
+
+## 0.63.0
+
+No changes, version bump only.
+
+## 0.62.0
+
+### Bump dependencies
+
+- [#4679](https://github.com/microsoft/typespec/pull/4679) Upgrade dependencies - October 2024
+
+
+## 0.61.0
+
+### Bump dependencies
+
+- [#4424](https://github.com/microsoft/typespec/pull/4424) Bump dependencies
+
+
+## 0.60.0
+
+### Bug Fixes
+
+- [#4353](https://github.com/microsoft/typespec/pull/4353) Fix crash when using anonymous union variant
+- [#4136](https://github.com/microsoft/typespec/pull/4136) Fix namespace with the same name conflicting in the tree navigation
+
+
+## 0.59.0
+
+### Bump dependencies
+
+- [#3948](https://github.com/microsoft/typespec/pull/3948) Update dependencies
+
+
 ## 0.58.0
 
 ### Bug Fixes

@@ -1,6 +1,7 @@
+import { printIdentifier } from "@typespec/compiler";
 import { ExtensionKey } from "@typespec/openapi";
 import { Extensions, OpenAPI3Parameter, OpenAPI3Schema, Refable } from "../../../../types.js";
-import { TypeSpecDecorator } from "../interfaces.js";
+import { TSValue, TypeSpecDecorator } from "../interfaces.js";
 
 const validLocations = ["header", "query", "path"];
 const extensionDecoratorName = "extension";
@@ -12,12 +13,21 @@ export function getExtensions(element: Extensions): TypeSpecDecorator[] {
     if (isExtensionKey(key)) {
       decorators.push({
         name: extensionDecoratorName,
-        args: [key, element[key]],
+        args: [key, normalizeObjectValue(element[key])],
       });
     }
   }
 
   return decorators;
+}
+function normalizeObjectValue(source: unknown): string | number | object | TSValue {
+  if (typeof source === "object") {
+    const result = createTSValueFromObjectValue(source as object);
+    if (result) {
+      return result;
+    }
+  }
+  return source as string | number;
 }
 
 function isExtensionKey(key: string): key is ExtensionKey {
@@ -44,38 +54,92 @@ function getLocationDecorator(parameter: OpenAPI3Parameter): TypeSpecDecorator |
     args: [],
   };
 
-  let format: string | undefined;
+  let decoratorArgs: TypeSpecDecorator["args"][0] | undefined;
   switch (parameter.in) {
     case "header":
-      format = getHeaderFormat(parameter.style);
+      decoratorArgs = getHeaderArgs(parameter);
       break;
     case "query":
-      format = getQueryFormat(parameter.explode, parameter.style);
+      decoratorArgs = getQueryArgs(parameter);
       break;
   }
 
-  if (format) {
-    decorator.args.push({ format });
+  if (decoratorArgs) {
+    decorator.args.push(decoratorArgs);
   }
 
   return decorator;
 }
 
-function getQueryFormat(explode?: boolean, style?: string): string | undefined {
-  if (explode) {
-    return "form";
-  } else if (style === "form") {
-    return "simple";
-  } else if (style === "spaceDelimited") {
-    return "ssv";
-  } else if (style === "pipeDelimited") {
-    return "pipes";
+function createTSValueFromObjectValue(value: object): TSValue | undefined {
+  if (Object.keys(value).length || Array.isArray(value)) {
+    return {
+      __kind: "value",
+      value: normalizeObjectValueToTSValueExpression(value),
+    };
   }
-  return;
+  return undefined;
+}
+export function normalizeObjectValueToTSValueExpression(value: any): string {
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return `#{${Object.entries(value)
+      .map(([key, v]) => {
+        return `${printIdentifier(key, "disallow-reserved")}: ${normalizeObjectValueToTSValueExpression(v)}`;
+      })
+      .join(", ")}}`;
+  } else if (Array.isArray(value)) {
+    return `#[${value.map((v) => normalizeObjectValueToTSValueExpression(v)).join(", ")}]`;
+  } else return `${JSON.stringify(value)}`;
 }
 
-function getHeaderFormat(style?: string): string | undefined {
-  return style === "simple" ? "simple" : undefined;
+function getQueryArgs(parameter: OpenAPI3Parameter): TSValue | undefined {
+  const queryOptions = getNormalizedQueryOptions(parameter);
+  return createTSValueFromObjectValue(queryOptions);
+}
+
+type QueryOptions = { explode?: boolean; format?: string };
+
+function getNormalizedQueryOptions({
+  explode,
+  style = "",
+}: {
+  explode?: boolean;
+  style?: string;
+}): QueryOptions {
+  const queryOptions: QueryOptions = {};
+  // In OpenAPI 3, default style is 'form', and explode is true when 'form' is the style
+  if (typeof explode !== "boolean") {
+    if (style === "form" || !style) {
+      explode = true;
+    } else {
+      explode = false;
+    }
+  }
+
+  // Format only emits additional data if set to one of the following:
+  // ssv (spaceDelimited), pipes (pipeDelimited)
+  if (style === "spaceDelimited") {
+    queryOptions.format = "ssv";
+  } else if (style === "pipeDelimited") {
+    queryOptions.format = "pipes";
+  }
+
+  // In TypeSpec, default explode is "false"
+  if (!explode && queryOptions.format) {
+    queryOptions.explode = false;
+  } else if (explode) {
+    queryOptions.explode = true;
+  }
+
+  return queryOptions;
+}
+
+function getHeaderArgs({ explode }: OpenAPI3Parameter): TSValue | undefined {
+  if (explode === true) {
+    return createTSValue(`#{ explode: true }`);
+  }
+
+  return undefined;
 }
 
 export function getDecoratorsForSchema(schema: Refable<OpenAPI3Schema>): TypeSpecDecorator[] {
@@ -91,9 +155,6 @@ export function getDecoratorsForSchema(schema: Refable<OpenAPI3Schema>): TypeSpe
     case "array":
       decorators.push(...getArraySchemaDecorators(schema));
       break;
-    case "object":
-      decorators.push(...getObjectSchemaDecorators(schema));
-      break;
     case "integer":
     case "number":
       decorators.push(...getNumberSchemaDecorators(schema));
@@ -105,11 +166,34 @@ export function getDecoratorsForSchema(schema: Refable<OpenAPI3Schema>): TypeSpe
       break;
   }
 
+  if (schema.title) {
+    decorators.push({ name: "summary", args: [schema.title] });
+  }
+
+  if (schema.discriminator) {
+    if (schema.oneOf || schema.anyOf) {
+      decorators.push({
+        name: "discriminated",
+        args: [
+          createTSValue(
+            `#{ envelope: "none", discriminatorPropertyName: ${JSON.stringify(schema.discriminator.propertyName)} }`,
+          ),
+        ],
+      });
+    } else {
+      decorators.push({ name: "discriminator", args: [schema.discriminator.propertyName] });
+    }
+  }
+
   if (schema.oneOf) {
     decorators.push(...getOneOfSchemaDecorators(schema));
   }
 
   return decorators;
+}
+
+function createTSValue(value: string): TSValue {
+  return { __kind: "value", value };
 }
 
 function getOneOfSchemaDecorators(schema: OpenAPI3Schema): TypeSpecDecorator[] {
@@ -125,16 +209,6 @@ function getArraySchemaDecorators(schema: OpenAPI3Schema) {
 
   if (typeof schema.maxItems === "number") {
     decorators.push({ name: "maxItems", args: [schema.maxItems] });
-  }
-
-  return decorators;
-}
-
-function getObjectSchemaDecorators(schema: OpenAPI3Schema) {
-  const decorators: TypeSpecDecorator[] = [];
-
-  if (schema.discriminator) {
-    decorators.push({ name: "discriminator", args: [schema.discriminator.propertyName] });
   }
 
   return decorators;

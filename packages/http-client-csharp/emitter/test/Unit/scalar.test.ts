@@ -1,11 +1,13 @@
+vi.resetModules();
+
 import { TestHost } from "@typespec/compiler/testing";
 import { strictEqual } from "assert";
-import { beforeEach, describe, it } from "vitest";
+import { beforeEach, describe, it, vi } from "vitest";
 import { createModel } from "../../src/lib/client-model-builder.js";
 import {
+  createCSharpSdkContext,
   createEmitterContext,
   createEmitterTestHost,
-  createNetSdkContext,
   typeSpecCompile,
 } from "./utils/test-util.js";
 
@@ -22,18 +24,21 @@ describe("Test GetInputType for scalar", () => {
         op test(@query location: azureLocation): void;
       `,
       runner,
-      { IsNamespaceNeeded: true, IsAzureCoreNeeded: true }
+      { IsNamespaceNeeded: true, IsAzureCoreNeeded: true },
     );
-    runner.compileAndDiagnose;
     const context = createEmitterContext(program);
-    const sdkContext = await createNetSdkContext(context);
+    const sdkContext = await createCSharpSdkContext(context);
     const root = createModel(sdkContext);
-    const type = root.Clients[0].Operations[0].Parameters[1].Type;
-    strictEqual(type.Kind, "string");
-    strictEqual(type.Name, "azureLocation");
-    strictEqual(type.CrossLanguageDefinitionId, "Azure.Core.azureLocation");
-    strictEqual(type.BaseType?.Kind, "string");
-    strictEqual(type.BaseType.Name, "string");
-    strictEqual(type.BaseType.CrossLanguageDefinitionId, "TypeSpec.string");
+    const inputParamArray = root.clients[0].methods[0].operation.parameters.filter(
+      (p) => p.name === "location",
+    );
+    strictEqual(1, inputParamArray.length);
+    const type = inputParamArray[0].type;
+    strictEqual(type.kind, "string");
+    strictEqual(type.name, "azureLocation");
+    strictEqual(type.crossLanguageDefinitionId, "Azure.Core.azureLocation");
+    strictEqual(type.baseType?.kind, "string");
+    strictEqual(type.baseType.name, "string");
+    strictEqual(type.baseType.crossLanguageDefinitionId, "TypeSpec.string");
   });
 });

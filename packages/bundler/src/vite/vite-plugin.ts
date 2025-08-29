@@ -36,14 +36,6 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
       }
     },
     async configureServer(server) {
-      for (const library of options.libraries) {
-        await watchBundleLibrary(config.root, library, (bundle) => {
-          bundles[library] = bundle;
-          definitions[library] = bundle.definition;
-          server.ws.send({ type: "full-reload" });
-        });
-      }
-
       server.middlewares.use((req, res, next) => {
         const id = req.url;
         if (id === undefined) {
@@ -85,6 +77,14 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
         }
         next();
       });
+
+      for (const library of options.libraries) {
+        void watchBundleLibrary(config.root, library, (bundle) => {
+          bundles[library] = bundle;
+          definitions[library] = bundle.definition;
+          server.ws.send({ type: "full-reload" });
+        });
+      }
     },
 
     async generateBundle() {
@@ -106,7 +106,7 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
         const importMapTag = `<script type="importmap">\n${JSON.stringify(
           createImportMap(options.folderName, definitions),
           null,
-          2
+          2,
         )}\n</script>`;
         return html.replace("<html", importMapTag + "\n<html");
       },
@@ -116,7 +116,7 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
 
 function createImportMap(
   folderName: string,
-  definitions: Record<string, TypeSpecBundleDefinition>
+  definitions: Record<string, TypeSpecBundleDefinition>,
 ) {
   const imports: Record<string, string> = {};
   for (const [library, definition] of Object.entries(definitions)) {
@@ -138,7 +138,7 @@ async function bundleLibrary(projectRoot: string, name: string) {
 async function watchBundleLibrary(
   projectRoot: string,
   name: string,
-  onChange: (bundle: TypeSpecBundle) => void
+  onChange: (bundle: TypeSpecBundle) => void,
 ) {
   return await watchTypeSpecBundle(resolve(projectRoot, "node_modules", name), onChange);
 }

@@ -1,14 +1,15 @@
 import { ok, strictEqual } from "assert";
 import { describe, it } from "vitest";
-import { PositionDetail, SyntaxKind, TypeSpecScriptNode, parse } from "../../src/core/index.js";
+import { SyntaxKind, TypeSpecScriptNode, parse } from "../../src/ast/index.js";
+import type { PositionDetail } from "../../src/index.js";
 import { getCompletionNodeAtPosition } from "../../src/server/serverlib.js";
-import { extractCursor } from "../../src/testing/test-server-host.js";
+import { extractCursor } from "../../src/testing/source-utils.js";
 import { dumpAST } from "../ast-test-utils.js";
 
 describe("compiler: server: misc", () => {
   describe("getCompletionNodeAtPosition", () => {
     async function getNodeAtCursor(
-      sourceWithCursor: string
+      sourceWithCursor: string,
     ): Promise<{ root: TypeSpecScriptNode; detail: PositionDetail | undefined }> {
       const { source, pos } = extractCursor(sourceWithCursor);
       const root = parse(source, { comments: true, docs: true });

@@ -25,16 +25,13 @@ export const Editor: FunctionComponent<EditorProps> = ({ model, options, actions
     editorRef.current = editor.create(editorContainerRef.current!, {
       model,
       automaticLayout: true,
+      fixedOverflowWidgets: true,
       ...options,
     });
     onMount?.({ editor: editorRef.current });
     // This needs special handling where we only want to run this effect once
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    editor.setTheme(options.theme ?? "typespec");
-  }, [options.theme]);
 
   useEffect(() => {
     const disposables: IDisposable[] = [];

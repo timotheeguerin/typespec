@@ -11,7 +11,7 @@ import { findTestPackageRoot } from "../../src/testing/test-utils.js";
 
 const scenarioRoot = resolvePath(
   await findTestPackageRoot(import.meta.url),
-  "test/config/scenarios"
+  "test/config/scenarios",
 );
 
 describe("compiler: config file loading", () => {
@@ -19,14 +19,14 @@ describe("compiler: config file loading", () => {
     const loadTestConfig = async (
       path: string,
       lookup: boolean = true,
-      errorIfNotFound: boolean = true
+      errorIfNotFound: boolean = true,
     ) => {
       const fullPath = join(scenarioRoot, path);
       const { filename, projectRoot, file, ...config } = await loadTypeSpecConfigForPath(
         NodeHost,
         fullPath,
         errorIfNotFound,
-        lookup
+        lookup,
       );
       return config;
     };
@@ -94,24 +94,7 @@ describe("compiler: config file loading", () => {
       });
     });
 
-    it("backcompat: loads old cadl-project.yaml config file if tspconfig.yaml not found", async () => {
-      const config = await loadTestConfig("backcompat/cadl-project-only");
-      deepStrictEqual(config, {
-        diagnostics: [
-          {
-            code: "deprecated",
-            message:
-              "Deprecated: `cadl-project.yaml` is deprecated. Please rename to `tspconfig.yaml`.",
-            severity: "warning",
-            target: Symbol.for("NoTarget"),
-          },
-        ],
-        outputDir: "{cwd}/tsp-output",
-        emit: ["old-emitter"],
-      });
-    });
-
-    it("backcompat: loads tspconfig.yaml even if cadl-project.yaml is found", async () => {
+    it("backcompat: loads tspconfig.yaml", async () => {
       const config = await loadTestConfig("backcompat/mixed");
       deepStrictEqual(config, {
         diagnostics: [],
@@ -170,18 +153,18 @@ describe("compiler: config file loading", () => {
     });
 
     it("fails if passing the wrong type", () => {
-      deepStrictEqual(validate({ emitters: true } as any), [
+      deepStrictEqual(validate({ emit: true } as any), [
         {
           code: "invalid-schema",
           target: { file, pos: 0, end: 0 },
           severity: "error",
-          message: "Schema violation: must be object (/emitters)",
+          message: "Schema violation: must be array (/emit)",
         },
       ]);
     });
 
     it("succeeds if config is valid", () => {
-      deepStrictEqual(validate({ emitters: { openapi: {} } }), []);
+      deepStrictEqual(validate({ options: { openapi: {} } }), []);
     });
   });
 });

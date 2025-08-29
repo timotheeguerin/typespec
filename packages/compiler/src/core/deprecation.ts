@@ -1,9 +1,6 @@
+import { createStateSymbol } from "../lib/utils.js";
 import type { Program } from "./program.js";
 import { BaseNode, Node, SyntaxKind, Type } from "./types.js";
-
-function createStateSymbol(name: string) {
-  return Symbol.for(`TypeSpec.${name}`);
-}
 
 const deprecatedKey = createStateSymbol("deprecated");
 
@@ -33,7 +30,7 @@ export function isDeprecated(program: Program, type: Type): boolean {
  */
 export function getDeprecationDetails(
   program: Program,
-  typeOrNode: Type | Node
+  typeOrNode: Type | Node,
 ): DeprecationDetails | undefined {
   function isType(maybeType: Type | Node): maybeType is Type {
     return typeof maybeType.kind === "string";
@@ -45,7 +42,7 @@ export function getDeprecationDetails(
   } else {
     // Look at the node for a deprecation directive
     const deprecatedDirective = ((typeOrNode as BaseNode).directives ?? []).find(
-      (directive) => directive.target.sv === "deprecated"
+      (directive) => directive.target.sv === "deprecated",
     );
 
     if (deprecatedDirective?.arguments[0].kind === SyntaxKind.StringLiteral) {

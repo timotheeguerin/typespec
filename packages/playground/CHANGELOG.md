@@ -1,5 +1,139 @@
 # Change Log - @typespec/playground
 
+## 0.10.0
+
+### Features
+
+- [#8013](https://github.com/microsoft/typespec/pull/8013) Add button to bookmark types in the type graph into `window.vars`
+- [#7944](https://github.com/microsoft/typespec/pull/7944) Exposed some debugging variables in the playground console, including the Program, a bound Typekit, and the compiler host.
+
+### Bump dependencies
+
+- [#7978](https://github.com/microsoft/typespec/pull/7978) Upgrade dependencies
+
+### Bug Fixes
+
+- [#7959](https://github.com/microsoft/typespec/pull/7959) Fix loading monaco web workers
+
+
+## 0.9.0
+
+### Features
+
+- [#7836](https://github.com/microsoft/typespec/pull/7836) Overall of the playground state
+    - Allow viewers to define their own state
+    - Can listen to any state change
+    - Standalone playground updates url on navigation(viewer change, viewer internal state change, etc.)
+
+### Bump dependencies
+
+- [#7674](https://github.com/microsoft/typespec/pull/7674) Upgrade dependencies
+
+### Bug Fixes
+
+- [#7833](https://github.com/microsoft/typespec/pull/7833) Fix editor hovers being cropped by the editor boundary
+
+
+## 0.8.2
+
+### Bump dependencies
+
+- [#7323](https://github.com/microsoft/typespec/pull/7323) Upgrade dependencies
+
+### Bug Fixes
+
+- [#7319](https://github.com/microsoft/typespec/pull/7319) Reduce visual noise in diagnostics by targeting the specific node id rather than the entire node.
+
+
+## 0.8.1
+
+### Bump dependencies
+
+- [#6595](https://github.com/microsoft/typespec/pull/6595) Upgrade dependencies
+
+### Bug Fixes
+
+- [#6753](https://github.com/microsoft/typespec/pull/6753) Guard against diagnostic reported without a target
+
+
+## 0.8.0
+
+### Breaking Changes
+
+- [#5977](https://github.com/microsoft/typespec/pull/5977) Minimum node version is now 20
+
+### Bump dependencies
+
+- [#6266](https://github.com/microsoft/typespec/pull/6266) Update dependencies
+
+
+## 0.7.2
+
+No changes, version bump only.
+
+## 0.7.1
+
+### Bump dependencies
+
+- [#5690](https://github.com/microsoft/typespec/pull/5690) Upgrade dependencies
+
+
+## 0.7.0
+
+### Features
+
+- [#5372](https://github.com/microsoft/typespec/pull/5372) Add support for displaying array-based emitter options
+
+
+## 0.6.1
+
+No changes, version bump only.
+
+## 0.6.0
+
+### Bug Fixes
+
+- [#4719](https://github.com/microsoft/typespec/pull/4719) Fix dark theme not applying
+
+### Bump dependencies
+
+- [#4679](https://github.com/microsoft/typespec/pull/4679) Upgrade dependencies - October 2024
+
+### Features
+
+- [#4587](https://github.com/microsoft/typespec/pull/4587) Expose state storage helper via its own exports
+
+
+## 0.5.0
+
+### Bug Fixes
+
+- [#4606](https://github.com/microsoft/typespec/pull/4606) Do not treat path as relative internally
+
+### Bump dependencies
+
+- [#4424](https://github.com/microsoft/typespec/pull/4424) Bump dependencies
+
+### Features
+
+- [#4538](https://github.com/microsoft/typespec/pull/4538) Upgrade to latest monaco-editor
+
+
+## 0.4.2
+
+### Bug Fixes
+
+- [#4276](https://github.com/microsoft/typespec/pull/4276) Accessibility, increase footer contrast
+- [#4081](https://github.com/microsoft/typespec/pull/4081) Fix: Reloading the playground will not register the typespec language server
+
+
+## 0.4.1
+
+### Bump dependencies
+
+- [#3948](https://github.com/microsoft/typespec/pull/3948) Update dependencies
+
+
 ## 0.4.0
 
 ### Bump dependencies

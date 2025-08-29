@@ -1,5 +1,122 @@
 # Change Log - @typespec/rest
 
+## 0.73.0
+
+### Bump dependencies
+
+- [#7978](https://github.com/microsoft/typespec/pull/7978) Upgrade dependencies
+
+
+## 0.72.0
+
+### Bump dependencies
+
+- [#7674](https://github.com/microsoft/typespec/pull/7674) Upgrade dependencies
+
+
+## 0.71.0
+
+No changes, version bump only.
+
+## 0.70.0
+
+### Bug Fixes
+
+- [#7230](https://github.com/microsoft/typespec/pull/7230) Handle new behavior of `@patch` keeping old behavior
+- [#7168](https://github.com/microsoft/typespec/pull/7168) Do not add a leading `/` in front of autoRoute optional parameter already using path expansion.
+
+
+## 0.69.0
+
+No changes, version bump only.
+
+## 0.68.0
+
+### Bump dependencies
+
+- [#6595](https://github.com/microsoft/typespec/pull/6595) Upgrade dependencies
+
+
+## 0.67.0
+
+### Breaking Changes
+
+- [#5977](https://github.com/microsoft/typespec/pull/5977) Minimum node version is now 20
+
+### Bump dependencies
+
+- [#6266](https://github.com/microsoft/typespec/pull/6266) Update dependencies
+
+### Bug Fixes
+
+- [#6326](https://github.com/microsoft/typespec/pull/6326) Updates `@autoRoute` behavior to apply same HttpOperationParameter filtering to HttpProperty
+
+
+## 0.66.0
+
+No changes, version bump only.
+
+## 0.65.0
+
+### Bump dependencies
+
+- [#5690](https://github.com/microsoft/typespec/pull/5690) Upgrade dependencies
+
+### Features
+
+- [#5685](https://github.com/microsoft/typespec/pull/5685) Updates `CollectionWithNextLink` to support pagination
+
+
+## 0.64.0
+
+### Bug Fixes
+
+- [#5455](https://github.com/microsoft/typespec/pull/5455) In some scenarios, the options for the `@path` decorator do not accurately reflect the provided parameters, including the `#{allowReserved: true}` which is the `x-ms-skip-url-encoding` option. This change addresses and fixes this issue.
+
+
+## 0.63.0
+
+No changes, version bump only.
+
+## 0.62.0
+
+### Bump dependencies
+
+- [#4679](https://github.com/microsoft/typespec/pull/4679) Upgrade dependencies - October 2024
+
+
+## 0.61.0
+
+### Bump dependencies
+
+- [#4424](https://github.com/microsoft/typespec/pull/4424) Bump dependencies
+
+
+## 0.60.0
+
+### Features
+
+- [#4139](https://github.com/microsoft/typespec/pull/4139) Internals: Migrate to new api for declaring decorator implementation
+
+
+## 0.59.1
+
+### Bug Fixes
+
+- [#4155](https://github.com/microsoft/typespec/pull/4155) HotFix: Uri template not correctly built when using `@autoRoute`
+
+
+## 0.59.0
+
+### Bump dependencies
+
+- [#3948](https://github.com/microsoft/typespec/pull/3948) Update dependencies
+
+### Features
+
+- [#3932](https://github.com/microsoft/typespec/pull/3932) Add support for URI templates in routes
+
+
 ## 0.58.0
 
 ### Bump dependencies

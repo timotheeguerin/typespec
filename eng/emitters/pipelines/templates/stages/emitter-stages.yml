@@ -72,6 +72,14 @@ parameters:
     type: string
     default: ""
 
+  - name: EnableCadlRanchReport
+    type: boolean
+    default: true
+
+  - name: PythonVersion
+    type: string
+    default: "3.12"
+
 stages:
   # Build stage
   # Responsible for building the autorest generator and typespec emitter packages
@@ -100,6 +108,8 @@ stages:
           NodeVersion: 20.x
           Os: linux
           EmitArtifacts: true # Emit artifacts only for the first job
+          PythonVersion: ${{ parameters.PythonVersion }}
+          RunSDLTools: true
       - template: /eng/emitters/pipelines/templates/jobs/build-job.yml
         parameters:
           BuildPrereleaseVersion: ${{ parameters.BuildPrereleaseVersion }}
@@ -109,8 +119,9 @@ stages:
           Packages: ${{ parameters.Packages }}
           PackagePath: ${{ parameters.PackagePath }}
           LanguageShortName: ${{ parameters.LanguageShortName }}
-          NodeVersion: 18.x
+          NodeVersion: 22.x
           Os: linux
+          PythonVersion: ${{ parameters.PythonVersion }}
       - template: /eng/emitters/pipelines/templates/jobs/build-job.yml
         parameters:
           BuildPrereleaseVersion: ${{ parameters.BuildPrereleaseVersion }}
@@ -122,6 +133,7 @@ stages:
           LanguageShortName: ${{ parameters.LanguageShortName }}
           NodeVersion: 20.x
           Os: windows
+          PythonVersion: ${{ parameters.PythonVersion }}
       - template: /eng/emitters/pipelines/templates/jobs/build-job.yml
         parameters:
           BuildPrereleaseVersion: ${{ parameters.BuildPrereleaseVersion }}
@@ -131,8 +143,9 @@ stages:
           Packages: ${{ parameters.Packages }}
           PackagePath: ${{ parameters.PackagePath }}
           LanguageShortName: ${{ parameters.LanguageShortName }}
-          NodeVersion: 18.x
+          NodeVersion: 22.x
           Os: windows
+          PythonVersion: ${{ parameters.PythonVersion }}
       - ${{ if eq(parameters.Publish, 'none') }}:
           - template: /eng/emitters/pipelines/templates/jobs/detect-api-changes.yml
             parameters:
@@ -170,6 +183,8 @@ stages:
                   Os: linux
                   EmitArtifacts: true # Emit artifacts only for the first job
                   CadlRanchName: ${{ parameters.CadlRanchName }} # only needed for first job
+                  EnableCadlRanchReport: ${{ parameters.EnableCadlRanchReport }}
+                  PythonVersion: ${{ parameters.PythonVersion }}
               - template: /eng/emitters/pipelines/templates/jobs/test-job.yml
                 parameters:
                   AdditionalInitializeSteps: ${{ parameters.AdditionalInitializeSteps }}
@@ -177,8 +192,9 @@ stages:
                   TestArgs: ${{ parameters.UnitTestArgs }}
                   LanguageShortName: ${{ parameters.LanguageShortName }}
                   BuildArtifactName: build_artifacts_${{ parameters.LanguageShortName }}
-                  NodeVersion: 18.x
+                  NodeVersion: 22.x
                   Os: linux
+                  PythonVersion: ${{ parameters.PythonVersion }}
               - template: /eng/emitters/pipelines/templates/jobs/test-job.yml
                 parameters:
                   AdditionalInitializeSteps: ${{ parameters.AdditionalInitializeSteps }}
@@ -188,6 +204,7 @@ stages:
                   BuildArtifactName: build_artifacts_${{ parameters.LanguageShortName }}
                   NodeVersion: 20.x
                   Os: windows
+                  PythonVersion: ${{ parameters.PythonVersion }}
               - template: /eng/emitters/pipelines/templates/jobs/test-job.yml
                 parameters:
                   AdditionalInitializeSteps: ${{ parameters.AdditionalInitializeSteps }}
@@ -195,8 +212,9 @@ stages:
                   TestArgs: ${{ parameters.UnitTestArgs }}
                   LanguageShortName: ${{ parameters.LanguageShortName }}
                   BuildArtifactName: build_artifacts_${{ parameters.LanguageShortName }}
-                  NodeVersion: 18.x
+                  NodeVersion: 22.x
                   Os: windows
+                  PythonVersion: ${{ parameters.PythonVersion }}
 
   # Regen Test stage
   # Responsible for running any regen tests needed to validate no manual changes were done.
@@ -220,6 +238,7 @@ stages:
               BuildArtifactName: build_artifacts_${{ parameters.LanguageShortName }}
               Os: windows
               TestMatrix: ${{ parameters.TestMatrix }}
+              PythonVersion: ${{ parameters.PythonVersion }}
           - template: /eng/emitters/pipelines/templates/jobs/test-job.yml
             parameters:
               AdditionalInitializeSteps: ${{ parameters.AdditionalInitializeSteps }}
@@ -228,6 +247,7 @@ stages:
               BuildArtifactName: build_artifacts_${{ parameters.LanguageShortName }}
               Os: linux
               TestMatrix: ${{ parameters.TestMatrix }}
+              PythonVersion: ${{ parameters.PythonVersion }}
 
   # Publish stage
   # Responsible for publishing the packages in `build_artifacts/packages` and producing `emitter-package-lock.json`
@@ -291,6 +311,8 @@ stages:
                       # todo update so we can publish publicly to nuget
                       publishVstsFeed: "29ec6040-b234-4e31-b139-33dc4287b756/fa8c16a3-dbe0-4de2-a297-03065ec1ba3f"
                       nuGetFeedType: internal
+                      # must set useDotNetTask=true on ubuntu-24.04 or later
+                      useDotNetTask: true
 
               - template: /eng/emitters/pipelines/templates/steps/create-apireview.yml
                 parameters:

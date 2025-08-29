@@ -1,23 +1,50 @@
 import { Contact, License } from "@typespec/openapi";
-import { OpenAPI3Encoding, OpenAPI3Schema, Refable } from "../../../types.js";
+import { OpenAPI3Encoding, OpenAPI3Responses, OpenAPI3Schema, Refable } from "../../../types.js";
 
 export interface TypeSpecProgram {
   serviceInfo: TypeSpecServiceInfo;
   namespaces: Record<string, TypeSpecNamespace>;
-  models: TypeSpecModel[];
+  types: TypeSpecDataTypes[];
+  tags: TypeSpecTagMetadata[];
   augmentations: TypeSpecAugmentation[];
   operations: TypeSpecOperation[];
+  servers: TypeSpecServer[];
+}
+
+export interface TypeSpecServer {
+  url: string;
+  description?: string;
+  variables?: Record<string, TypeSpecServerVariable>;
+}
+
+export interface TypeSpecServerVariable {
+  default: string;
+  description?: string;
+  enum?: string[];
+}
+
+export interface TypeSpecTagMetadata {
+  name: string;
+  description?: string;
+  externalDocs?: TypeSpecExternalDocs;
+}
+
+export interface TypeSpecExternalDocs {
+  url: string;
+  description?: string;
 }
 
 export interface TypeSpecDeclaration {
   name: string;
   doc?: string;
+  decorators: TypeSpecDecorator[];
   scope: string[];
+  fixmes?: string[];
 }
 
 export interface TypeSpecNamespace {
   namespaces: Record<string, TypeSpecNamespace>;
-  models: TypeSpecModel[];
+  types: TypeSpecDataTypes[];
   operations: TypeSpecOperation[];
 }
 
@@ -33,15 +60,32 @@ export interface TypeSpecServiceInfo {
 
 export interface TypeSpecDecorator {
   name: string;
-  args: (object | number | string)[];
+  args: (object | number | string | TSValue)[];
+}
+
+export interface TSValue {
+  __kind: "value";
+  /**
+   * String representation of the value.
+   * This will be directly substituted into the generated code.
+   */
+  value: string;
 }
 
 export interface TypeSpecAugmentation extends TypeSpecDecorator {
   target: string;
 }
 
+export type TypeSpecDataTypes =
+  | TypeSpecAlias
+  | TypeSpecEnum
+  | TypeSpecModel
+  | TypeSpecScalar
+  | TypeSpecUnion;
+
 export interface TypeSpecModel extends TypeSpecDeclaration {
-  decorators: TypeSpecDecorator[];
+  kind: "model";
+
   properties: TypeSpecModelProperty[];
   additionalProperties?: Refable<OpenAPI3Schema>;
   /**
@@ -56,6 +100,37 @@ export interface TypeSpecModel extends TypeSpecDeclaration {
    * Defaults to 'object'
    */
   type?: OpenAPI3Schema["type"];
+
+  spread?: string[];
+
+  /**
+   * Whether the model is referenced as a multipart request body and needs to be emitted as a set of http parts
+   */
+  isModelReferencedAsMultipartRequestBody?: boolean;
+  /**
+   * The encoding information to use, if any, for the multipart request body.
+   */
+  encoding?: Record<string, OpenAPI3Encoding>;
+}
+
+export interface TypeSpecAlias extends Pick<TypeSpecDeclaration, "name" | "doc" | "scope"> {
+  kind: "alias";
+  ref: string;
+}
+
+export interface TypeSpecEnum extends TypeSpecDeclaration {
+  kind: "enum";
+  schema: OpenAPI3Schema;
+}
+
+export interface TypeSpecUnion extends TypeSpecDeclaration {
+  kind: "union";
+  schema: OpenAPI3Schema;
+}
+
+export interface TypeSpecScalar extends TypeSpecDeclaration {
+  kind: "scalar";
+  schema: OpenAPI3Schema;
 }
 
 export interface TypeSpecModelProperty {
@@ -72,18 +147,16 @@ export interface TypeSpecModelProperty {
 }
 
 export interface TypeSpecOperation extends TypeSpecDeclaration {
-  name: string;
-  doc?: string;
-  decorators: TypeSpecDecorator[];
   operationId?: string;
   parameters: Refable<TypeSpecOperationParameter>[];
   requestBodies: TypeSpecRequestBody[];
-  responseTypes: string[];
+  responses: OpenAPI3Responses;
   tags: string[];
 }
 
 export interface TypeSpecOperationParameter {
   name: string;
+  in: string;
   doc?: string;
   decorators: TypeSpecDecorator[];
   isOptional: boolean;

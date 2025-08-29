@@ -1,8 +1,8 @@
-import { Console } from "console";
 import { mkdir, writeFile } from "fs/promises";
 import inspector from "inspector";
 import { join } from "path";
 import { fileURLToPath } from "url";
+import { format, inspect } from "util";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   ApplyWorkspaceEditParams,
@@ -13,9 +13,10 @@ import {
   createConnection,
 } from "vscode-languageserver/node.js";
 import { NodeHost } from "../core/node-host.js";
-import { typespecVersion } from "../utils/misc.js";
+import { typespecVersion } from "../manifest.js";
+import { createClientConfigProvider } from "./client-config-provider.js";
 import { createServer } from "./serverlib.js";
-import { Server, ServerHost, ServerLog } from "./types.js";
+import { CustomRequestName, Server, ServerHost, ServerLog } from "./types.js";
 
 let server: Server | undefined = undefined;
 
@@ -31,14 +32,20 @@ try {
 }
 
 function main() {
-  // Redirect all console stdout output to stderr since LSP pipe uses stdout
-  // and writing to stdout for anything other than LSP protocol will break
-  // things badly.
-  global.console = new Console(process.stderr, process.stderr);
-
   let clientHasWorkspaceFolderCapability = false;
   const connection = createConnection(ProposedFeatures.all);
   const documents = new TextDocuments(TextDocument);
+
+  // eslint-disable-next-line no-console
+  console.log = (data: any, ...args: any[]) => connection.console.info(format(data, ...args));
+  // eslint-disable-next-line no-console
+  console.info = (data: any, ...args: any[]) => connection.console.info(format(data, ...args));
+  // eslint-disable-next-line no-console
+  console.debug = (data: any, ...args: any[]) => connection.console.debug(format(data, ...args));
+  // eslint-disable-next-line no-console
+  console.warn = (data: any, ...args: any[]) => connection.console.warn(format(data, ...args));
+  // eslint-disable-next-line no-console
+  console.error = (data: any, ...args: any[]) => connection.console.error(format(data, ...args));
 
   const host: ServerHost = {
     compilerHost: NodeHost,
@@ -50,8 +57,7 @@ function main() {
       let detail: string | undefined = undefined;
       let fullMessage = message;
       if (log.detail) {
-        detail =
-          typeof log.detail === "string" ? log.detail : JSON.stringify(log.detail, undefined, 2);
+        detail = typeof log.detail === "string" ? log.detail : inspect(log.detail);
         fullMessage = `${message}:\n${detail}`;
       }
 
@@ -73,7 +79,7 @@ function main() {
           break;
         default:
           connection.console.error(
-            `Log Message with invalid LogLevel (${log.level}). Raw Message: ${fullMessage}`
+            `Log Message with invalid LogLevel (${log.level}). Raw Message: ${fullMessage}`,
           );
           break;
       }
@@ -86,7 +92,8 @@ function main() {
     },
   };
 
-  const s = createServer(host);
+  const clientConfigProvider = createClientConfigProvider();
+  const s = createServer(host, clientConfigProvider);
   server = s;
   s.log({ level: `info`, message: `TypeSpec language server v${typespecVersion}` });
   s.log({ level: `info`, message: `Module: ${fileURLToPath(import.meta.url)}` });
@@ -106,10 +113,13 @@ function main() {
     return await s.initialize(params);
   });
 
-  connection.onInitialized((params) => {
+  connection.onInitialized(async (params) => {
     if (clientHasWorkspaceFolderCapability) {
       connection.workspace.onDidChangeWorkspaceFolders(s.workspaceFoldersChanged);
     }
+
+    // Initialize client configurations
+    await clientConfigProvider.initialize(connection, host);
     s.initialized(params);
   });
 
@@ -128,6 +138,16 @@ function main() {
   connection.onCodeAction(profile(s.getCodeActions));
   connection.onExecuteCommand(profile(s.executeCommand));
   connection.languages.semanticTokens.on(profile(s.buildSemanticTokens));
+  connection.workspace.onDidRenameFiles(profile(s.renameFiles));
+
+  const validateInitProjectTemplate: CustomRequestName = "typespec/validateInitProjectTemplate";
+  connection.onRequest(validateInitProjectTemplate, profile(s.validateInitProjectTemplate));
+  const getInitProjectContextRequestName: CustomRequestName = "typespec/getInitProjectContext";
+  connection.onRequest(getInitProjectContextRequestName, profile(s.getInitProjectContext));
+  const initProjectRequestName: CustomRequestName = "typespec/initProject";
+  connection.onRequest(initProjectRequestName, profile(s.initProject));
+  const compileProjectRequestName: CustomRequestName = "typespec/internalCompile";
+  connection.onRequest(compileProjectRequestName, profile(s.internalCompile));
 
   documents.onDidChangeContent(profile(s.checkChange));
   documents.onDidClose(profile(s.documentClosed));
@@ -161,10 +181,8 @@ function profile<T extends (...args: any) => any>(func: T): T {
 
   return (async (...args: any[]) => {
     profileSession!.post("Profiler.enable", () => {
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       profileSession!.post("Profiler.start", async () => {
         const ret = await func.apply(undefined!, args);
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         profileSession!.post("Profiler.stop", async (err, args) => {
           if (!err && args.profile) {
             await mkdir(profileDir!, { recursive: true });

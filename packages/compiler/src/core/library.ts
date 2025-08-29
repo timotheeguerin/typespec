@@ -29,12 +29,9 @@ export function getLibraryUrlsLoaded(): Set<string> {
   return loadedUrls;
 }
 
-/** @deprecated use createTypeSpecLibrary */
-export const createCadlLibrary = createTypeSpecLibrary;
-
 function createStateKeys<T extends string>(
   libName: string,
-  state: Record<T, StateDef> | undefined
+  state: Record<T, StateDef> | undefined,
 ): Record<T, symbol> {
   const result: Record<string, symbol> = {};
 
@@ -50,7 +47,7 @@ function createStateKeys<T extends string>(
  * @returns Library with utility functions.
  *
  *
- * @tutorial Create the lib object with `as const` to get the full typing.
+ * @remarks Create the lib object with `as const` to get the full typing.
  *
  * @example
  * const libDef = {
@@ -113,14 +110,11 @@ export function defineLinter(def: LinterDefinition): LinterDefinition {
 
 /** Create a new linter rule. */
 export function createLinterRule<const N extends string, const T extends DiagnosticMessages>(
-  definition: LinterRuleDefinition<N, T>
+  definition: LinterRuleDefinition<N, T>,
 ) {
   compilerAssert(!definition.name.includes("/"), "Rule name cannot contain a '/'.");
   return definition;
 }
-
-/** @deprecated use setTypeSpecNamespace */
-export const setCadlNamespace = setTypeSpecNamespace;
 
 /**
  * Set the TypeSpec namespace for that function.
@@ -142,7 +136,7 @@ function getCaller() {
 function getCallStack() {
   const _prepareStackTrace = Error.prepareStackTrace;
   Error.prepareStackTrace = (_, stack) => stack;
-  const stack = (new Error() as any).stack.slice(1); // eslint-disable-line unicorn/error-message
+  const stack = (new Error() as any).stack.slice(1);
   Error.prepareStackTrace = _prepareStackTrace;
   return stack;
 }

@@ -1,4 +1,4 @@
-import { Model } from "@typespec/compiler";
+import type { Model } from "@typespec/compiler";
 import { expectDiagnosticEmpty, expectDiagnostics } from "@typespec/compiler/testing";
 import { deepStrictEqual, ok, strictEqual } from "assert";
 import { describe, it } from "vitest";
@@ -7,7 +7,7 @@ import { compileOperations, getOperationsWithServiceNamespace } from "./test-hos
 describe("body resolution", () => {
   it("emit diagnostics for duplicate @body decorator", async () => {
     const [_, diagnostics] = await compileOperations(
-      `op read(): { @body body1: string, @body body2: int32 };`
+      `op read(): { @body body1: string, @body body2: int32 };`,
     );
     expectDiagnostics(diagnostics, [
       { code: "@typespec/http/duplicate-body" },
@@ -17,7 +17,7 @@ describe("body resolution", () => {
 
   it("emit diagnostics for duplicate @bodyRoot decorator", async () => {
     const [_, diagnostics] = await compileOperations(
-      `op read(): { @bodyRoot body1: string, @bodyRoot body2: int32 };`
+      `op read(): { @bodyRoot body1: string, @bodyRoot body2: int32 };`,
     );
     expectDiagnostics(diagnostics, [
       { code: "@typespec/http/duplicate-body" },
@@ -27,7 +27,7 @@ describe("body resolution", () => {
 
   it("emit diagnostics for using @body and @bodyRoute decorator", async () => {
     const [_, diagnostics] = await compileOperations(
-      `op read(): { @bodyRoot body1: string, @body body2: int32 };`
+      `op read(): { @bodyRoot body1: string, @body body2: int32 };`,
     );
     expectDiagnostics(diagnostics, [
       { code: "@typespec/http/duplicate-body" },
@@ -57,16 +57,34 @@ describe("body resolution", () => {
       ["@statusCode", "_: 200"],
     ])("%s", async (dec, prop) => {
       const [_, diagnostics] = await compileOperations(
-        `op read(): { @body explicit: {${dec} ${prop}, other: string} };`
+        `op read(): { @body explicit: {${dec} ${prop}, other: string} };`,
       );
       expectDiagnostics(diagnostics, { code: "@typespec/http/metadata-ignored" });
     });
   });
 });
 
+describe("response cookie", () => {
+  it("emit diagnostics for implicit @cookie in the response", async () => {
+    const [_, diagnostics] = await compileOperations(`
+        op get(): { @cookie token: string };
+      `);
+
+    expectDiagnostics(diagnostics, { code: "@typespec/http/response-cookie-not-supported" });
+  });
+
+  it("doesn't emit response-cookie-not-supported diagnostics for explicit @cookie in the response", async () => {
+    const [_, diagnostics] = await compileOperations(`
+        op get(): { @body explicit: { @cookie token: string } };
+      `);
+
+    expectDiagnostics(diagnostics, { code: "@typespec/http/metadata-ignored" });
+  });
+});
+
 it("doesn't emit diagnostic if the metadata is not applicable in the response", async () => {
   const [_, diagnostics] = await compileOperations(
-    `op read(): { @body explicit: {@path id: string} };`
+    `op read(): { @body explicit: {@path id: string} };`,
   );
   expectDiagnosticEmpty(diagnostics);
 });
@@ -91,7 +109,7 @@ it("issues diagnostics for invalid content types", async () => {
       @route("/test3")
       @get
       op test3(): { @header contentType: "application/json" | TextPlain, @body body: Foo };
-    `
+    `,
   );
   expectDiagnostics(diagnostics, [
     { code: "@typespec/http/content-type-string" },
@@ -113,7 +131,7 @@ it("supports any casing for string literal 'Content-Type' header properties.", a
 
       @route("/test3")
       op test3(): { @header "content-type": "application/json", @body body: Foo };
-    `
+    `,
   );
   expectDiagnosticEmpty(diagnostics);
   strictEqual(routes.length, 3);
@@ -141,7 +159,7 @@ it("empty response model becomes body if it has children", async () => {
         c: string;
       }
 
-    `
+    `,
   );
   expectDiagnosticEmpty(diagnostics);
   strictEqual(routes.length, 1);
@@ -151,4 +169,48 @@ it("empty response model becomes body if it has children", async () => {
   const body = response.responses[0].body;
   ok(body);
   strictEqual((body.type as Model).name, "A");
+});
+
+it("chooses correct content-type for extensible union body", async () => {
+  const [routes, diagnostics] = await getOperationsWithServiceNamespace(`
+    union DaysOfWeekExtensibleEnum {
+      string,
+
+      @doc("Monday.")
+      Monday: "Monday",
+
+      @doc("Tuesday.")
+      Tuesday: "Tuesday",
+
+      @doc("Wednesday.")
+      Wednesday: "Wednesday",
+
+      @doc("Thursday.")
+      Thursday: "Thursday",
+
+      @doc("Friday.")
+      Friday: "Friday",
+
+      @doc("Saturday.")
+      Saturday: "Saturday",
+
+      @doc("Sunday.")
+      Sunday: "Sunday",
+    }
+
+    @get
+    @route("/unknown-value")
+    op getUnknownValue(): {
+      @body body: DaysOfWeekExtensibleEnum;
+    };
+  `);
+
+  expectDiagnosticEmpty(diagnostics);
+  strictEqual(routes.length, 1);
+  const responses = routes[0].responses;
+  strictEqual(responses.length, 1);
+  const response = responses[0];
+  const body = response.responses[0].body;
+  ok(body);
+  deepStrictEqual(body.contentTypes, ["text/plain"]);
 });

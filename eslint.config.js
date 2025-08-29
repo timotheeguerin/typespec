@@ -1,12 +1,9 @@
 // @ts-check
 import eslint from "@eslint/js";
-import deprecation from "eslint-plugin-deprecation";
+import vitest from "@vitest/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
 import unicorn from "eslint-plugin-unicorn";
-import vitest from "eslint-plugin-vitest";
-import { dirname } from "path";
 import tsEslint from "typescript-eslint";
-import { fileURLToPath } from "url";
 
 /** Config that will apply to all files */
 const allFilesConfig = tsEslint.config({
@@ -22,13 +19,23 @@ const allFilesConfig = tsEslint.config({
     "@typescript-eslint/no-inferrable-types": "off",
     "@typescript-eslint/no-empty-function": "off",
     "@typescript-eslint/no-empty-interface": "off",
+    "@typescript-eslint/no-empty-object-type": "off",
     "@typescript-eslint/no-unused-vars": [
       "warn",
-      { varsIgnorePattern: "^_", argsIgnorePattern: ".*", ignoreRestSiblings: true },
+      {
+        varsIgnorePattern: "^_",
+        argsIgnorePattern: ".*",
+        ignoreRestSiblings: true,
+        caughtErrorsIgnorePattern: ".*",
+      },
     ],
 
     // This rule is bugged https://github.com/typescript-eslint/typescript-eslint/issues/6538
     "@typescript-eslint/no-misused-promises": "off",
+    "@typescript-eslint/no-unused-expressions": [
+      "warn",
+      { allowShortCircuit: true, allowTernary: true },
+    ],
 
     /**
      * Unicorn
@@ -65,21 +72,25 @@ const allFilesConfig = tsEslint.config({
  */
 export function getTypeScriptProjectRules(root) {
   return tsEslint.config({
-    files: ["**/*.ts", "**/*.tsx"],
-    ignores: ["packages/http-client-csharp/**/*"], // Ignore isolated modules
-    plugins: {
-      deprecation,
-    },
+    files: [
+      "**/packages/*/src/**/*.ts",
+      "**/packages/*/src/**/*.tsx",
+      "**/packages/*/emitter/src/**/*.ts",
+    ],
+    ignores: ["**/packages/http-client-csharp/**/*", "**/packages/http-client-python/**/*"], // Ignore isolated modules
+    plugins: {},
     languageOptions: {
       parserOptions: {
-        project: "./tsconfig.json",
+        projectService: {
+          allowDefaultProject: ["packages/*/vitest.config.ts"],
+        },
         tsconfigRootDir: root,
       },
     },
     rules: {
       // Only put rules here that need typescript project information
       "@typescript-eslint/no-floating-promises": "error",
-      "deprecation/deprecation": ["warn"],
+      "@typescript-eslint/no-deprecated": "warn",
     },
   });
 }
@@ -109,6 +120,8 @@ const testFilesConfig = tsEslint.config({
 const jsxFilesConfig = tsEslint.config({
   files: ["**/*.tsx"],
   plugins: { "react-hooks": reactHooks },
+  // Exclude need **/ to make sure this can be reused in typespec-azure
+  ignores: ["**/packages/emitter-framework/src/**/*", "**/packages/http-client-js/**/*"],
   rules: {
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
@@ -127,11 +140,23 @@ export default tsEslint.config(
   {
     ignores: [
       "**/dist/**/*",
+      "**/dist-test/**/*",
       "**/.temp/**/*",
+      "**/temp/**/*",
       "**/generated-defs/*",
+      "**/__snapshots__/*",
+      "**/.astro/*",
       "**/website/build/**/*",
+      "**/.astro/**/*",
       "**/.docusaurus/**/*",
+      "website/src/assets/**/*",
       "packages/compiler/templates/**/*", // Ignore the templates which might have invalid code and not follow exactly our rules.
+      "packages/http-client-js/test/e2e/generated", // Ignore the generated http client
+      "packages/http-client-js/sample/output/**/*", // Ignore the generated http client
+      "packages/http-server-js/test/e2e/generated", // Ignore the generated http server
+      "**/venv/**/*", // Ignore python virtual env
+      "**/.vscode-test-web/**/*", // Ignore VSCode test web project
+      "packages/typespec-vscode/swagger-ui/swagger-ui*", // Ignore swagger-ui-dist files
       // TODO: enable
       "**/.scripts/**/*",
       "eng/tsp-core/scripts/**/*",
@@ -140,5 +165,5 @@ export default tsEslint.config(
     ],
   },
   ...TypeSpecCommonEslintConfigs,
-  ...getTypeScriptProjectRules(dirname(fileURLToPath(import.meta.url)))
+  ...getTypeScriptProjectRules(import.meta.dirname),
 );

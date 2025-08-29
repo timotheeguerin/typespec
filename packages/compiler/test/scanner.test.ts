@@ -3,7 +3,8 @@ import { readFile } from "fs/promises";
 import { URL } from "url";
 import { describe, it } from "vitest";
 import { isIdentifierContinue, isIdentifierStart } from "../src/core/charcode.js";
-import { DiagnosticHandler, formatDiagnostic } from "../src/core/diagnostics.js";
+import { DiagnosticHandler } from "../src/core/diagnostics.js";
+import { formatDiagnostic } from "../src/core/logger/console-sink.js";
 import {
   KeywordLimit,
   Keywords,
@@ -12,10 +13,11 @@ import {
   createScanner,
   isKeyword,
   isPunctuation,
+  isReservedKeyword,
   isStatementKeyword,
 } from "../src/core/scanner.js";
 import { DiagnosticMatch, expectDiagnostics } from "../src/testing/expect.js";
-import { extractSquiggles } from "../src/testing/test-server-host.js";
+import { extractSquiggles } from "../src/testing/source-utils.js";
 
 type TokenEntry = [
   Token,
@@ -70,7 +72,7 @@ function verify(tokens: TokenEntry[], expecting: TokenEntry[]) {
       assert.strictEqual(
         additional!.pos,
         expectedAdditional.pos,
-        `Token ${index} position must match`
+        `Token ${index} position must match`,
       );
     }
 
@@ -78,7 +80,7 @@ function verify(tokens: TokenEntry[], expecting: TokenEntry[]) {
       assert.strictEqual(
         additional!.line,
         expectedAdditional.line,
-        `Token ${index} line must match`
+        `Token ${index} line must match`,
       );
     }
 
@@ -86,7 +88,7 @@ function verify(tokens: TokenEntry[], expecting: TokenEntry[]) {
       assert.strictEqual(
         additional!.character,
         expectedAdditional?.character,
-        `Token ${index} character must match`
+        `Token ${index} character must match`,
       );
     }
 
@@ -94,7 +96,7 @@ function verify(tokens: TokenEntry[], expecting: TokenEntry[]) {
       assert.strictEqual(
         additional!.value,
         expectedAdditional.value,
-        `Token ${index} value must match`
+        `Token ${index} value must match`,
       );
     }
   }
@@ -103,10 +105,10 @@ function verify(tokens: TokenEntry[], expecting: TokenEntry[]) {
 describe("compiler: scanner", () => {
   /** verifies that we can scan tokens and get back some output. */
   it("smoketest", () => {
-    const all = tokens('\tthis was "a" test');
+    const all = tokens('\tit was "a" test');
     verify(all, [
       [Token.Whitespace],
-      [Token.Identifier, "this", { value: "this" }],
+      [Token.Identifier, "it", { value: "it" }],
       [Token.Whitespace],
       [Token.Identifier, "was", { value: "was" }],
       [Token.Whitespace],
@@ -197,7 +199,7 @@ describe("compiler: scanner", () => {
     ]);
   });
 
-  it("scans projection-related tokens", () => {
+  it("scans projection-related tokens (reserve)", () => {
     const all = tokens("<= >= && || == projection if =>");
     verify(all, [
       [Token.LessThanEquals, "<="],
@@ -221,7 +223,7 @@ describe("compiler: scanner", () => {
   function scanString(
     text: string,
     expectedValue: string,
-    expectedDiagnostic?: RegExp | DiagnosticMatch
+    expectedDiagnostic?: RegExp | DiagnosticMatch,
   ) {
     const scanner = createScanner(text, (diagnostic) => {
       if (expectedDiagnostic) {
@@ -278,7 +280,7 @@ describe("compiler: scanner", () => {
       "You do not need to escape lone quotes"
       You can use escape sequences: \\r \\n \\t \\\\ \\"
       """`,
-      'This is a triple-quoted string\n\n\n"You do not need to escape lone quotes"\nYou can use escape sequences: \r \n \t \\ "'
+      'This is a triple-quoted string\n\n\n"You do not need to escape lone quotes"\nYou can use escape sequences: \r \n \t \\ "',
     );
   });
 
@@ -322,7 +324,7 @@ describe("compiler: scanner", () => {
 
   it("scans backticked identifiers", () => {
     const all = tokens(
-      "`a` `01-01`\n`aa x`\r\n`1+1=2` `1!=2` `x\\`x` `\\\\x`\u{2028}`3.14`\u{2029}`import` `a\\n\\t\\`b`"
+      "`a` `01-01`\n`aa x`\r\n`1+1=2` `1!=2` `x\\`x` `\\\\x`\u{2028}`3.14`\u{2029}`import` `a\\n\\t\\`b`",
     );
     verify(all, [
       [Token.Identifier, "`a`", { pos: 0, value: "a", line: 0, character: 0 }],
@@ -404,33 +406,38 @@ describe("compiler: scanner", () => {
       assert.match(
         name,
         /^[a-z]+$/,
-        "We need to change the keyword lookup algorithm in the scanner if we ever add a keyword that is not all lowercase ascii letters."
+        "We need to change the keyword lookup algorithm in the scanner if we ever add a keyword that is not all lowercase ascii letters.",
       );
       minKeywordLengthFound = Math.min(minKeywordLengthFound, name.length);
       maxKeywordLengthFound = Math.max(maxKeywordLengthFound, name.length);
 
       assert.strictEqual(TokenDisplay[token], `'${name}'`, "token display should match");
-      assert(isKeyword(token), `${name} should be classified as a keyword`);
-      if (nonStatementKeywords.includes(token)) {
-        assert(
-          !isStatementKeyword(token),
-          `${name} should not be classified as a statement keyword`
-        );
-      } else {
-        assert(isStatementKeyword(token), `${name} should be classified as statement keyword`);
+      assert(
+        isKeyword(token) || isReservedKeyword(token),
+        `${name} should be classified as a keyword or reserved keyword`,
+      );
+      if (!isReservedKeyword(token)) {
+        if (nonStatementKeywords.includes(token)) {
+          assert(
+            !isStatementKeyword(token),
+            `${name} should not be classified as a statement keyword`,
+          );
+        } else {
+          assert(isStatementKeyword(token), `${name} should be classified as statement keyword`);
+        }
       }
     }
 
     assert.strictEqual(
       minKeywordLengthFound,
       KeywordLimit.MinLength,
-      `min keyword length is incorrect, set KeywordLimit.MinLength to ${minKeywordLengthFound}`
+      `min keyword length is incorrect, set KeywordLimit.MinLength to ${minKeywordLengthFound}`,
     );
 
     assert.strictEqual(
       maxKeywordLengthFound,
       KeywordLimit.MaxLength,
-      `max keyword length is incorrect, set KeywordLimit.MaxLength to ${maxKeywordLengthFound}`
+      `max keyword length is incorrect, set KeywordLimit.MaxLength to ${maxKeywordLengthFound}`,
     );
 
     // check single character punctuation
@@ -476,7 +483,7 @@ describe("compiler: scanner", () => {
     for (const codePoint of otherIDStart) {
       assert(
         isIdentifierStart(codePoint),
-        `U+${codePoint.toString(16)} should be allowed to start identifier.`
+        `U+${codePoint.toString(16)} should be allowed to start identifier.`,
       );
     }
   });
@@ -490,7 +497,7 @@ describe("compiler: scanner", () => {
     for (const codePoint of [...otherIDStart, ...otherIdContinue]) {
       assert(
         isIdentifierContinue(codePoint),
-        `U+${codePoint.toString(16)} should be allowed to continue identifier.`
+        `U+${codePoint.toString(16)} should be allowed to continue identifier.`,
       );
     }
     // cspell:disable-next-line

@@ -212,7 +212,7 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          text/plain:
             schema:
               $ref: '#/components/schemas/shelf_name'
         description: The name of the shelf we're removing books from and deleting.
@@ -270,6 +270,7 @@ components:
       schema:
         type: integer
         format: int32
+      explode: false
     ListRequestBase.page_token:
       name: page_token
       in: query
@@ -281,6 +282,7 @@ components:
         returned from the previous call to `ListShelves` method.
       schema:
         type: string
+      explode: false
     MergeShelvesRequest.name:
       name: name
       in: path

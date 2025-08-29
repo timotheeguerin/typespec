@@ -2,6 +2,7 @@ import { definePlaygroundViteConfig } from "@typespec/playground/vite";
 import { execSync } from "child_process";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig, loadEnv } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { TypeSpecPlaygroundConfig } from "./src/config.js";
 
 function getCommit() {
@@ -29,7 +30,17 @@ export default defineConfig(({ mode }) => {
   config.plugins!.push(
     visualizer({
       filename: "temp/stats.html",
-    }) as any
+    }) as any,
+  );
+
+  config.plugins!.push(
+    nodePolyfills({
+      include: [],
+      globals: {
+        Buffer: true,
+        process: "dev",
+      },
+    }),
   );
 
   const prNumber = getPrNumber();

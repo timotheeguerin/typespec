@@ -6,15 +6,15 @@ import {
   Refable,
 } from "../../../../types.js";
 import {
-  TypeSpecModel,
   TypeSpecOperation,
   TypeSpecOperationParameter,
   TypeSpecRequestBody,
 } from "../interfaces.js";
+import { Context } from "../utils/context.js";
 import { getExtensions, getParameterDecorators } from "../utils/decorators.js";
+import { generateOperationId } from "../utils/generate-operation-id.js";
 import { getScopeAndName } from "../utils/get-scope-and-name.js";
 import { supportedHttpMethods } from "../utils/supported-http-methods.js";
-import { collectOperationResponses } from "./transform-operation-responses.js";
 
 /**
  * Transforms each operation defined under #/paths/{route}/{httpMethod} into a TypeSpec operation.
@@ -23,12 +23,14 @@ import { collectOperationResponses } from "./transform-operation-responses.js";
  * @returns
  */
 export function transformPaths(
-  models: TypeSpecModel[],
-  paths: Record<string, OpenAPI3PathItem>
+  paths: Record<string, OpenAPI3PathItem>,
+  context: Context,
 ): TypeSpecOperation[] {
   const operations: TypeSpecOperation[] = [];
+  const usedOperationIds = new Set<string>();
 
   for (const route of Object.keys(paths)) {
+    const routeParameters = paths[route].parameters?.map(transformOperationParameter) ?? [];
     const path = paths[route];
     for (const verb of supportedHttpMethods) {
       const operation = path[verb];
@@ -38,22 +40,40 @@ export function transformPaths(
       const tags = operation.tags?.map((t) => t) ?? [];
 
       const operationResponses = operation.responses ?? {};
-      const responseModels = collectOperationResponses(operation.operationId!, operationResponses);
-      models.push(...responseModels);
+
+      const decorators = [
+        ...getExtensions(operation),
+        { name: "route", args: [route] },
+        { name: verb, args: [] },
+      ];
+
+      if (operation.summary) {
+        decorators.push({ name: "summary", args: [operation.summary] });
+      }
+
+      const fixmes: string[] = [];
+
+      // Handle missing operationId
+      let operationId = operation.operationId;
+      if (!operationId) {
+        operationId = generateOperationId(verb, route, usedOperationIds);
+        const warning = `Open API operation '${verb.toUpperCase()} ${route}' is missing an operationId. Generated: '${operationId}'`;
+        context.logger.warn(warning);
+        fixmes.push(warning);
+      } else {
+        usedOperationIds.add(operationId);
+      }
 
       operations.push({
-        ...getScopeAndName(operation.operationId!),
-        decorators: [
-          ...getExtensions(operation),
-          { name: "route", args: [route] },
-          { name: verb, args: [] },
-        ],
-        parameters,
+        ...getScopeAndName(operationId),
+        decorators,
+        parameters: dedupeParameters([...routeParameters, ...parameters]),
         doc: operation.description,
-        operationId: operation.operationId,
-        requestBodies: transformRequestBodies(operation.requestBody),
-        responseTypes: responseModels.map((m) => m.name),
+        operationId: operationId,
+        requestBodies: transformRequestBodies(operation.requestBody, context),
+        responses: operationResponses,
         tags: tags,
+        fixmes,
       });
     }
   }
@@ -61,8 +81,32 @@ export function transformPaths(
   return operations;
 }
 
+function dedupeParameters(
+  parameters: Refable<TypeSpecOperationParameter>[],
+): Refable<TypeSpecOperationParameter>[] {
+  const seen = new Set<string>();
+  const dedupeList: Refable<TypeSpecOperationParameter>[] = [];
+
+  // iterate in reverse since more specific-scoped parameters are added last
+  for (let i = parameters.length - 1; i >= 0; i--) {
+    // ignore resolving the $ref for now, unlikely to be able to resolve
+    // issues without user intervention if a duplicate is present except in
+    // very simple cases.
+    const param = parameters[i];
+
+    const identifier = "$ref" in param ? param.$ref : `${param.in}.${param.name}`;
+
+    if (seen.has(identifier)) continue;
+    seen.add(identifier);
+
+    dedupeList.unshift(param);
+  }
+
+  return dedupeList;
+}
+
 function transformOperationParameter(
-  parameter: Refable<OpenAPI3Parameter>
+  parameter: Refable<OpenAPI3Parameter>,
 ): Refable<TypeSpecOperationParameter> {
   if ("$ref" in parameter) {
     return { $ref: parameter.$ref };
@@ -70,6 +114,7 @@ function transformOperationParameter(
 
   return {
     name: printIdentifier(parameter.name),
+    in: parameter.in,
     doc: parameter.description,
     decorators: getParameterDecorators(parameter),
     isOptional: !parameter.required,
@@ -77,7 +122,20 @@ function transformOperationParameter(
   };
 }
 
-function transformRequestBodies(requestBodies?: OpenAPI3RequestBody): TypeSpecRequestBody[] {
+function transformRequestBodies(
+  requestBodies: Refable<OpenAPI3RequestBody> | undefined,
+  context: Context,
+): TypeSpecRequestBody[] {
+  if (!requestBodies) {
+    return [];
+  }
+
+  const description = requestBodies.description;
+
+  if ("$ref" in requestBodies) {
+    requestBodies = context.getByRef<OpenAPI3RequestBody>(requestBodies.$ref);
+  }
+
   if (!requestBodies) {
     return [];
   }
@@ -88,7 +146,7 @@ function transformRequestBodies(requestBodies?: OpenAPI3RequestBody): TypeSpecRe
     typespecBodies.push({
       contentType,
       isOptional: !requestBodies.required,
-      doc: requestBodies.description,
+      doc: description ?? requestBodies.description,
       encoding: contentBody.encoding,
       schema: contentBody.schema,
     });

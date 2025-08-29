@@ -42,14 +42,9 @@ const Token = {
     alias: createToken("alias", "keyword.other.tsp"),
     dec: createToken("dec", "keyword.other.tsp"),
     fn: createToken("fn", "keyword.other.tsp"),
-    projection: createToken("projection", "keyword.other.tsp"),
     extends: createToken("extends", "keyword.other.tsp"),
     extern: createToken("extern", "keyword.other.tsp"),
     is: createToken("is", "keyword.other.tsp"),
-    if: createToken("if", "keyword.other.tsp"),
-    else: createToken("else", "keyword.other.tsp"),
-    to: createToken("to", "keyword.other.tsp"),
-    from: createToken("from", "keyword.other.tsp"),
     valueof: createToken("valueof", "keyword.other.tsp"),
     typeof: createToken("typeof", "keyword.other.tsp"),
     const: createToken("const", "keyword.other.tsp"),
@@ -189,7 +184,7 @@ function testColorization(description: string, tokenize: Tokenize) {
           deepStrictEqual(tokens, [
             ...joinTokensInSemantic(
               [Token.literals.stringTriple('"""'), Token.literals.stringTriple("          Start ")],
-              "\n"
+              "\n",
             ),
             Token.punctuation.templateExpression.begin,
             Token.literals.numeric("123"),
@@ -203,7 +198,7 @@ function testColorization(description: string, tokenize: Tokenize) {
                   templateTripleOrDouble('"""'),
                 ]),
               ],
-              "\n"
+              "\n",
             ),
           ]);
         });
@@ -228,7 +223,7 @@ function testColorization(description: string, tokenize: Tokenize) {
                   Token.literals.stringTriple('"""'),
                 ]),
               ],
-              "\n"
+              "\n",
             ),
           ]);
         });
@@ -249,7 +244,7 @@ function testColorization(description: string, tokenize: Tokenize) {
                   Token.literals.stringTriple(`"""`),
                 ]),
               ],
-              "\n"
+              "\n",
             ),
           ]);
         });
@@ -827,26 +822,58 @@ function testColorization(description: string, tokenize: Tokenize) {
       });
     });
 
-    it("named template argument list", async () => {
-      const tokens = await tokenize("alias X = Foo<boolean, T = string, U = int32>;");
-      deepStrictEqual(tokens, [
-        Token.keywords.alias,
-        Token.identifiers.type("X"),
-        Token.operators.assignment,
-        Token.identifiers.type("Foo"),
-        Token.punctuation.typeParameters.begin,
-        Token.identifiers.type("boolean"),
-        Token.punctuation.comma,
-        Token.identifiers.type("T"),
-        Token.operators.assignment,
-        Token.identifiers.type("string"),
-        Token.punctuation.comma,
-        Token.identifiers.type("U"),
-        Token.operators.assignment,
-        Token.identifiers.type("int32"),
-        Token.punctuation.typeParameters.end,
-        Token.punctuation.semicolon,
-      ]);
+    describe("template argument", () => {
+      it("multiple named arguments", async () => {
+        const tokens = await tokenize("alias X = Foo<boolean, T = string, U = int32>;");
+        deepStrictEqual(tokens, [
+          Token.keywords.alias,
+          Token.identifiers.type("X"),
+          Token.operators.assignment,
+          Token.identifiers.type("Foo"),
+          Token.punctuation.typeParameters.begin,
+          Token.identifiers.type("boolean"),
+          Token.punctuation.comma,
+          Token.identifiers.type("T"),
+          Token.operators.assignment,
+          Token.identifiers.type("string"),
+          Token.punctuation.comma,
+          Token.identifiers.type("U"),
+          Token.operators.assignment,
+          Token.identifiers.type("int32"),
+          Token.punctuation.typeParameters.end,
+          Token.punctuation.semicolon,
+        ]);
+      });
+
+      it("multiple references", async () => {
+        const tokens = await tokenize(`
+          alias A = Foo<Parameters=string>;
+          alias B = Foo<Parameters=string>;  
+        `);
+        deepStrictEqual(tokens, [
+          Token.keywords.alias,
+          Token.identifiers.type("A"),
+          Token.operators.assignment,
+          Token.identifiers.type("Foo"),
+          Token.punctuation.typeParameters.begin,
+          Token.identifiers.type("Parameters"),
+          Token.operators.assignment,
+          Token.identifiers.type("string"),
+          Token.punctuation.typeParameters.end,
+          Token.punctuation.semicolon,
+          // --
+          Token.keywords.alias,
+          Token.identifiers.type("B"),
+          Token.operators.assignment,
+          Token.identifiers.type("Foo"),
+          Token.punctuation.typeParameters.begin,
+          Token.identifiers.type("Parameters"),
+          Token.operators.assignment,
+          Token.identifiers.type("string"),
+          Token.punctuation.typeParameters.end,
+          Token.punctuation.semicolon,
+        ]);
+      });
     });
 
     describe("enums", () => {
@@ -882,6 +909,26 @@ function testColorization(description: string, tokenize: Tokenize) {
           Token.identifiers.variable("`North West`"),
           Token.punctuation.comma,
           Token.identifiers.variable("`North West`"),
+          Token.punctuation.closeBrace,
+        ]);
+      });
+
+      it("decorators on escaped members", async () => {
+        const tokens = await tokenize("enum Direction { @foo `Val 123`, @foo(123) `456 after`}");
+        deepStrictEqual(tokens, [
+          Token.keywords.enum,
+          Token.identifiers.type("Direction"),
+          Token.punctuation.openBrace,
+          Token.identifiers.tag("@"),
+          Token.identifiers.tag("foo"),
+          Token.identifiers.variable("`Val 123`"),
+          Token.punctuation.comma,
+          Token.identifiers.tag("@"),
+          Token.identifiers.tag("foo"),
+          Token.punctuation.openParen,
+          Token.literals.numeric("123"),
+          Token.punctuation.closeParen,
+          Token.identifiers.variable("`456 after`"),
           Token.punctuation.closeBrace,
         ]);
       });
@@ -949,7 +996,7 @@ function testColorization(description: string, tokenize: Tokenize) {
 
       it("union with named variants with escaped identifier", async () => {
         const tokens = await tokenize(
-          `union Direction { \`north east\`: "North East", \`north west\`: "North West" }`
+          `union Direction { \`north east\`: "North East", \`north west\`: "North West" }`,
         );
         deepStrictEqual(tokens, [
           Token.keywords.union,
@@ -1078,7 +1125,7 @@ function testColorization(description: string, tokenize: Tokenize) {
 
       it("operation with decorated parameters", async () => {
         const tokens = await tokenize(
-          "op foo(@path param1: string, @query param2?: int32): string"
+          "op foo(@path param1: string, @query param2?: int32): string",
         );
         deepStrictEqual(tokens, [
           Token.keywords.operation,
@@ -1120,7 +1167,7 @@ function testColorization(description: string, tokenize: Tokenize) {
 
       it("defining a templated operation signature", async () => {
         const tokens = await tokenize(
-          "op ResourceRead<TResource> is ResourceReadBase<TResource, DefaultOptions>"
+          "op ResourceRead<TResource> is ResourceReadBase<TResource, DefaultOptions>",
         );
         deepStrictEqual(tokens, [
           Token.keywords.operation,
@@ -1402,7 +1449,7 @@ function testColorization(description: string, tokenize: Tokenize) {
             > = T`);
 
             const index = tokens.findIndex((x) =>
-              deepEquals(x, Token.punctuation.typeParameters.begin)
+              deepEquals(x, Token.punctuation.typeParameters.begin),
             );
             deepStrictEqual(tokens.slice(index, index + 4), [
               Token.punctuation.typeParameters.begin,
@@ -1438,7 +1485,7 @@ function testColorization(description: string, tokenize: Tokenize) {
             * Doc comment
             * @param foo Foo desc
             */
-          alias A = 1;`
+          alias A = 1;`,
         );
 
         deepStrictEqual(tokens, [
@@ -1455,7 +1502,7 @@ function testColorization(description: string, tokenize: Tokenize) {
             * Doc comment
             * @template foo Foo desc
             */
-          alias A = 1;`
+          alias A = 1;`,
         );
 
         deepStrictEqual(tokens, [
@@ -1472,7 +1519,7 @@ function testColorization(description: string, tokenize: Tokenize) {
             * Doc comment
             * @prop foo Foo desc
             */
-          alias A = 1;`
+          alias A = 1;`,
         );
 
         deepStrictEqual(tokens, [
@@ -1489,7 +1536,7 @@ function testColorization(description: string, tokenize: Tokenize) {
             * Doc comment
             * @returns Foo desc
             */
-          alias A = 1;`
+          alias A = 1;`,
         );
 
         deepStrictEqual(tokens, [Token.tspdoc.tag("@"), Token.tspdoc.tag("returns"), ...common]);
@@ -1500,7 +1547,7 @@ function testColorization(description: string, tokenize: Tokenize) {
             * Doc comment
             * @custom Foo desc
             */
-          alias A = 1;`
+          alias A = 1;`,
         );
 
         deepStrictEqual(tokens, [
@@ -1508,137 +1555,6 @@ function testColorization(description: string, tokenize: Tokenize) {
           Token.identifiers.tag("custom"),
           ...common,
         ]);
-      });
-    });
-
-    describe("projections", () => {
-      it("simple projection", async () => {
-        const tokens = await tokenize(`
-      projection op#foo {
-        to(arg1) {
-          calling(arg1);
-        }
-      }
-      `);
-        deepStrictEqual(tokens, [
-          Token.keywords.projection,
-          Token.keywords.operation,
-          Token.operators.selector,
-          Token.identifiers.variable("foo"),
-          Token.punctuation.openBrace,
-          Token.keywords.to,
-          Token.punctuation.openParen,
-          Token.identifiers.variable("arg1"),
-          Token.punctuation.closeParen,
-          Token.punctuation.openBrace,
-          Token.identifiers.functionName("calling"),
-          Token.punctuation.openParen,
-          Token.identifiers.type("arg1"),
-          Token.punctuation.closeParen,
-          Token.punctuation.semicolon,
-          Token.punctuation.closeBrace,
-          Token.punctuation.closeBrace,
-        ]);
-      });
-
-      async function testProjectionBody(body: string, expectedTokens: Token[]) {
-        const tokens = await tokenize(`
-      projection op#foo {
-        to(arg1) {
-          ${body}
-        }
-      }
-      `);
-        deepStrictEqual(tokens, [
-          Token.keywords.projection,
-          Token.keywords.operation,
-          Token.operators.selector,
-          Token.identifiers.variable("foo"),
-          Token.punctuation.openBrace,
-          Token.keywords.to,
-          Token.punctuation.openParen,
-          Token.identifiers.variable("arg1"),
-          Token.punctuation.closeParen,
-          Token.punctuation.openBrace,
-          ...expectedTokens,
-          Token.punctuation.closeBrace,
-          Token.punctuation.closeBrace,
-        ]);
-      }
-
-      it("if expression with body", async () => {
-        await testProjectionBody(
-          `
-        if hasFoo(arg1) {
-          doFoo(arg1);
-        };
-      `,
-          [
-            Token.keywords.if,
-            Token.identifiers.functionName("hasFoo"),
-            Token.punctuation.openParen,
-            Token.identifiers.type("arg1"),
-            Token.punctuation.closeParen,
-            Token.punctuation.openBrace,
-            Token.identifiers.functionName("doFoo"),
-            Token.punctuation.openParen,
-            Token.identifiers.type("arg1"),
-            Token.punctuation.closeParen,
-            Token.punctuation.semicolon,
-            Token.punctuation.closeBrace,
-            Token.punctuation.semicolon,
-          ]
-        );
-      });
-
-      it("if, else if, else expression", async () => {
-        await testProjectionBody(
-          `
-        if hasFoo() {
-        } else if hasBar() {
-        } else {
-        };
-      `,
-          [
-            Token.keywords.if,
-            Token.identifiers.functionName("hasFoo"),
-            Token.punctuation.openParen,
-            Token.punctuation.closeParen,
-            Token.punctuation.openBrace,
-            Token.punctuation.closeBrace,
-
-            Token.keywords.else,
-            Token.keywords.if,
-            Token.identifiers.functionName("hasBar"),
-            Token.punctuation.openParen,
-            Token.punctuation.closeParen,
-            Token.punctuation.openBrace,
-            Token.punctuation.closeBrace,
-
-            Token.keywords.else,
-            Token.punctuation.openBrace,
-            Token.punctuation.closeBrace,
-
-            Token.punctuation.semicolon,
-          ]
-        );
-      });
-
-      it("property accessor", async () => {
-        await testProjectionBody(
-          `
-        doFoo(self::name);
-        `,
-          [
-            Token.identifiers.functionName("doFoo"),
-            Token.punctuation.openParen,
-            Token.identifiers.type("self"),
-            ...(tokenize === tokenizeSemantic ? [Token.punctuation.valueAccessor] : []),
-            Token.identifiers.type("name"),
-            Token.punctuation.closeParen,
-            Token.punctuation.semicolon,
-          ]
-        );
       });
     });
   });
@@ -1737,7 +1653,7 @@ async function createOnigLib(): Promise<IOnigLib> {
   const require = createRequire(import.meta.url);
   const onigWasm = await readFile(`${dirname(require.resolve("vscode-oniguruma"))}/onig.wasm`);
 
-  await loadWASM(onigWasm.buffer);
+  await loadWASM(onigWasm.buffer as any);
 
   return {
     createOnigScanner: (sources) => createOnigScanner(sources),
@@ -1750,7 +1666,7 @@ const registry = new Registry({
   loadGrammar: async () => {
     const data = await readFile(
       resolve(await findTestPackageRoot(import.meta.url), "dist/typespec.tmLanguage"),
-      "utf-8"
+      "utf-8",
     );
     return parseRawGrammar(data);
   },
@@ -1824,7 +1740,7 @@ interface Span {
 class Input {
   private constructor(
     public lines: string[],
-    public span: Span
+    public span: Span,
   ) {}
 
   public static fromText(text: string) {

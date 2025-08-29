@@ -1,0 +1,653 @@
+import type { Model } from "@typespec/compiler";
+import { assert, describe, expect, it } from "vitest";
+import { expectDecorators } from "./utils/expect.js";
+import { tspForOpenAPI3 } from "./utils/tsp-for-openapi3.js";
+
+describe("converts top-level schemas", () => {
+  it("prioritizes discriminator information over enum convention", async () => {
+    const serviceNamespace = await tspForOpenAPI3({
+      schemas: {
+        Cat: {
+          type: "object",
+          properties: {
+            age: { type: "integer", format: "int32" },
+          },
+        },
+        Dog: {
+          type: "object",
+          properties: {
+            age: { type: "integer", format: "int32" },
+          },
+        },
+        Pet: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ["cat", "dog", "BigCat", "BigDog"] },
+          },
+          oneOf: [{ $ref: "#/components/schemas/Cat" }, { $ref: "#/components/schemas/Dog" }],
+          discriminator: {
+            propertyName: "type",
+            mapping: {
+              cat: "#/components/schemas/Cat",
+              dog: "#/components/schemas/Dog",
+            },
+          },
+        },
+      },
+    });
+
+    const unions = serviceNamespace.unions;
+    const perUnion = unions.get("Pet");
+    expect(perUnion).toBeDefined();
+    expect(perUnion?.variants.size).toBe(2);
+    expect(perUnion?.variants.get("dog")).toBeDefined();
+    expect(perUnion?.variants.get("cat")).toBeDefined();
+    expect(perUnion?.variants.get("BigCat")).toBeUndefined();
+    expect(perUnion?.variants.get("BigDog")).toBeUndefined();
+  });
+
+  it("handles scalars", async () => {
+    const serviceNamespace = await tspForOpenAPI3({
+      schemas: {
+        CustomBoolean: {
+          type: "boolean",
+        },
+        CustomInteger: {
+          type: "integer",
+          format: "int32",
+        },
+        CustomString: {
+          title: "Custom String",
+          type: "string",
+        },
+      },
+    });
+
+    const scalars = serviceNamespace.scalars;
+    /* scalar CustomBoolean extends boolean; */
+    expect(scalars.get("CustomBoolean")?.baseScalar?.name).toBe("boolean");
+    /* scalar CustomInteger extends int32; */
+    expect(scalars.get("CustomInteger")?.baseScalar?.name).toBe("int32");
+    /* @summary("Custom String") scalar CustomString extends string; */
+    expect(scalars.get("CustomString")?.baseScalar?.name).toBe("string");
+    expectDecorators(scalars.get("CustomString")!.decorators, [
+      { name: "summary", args: ["Custom String"] },
+    ]);
+  });
+
+  it("handles arrays", async () => {
+    const serviceNamespace = await tspForOpenAPI3({
+      schemas: {
+        CustomArray: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        ArrayOfArrays: {
+          type: "array",
+          items: { $ref: "#/components/schemas/CustomArray" },
+        },
+        ArrayWithTitle: {
+          title: "Array With Title",
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+    });
+
+    const models = serviceNamespace.models;
+
+    /* model CustomArray is string[]; */
+    const customArray = models.get("CustomArray")!;
+    expect(customArray?.indexer).toBeDefined();
+    expect(customArray.indexer?.key.name).toBe("integer");
+    assert(
+      customArray.indexer?.value.kind === "Scalar",
+      `Expected indexer.value.kind to be "Scalar", got "${customArray?.indexer?.value?.kind}"`,
+    );
+    expect(customArray.indexer?.value.name).toBe("string");
+
+    /* model ArrayOfArrays is CustomArray[]; */
+    const arrayOfArrays = models.get("ArrayOfArrays");
+    expect(arrayOfArrays?.indexer).toBeDefined();
+    expect(arrayOfArrays?.indexer?.key.name).toBe("integer");
+    expect(arrayOfArrays?.indexer?.value).toBe(customArray);
+
+    /* @summary("Array With Title") model ArrayWithTitle is string[]; */
+    const arrayWithTitle = models.get("ArrayWithTitle");
+    expect(arrayWithTitle?.indexer).toBeDefined();
+    expect(arrayWithTitle?.indexer?.key.name).toBe("integer");
+    assert(
+      arrayWithTitle?.indexer?.value.kind === "Scalar",
+      `Expected indexer.value.kind to be "Scalar", got "${arrayWithTitle?.indexer?.value.kind}"`,
+    );
+    expect(arrayWithTitle.indexer.value.name).toBe("string");
+    expectDecorators(arrayWithTitle.decorators, [{ name: "summary", args: ["Array With Title"] }], {
+      strict: false,
+    });
+  });
+
+  describe("handles enums", () => {
+    it("string enums", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          SimpleEnum: {
+            type: "string",
+            enum: ["foo", "bar"],
+            title: "Simple Enum",
+          },
+        },
+      });
+
+      expect(serviceNamespace.enums.size).toBe(1);
+
+      /* @summary("Simple Enum") enum SimpleEnum { "foo", "bar", } */
+      const simpleEnum = serviceNamespace.enums.get("SimpleEnum");
+      expectDecorators(simpleEnum!.decorators, [{ name: "summary", args: ["Simple Enum"] }]);
+      const simpleEnumMembers = [...(simpleEnum?.members.values() ?? [])];
+      expect(simpleEnumMembers.length).toBe(2);
+      expect(simpleEnumMembers[0]).toMatchObject({ kind: "EnumMember", name: "foo" });
+      expect(simpleEnumMembers[1]).toMatchObject({ kind: "EnumMember", name: "bar" });
+    });
+  });
+
+  describe("handles unions", () => {
+    it("nullable enums", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          EnumUnion: {
+            type: "string",
+            enum: ["foo", "bar"],
+            nullable: true,
+          },
+        },
+      });
+
+      expect(serviceNamespace.unions.size).toBe(1);
+
+      /* union EnumUnion { "foo", "bar", null, } */
+      const enumUnion = serviceNamespace.unions.get("EnumUnion");
+      expect(enumUnion?.decorators.length).toBe(0);
+      const enumUnionVariants = [...(enumUnion?.variants.values() ?? [])];
+      expect(enumUnionVariants.length).toBe(3);
+      expect(enumUnionVariants[0].type).toMatchObject({ kind: "String", value: "foo" });
+      expect(enumUnionVariants[1].type).toMatchObject({ kind: "String", value: "bar" });
+      expect(enumUnionVariants[2].type).toMatchObject({ kind: "Intrinsic", name: "null" });
+    });
+
+    it("non-string enums", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          EnumUnion: {
+            type: "integer",
+            format: "int32",
+            enum: [1, 2],
+          },
+        },
+      });
+
+      expect(serviceNamespace.unions.size).toBe(1);
+
+      /* union EnumUnion { 1, 2, } */
+      const enumUnion = serviceNamespace.unions.get("EnumUnion");
+      expect(enumUnion?.decorators.length).toBe(0);
+      const enumUnionVariants = [...(enumUnion?.variants.values() ?? [])];
+      expect(enumUnionVariants.length).toBe(2);
+      expect(enumUnionVariants[0].type).toMatchObject({ kind: "Number", value: 1 });
+      expect(enumUnionVariants[1].type).toMatchObject({ kind: "Number", value: 2 });
+    });
+
+    it("anyOf", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Foo: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+            },
+          },
+          AnyOfUnion: {
+            title: "Any Of Union",
+            anyOf: [{ type: "string" }, { type: "boolean" }, { $ref: "#/components/schemas/Foo" }],
+          },
+        },
+      });
+
+      const Foo = serviceNamespace.models.get("Foo");
+      assert(Foo, "Foo model not found");
+
+      expect(serviceNamespace.unions.size).toBe(1);
+
+      /* @summary("Any of Union") union AnyOfUnion { string, boolean, Foo, } */
+      const anyOfUnion = serviceNamespace.unions.get("AnyOfUnion");
+      expectDecorators(anyOfUnion!.decorators, [{ name: "summary", args: ["Any Of Union"] }]);
+      const anyOfUnionVariants = [...(anyOfUnion?.variants.values() ?? [])];
+      expect(anyOfUnionVariants.length).toBe(3);
+      expect(anyOfUnionVariants[0].type).toMatchObject({ kind: "Scalar", name: "string" });
+      expect(anyOfUnionVariants[1].type).toMatchObject({ kind: "Scalar", name: "boolean" });
+      expect(anyOfUnionVariants[2].type).toBe(Foo);
+    });
+
+    it("oneOf", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          OneOfUnion: {
+            oneOf: [{ type: "string" }, { type: "boolean" }],
+          },
+        },
+      });
+
+      expect(serviceNamespace.unions.size).toBe(1);
+
+      /* @oneOf union OneOfUnion { string, boolean, } */
+      const oneOfUnion = serviceNamespace.unions.get("OneOfUnion");
+      expect(oneOfUnion?.decorators.length).toBe(1);
+      expect(oneOfUnion?.decorators[0].definition?.name).toBe("@oneOf");
+      const oneOfUnionVariants = [...(oneOfUnion?.variants.values() ?? [])];
+      expect(oneOfUnionVariants.length).toBe(2);
+      expect(oneOfUnionVariants[0].type).toMatchObject({ kind: "Scalar", name: "string" });
+      expect(oneOfUnionVariants[1].type).toMatchObject({ kind: "Scalar", name: "boolean" });
+    });
+
+    it("discriminator", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          DiscriminatedUnion: {
+            anyOf: [
+              {
+                type: "object",
+                required: ["kind"],
+                properties: { kind: { type: "string", enum: ["foo"] } },
+              },
+              {
+                type: "object",
+                required: ["kind"],
+                properties: { kind: { type: "string", enum: ["bar"] } },
+              },
+            ],
+            discriminator: { propertyName: "kind" },
+          },
+        },
+      });
+
+      expect(serviceNamespace.unions.size).toBe(1);
+
+      /* @discriminator("kind") union DiscriminatedUnion { { kind: "foo" }, { kind: "bar" }, } */
+      const discriminatedUnion = serviceNamespace.unions.get("DiscriminatedUnion");
+      expect(discriminatedUnion?.decorators.length).toBe(1);
+      expect(discriminatedUnion?.decorators[0].definition?.name).toBe("@discriminated");
+      expect(discriminatedUnion?.decorators[0].args[0].jsValue).toMatchObject({
+        envelope: "none",
+        discriminatorPropertyName: "kind",
+      });
+      const discriminatedUnionVariants = [...(discriminatedUnion?.variants.values() ?? [])];
+      expect(discriminatedUnionVariants.length).toBe(2);
+      expect(
+        (discriminatedUnionVariants[0].type as Model).properties.get("kind")?.type,
+      ).toMatchObject({
+        kind: "String",
+        value: "foo",
+      });
+      expect(
+        (discriminatedUnionVariants[1].type as Model).properties.get("kind")?.type,
+      ).toMatchObject({
+        kind: "String",
+        value: "bar",
+      });
+    });
+
+    it("nullable", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          NullableUnion: {
+            type: "string",
+            nullable: true,
+          },
+        },
+      });
+
+      expect(serviceNamespace.unions.size).toBe(1);
+
+      /* union NullableUnion { string, null, } */
+      const nullableUnion = serviceNamespace.unions.get("NullableUnion");
+      expect(nullableUnion?.decorators.length).toBe(0);
+      const nullableUnionVariants = [...(nullableUnion?.variants.values() ?? [])];
+      expect(nullableUnionVariants.length).toBe(2);
+      expect(nullableUnionVariants[0].type).toMatchObject({ kind: "Scalar", name: "string" });
+      expect(nullableUnionVariants[1].type).toMatchObject({ kind: "Intrinsic", name: "null" });
+    });
+
+    it("nullable array with enum items", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          ChatCompletionModalities: {
+            type: "array",
+            nullable: true,
+            items: {
+              type: "string",
+              enum: ["text", "audio"],
+            },
+          },
+        },
+      });
+
+      expect(serviceNamespace.unions.size).toBe(1);
+
+      /* union ChatCompletionModalities { ("text" | "audio")[], null, } */
+      const modalitiesUnion = serviceNamespace.unions.get("ChatCompletionModalities");
+      expect(modalitiesUnion?.decorators.length).toBe(0);
+      const modalitiesUnionVariants = [...(modalitiesUnion?.variants.values() ?? [])];
+      expect(modalitiesUnionVariants.length).toBe(2);
+
+      expect(modalitiesUnionVariants[0].type).toMatchObject({ kind: "Model" });
+      const arrayModel = modalitiesUnionVariants[0].type as Model;
+      expect(arrayModel.name).toBe("Array");
+
+      expect(modalitiesUnionVariants[1].type).toMatchObject({ kind: "Intrinsic", name: "null" });
+    });
+  });
+
+  describe("handles models", () => {
+    it("simple schemas", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Foo: {
+            type: "object",
+            required: ["id"],
+            properties: {
+              name: { type: "string" },
+              id: { type: "integer", format: "int32" },
+            },
+          },
+        },
+      });
+
+      /* model Foo { name?: string, id: int32, } */
+      const Foo = serviceNamespace.models.get("Foo");
+      assert(Foo, "Foo model not found");
+      expect(Foo.properties.size).toBe(2);
+      expect(Foo.properties.get("name")).toMatchObject({
+        optional: true,
+        type: { kind: "Scalar", name: "string" },
+      });
+      expect(Foo.properties.get("id")).toMatchObject({
+        optional: false,
+        type: { kind: "Scalar", name: "int32" },
+      });
+    });
+
+    it("with additionalProps", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Foo: {
+            type: "object",
+            required: ["id"],
+            properties: {
+              name: { type: "string" },
+              id: { type: "integer", format: "int32" },
+            },
+            additionalProperties: {
+              type: "string",
+            },
+          },
+        },
+      });
+
+      /* model Foo { name?: string, id: int32, ...Record<string> } */
+      const Foo = serviceNamespace.models.get("Foo");
+      assert(Foo, "Foo model not found");
+      expect(Foo.properties.size).toBe(2);
+      expect(Foo.properties.get("name")).toMatchObject({
+        optional: true,
+        type: { kind: "Scalar", name: "string" },
+      });
+      expect(Foo.properties.get("id")).toMatchObject({
+        optional: false,
+        type: { kind: "Scalar", name: "int32" },
+      });
+      assert(
+        Foo.indexer?.value.kind === "Scalar",
+        `Expected indexer.value.kind to be 'Scalar', got ${Foo.indexer?.value.kind}`,
+      );
+      expect(Foo.indexer?.value.name).toBe("string");
+    });
+
+    it("aliases references", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Foo: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+            },
+          },
+          FooAlias: { $ref: "#/components/schemas/Foo" },
+        },
+      });
+
+      /* model FooAlias is Foo; */
+      const Foo = serviceNamespace.models.get("Foo");
+      assert(Foo, "Foo model not found");
+
+      const FooAlias = serviceNamespace.models.get("FooAlias");
+      expect(FooAlias?.sourceModels.length).toBe(1);
+      expect(FooAlias?.sourceModels[0].usage).toBe("is");
+      expect(FooAlias?.sourceModels[0].model).toBe(Foo);
+    });
+
+    it("allOf with parent discriminator", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Pet: {
+            type: "object",
+            required: ["kind"],
+            properties: {
+              kind: { type: "string" },
+            },
+            discriminator: { propertyName: "kind" },
+          },
+          Cat: {
+            allOf: [
+              { $ref: "#/components/schemas/Pet" },
+              {
+                type: "object",
+                required: ["kind", "meow"],
+                properties: { kind: { type: "string", enum: ["cat"] }, meow: { type: "string" } },
+              },
+            ],
+          },
+        },
+      });
+
+      /* @discriminator("kind") model Pet { kind: string, } */
+      const Pet = serviceNamespace.models.get("Pet");
+      assert(Pet, "Pet model not found");
+
+      /* model Cat extends Pet { kind: "cat", meow: string, } */
+      const Cat = serviceNamespace.models.get("Cat");
+      assert(Cat, "Cat model not found");
+      expect(Cat.baseModel).toBe(Pet);
+      expect(Cat.properties.size).toBe(2);
+      expect(Cat.properties.get("kind")).toMatchObject({
+        optional: false,
+        type: { kind: "String", value: "cat" },
+      });
+      expect(Cat.properties.get("meow")).toMatchObject({
+        optional: false,
+        type: { kind: "Scalar", name: "string" },
+      });
+    });
+
+    it("allOf without parent discriminator", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Pet: {
+            type: "object",
+            required: ["name"],
+            properties: {
+              name: { type: "string" },
+            },
+          },
+          Cat: {
+            allOf: [
+              { $ref: "#/components/schemas/Pet" },
+              {
+                type: "object",
+                required: ["kind", "meow"],
+                properties: { kind: { type: "string", enum: ["cat"] }, meow: { type: "string" } },
+              },
+            ],
+          },
+        },
+      });
+
+      /* model Pet { name: string, } */
+      const Pet = serviceNamespace.models.get("Pet");
+      assert(Pet, "Pet model not found");
+
+      /* model Cat { ...Pet, kind: "cat", meow: string, } */
+      const Cat = serviceNamespace.models.get("Cat");
+      assert(Cat, "Cat model not found");
+      expect(Cat.baseModel).toBeUndefined();
+      expect(Cat.properties.size).toBe(3);
+      expect(Cat.properties.get("name")).toMatchObject({
+        optional: false,
+        type: { kind: "Scalar", name: "string" },
+      });
+      expect(Cat.properties.get("kind")).toMatchObject({
+        optional: false,
+        type: { kind: "String", value: "cat" },
+      });
+      expect(Cat.properties.get("meow")).toMatchObject({
+        optional: false,
+        type: { kind: "Scalar", name: "string" },
+      });
+    });
+
+    it("allOf with props", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Pet: {
+            type: "object",
+            required: ["kind"],
+            properties: {
+              kind: { type: "string" },
+            },
+            discriminator: { propertyName: "kind" },
+          },
+          Cat: {
+            type: "object",
+            properties: {
+              paws: { type: "integer", format: "int8" },
+            },
+            allOf: [
+              { $ref: "#/components/schemas/Pet" },
+              {
+                type: "object",
+                required: ["kind", "meow"],
+                properties: { kind: { type: "string", enum: ["cat"] }, meow: { type: "string" } },
+              },
+            ],
+          },
+        },
+      });
+
+      /* @discriminator("kind") model Pet { kind: string, } */
+      const Pet = serviceNamespace.models.get("Pet");
+      assert(Pet, "Pet model not found");
+
+      /* model Cat extends Pet { kind: "cat", meow: string, paws?: int8 } */
+      const Cat = serviceNamespace.models.get("Cat");
+      assert(Cat, "Cat model not found");
+      expect(Cat.baseModel).toBe(Pet);
+      expect(Cat.properties.size).toBe(3);
+      expect(Cat.properties.get("kind")).toMatchObject({
+        optional: false,
+        type: { kind: "String", value: "cat" },
+      });
+      expect(Cat.properties.get("meow")).toMatchObject({
+        optional: false,
+        type: { kind: "Scalar", name: "string" },
+      });
+      expect(Cat.properties.get("paws")).toMatchObject({
+        optional: true,
+        type: { kind: "Scalar", name: "int8" },
+      });
+    });
+
+    it("allOf with multiple discriminators fallback to spread", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Foo: {
+            type: "object",
+            required: ["kind"],
+            properties: {
+              kind: { type: "string" },
+            },
+            discriminator: { propertyName: "kind" },
+          },
+          Bar: {
+            type: "object",
+            required: ["type"],
+            properties: {
+              type: { type: "string" },
+            },
+            discriminator: { propertyName: "type" },
+          },
+          Thing: {
+            allOf: [{ $ref: "#/components/schemas/Foo" }, { $ref: "#/components/schemas/Bar" }],
+          },
+        },
+      });
+
+      /* @discriminator("kind") model Foo { kind: string, } */
+      const Foo = serviceNamespace.models.get("Foo");
+      assert(Foo, "Foo model not found");
+      /* @discriminator("type") model Bar { type: string, } */
+      const Bar = serviceNamespace.models.get("Bar");
+      assert(Bar, "Bar model not found");
+
+      /* model Thing { ...Foo; ...Bar; } */
+      const Thing = serviceNamespace.models.get("Thing");
+      assert(Thing, "Thing model not found");
+      expect(Thing.baseModel).toBeUndefined();
+      expect(Thing.properties.size).toBe(2);
+      expect(Thing.properties.get("kind")).toMatchObject({
+        optional: false,
+        type: { kind: "Scalar", name: "string" },
+      });
+      expect(Thing.properties.get("type")).toMatchObject({
+        optional: false,
+        type: { kind: "Scalar", name: "string" },
+      });
+    });
+
+    it("converts title to summary decorator", async () => {
+      const serviceNamespace = await tspForOpenAPI3({
+        schemas: {
+          Foo: {
+            type: "object",
+            properties: {
+              name: { type: "string", title: "Name Summary" },
+            },
+            title: "Foo Summary",
+          },
+        },
+      });
+
+      /* @summary("Foo Summary") model Foo { @summary("Foo Summary") name?: string } */
+      const Foo = serviceNamespace.models.get("Foo");
+      assert(Foo, "Foo model not found");
+      expectDecorators(Foo.decorators, [{ name: "summary", args: ["Foo Summary"] }]);
+      expect(Foo.properties.size).toBe(1);
+      expect(Foo.properties.get("name")).toMatchObject({
+        optional: true,
+        type: { kind: "Scalar", name: "string" },
+      });
+      expectDecorators(Foo.properties.get("name")!.decorators, [
+        { name: "summary", args: ["Name Summary"] },
+      ]);
+    });
+  });
+});

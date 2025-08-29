@@ -30,16 +30,18 @@ export default defineConfig({
     lib: {
       entry: {
         index: "src/index.ts",
+        "state-storage": "src/state-storage.ts",
         "react/index": "src/react/index.ts",
         "react/viewers/index": "src/react/viewers/index.tsx",
         "tooling/index": "src/tooling/index.ts",
         "vite/index": "src/vite/index.ts",
       },
+      cssFileName: "style",
       formats: ["es"],
     },
 
     rollupOptions: {
-      external: externals,
+      external: (id) => externals.some((x) => id.startsWith(x)),
     },
   },
   esbuild: {

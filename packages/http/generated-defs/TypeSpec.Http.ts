@@ -7,6 +7,31 @@ import type {
   Type,
 } from "@typespec/compiler";
 
+export interface HeaderOptions {
+  readonly name?: string;
+  readonly explode?: boolean;
+}
+
+export interface CookieOptions {
+  readonly name?: string;
+}
+
+export interface QueryOptions {
+  readonly name?: string;
+  readonly explode?: boolean;
+}
+
+export interface PathOptions {
+  readonly name?: string;
+  readonly explode?: boolean;
+  readonly style?: "simple" | "label" | "matrix" | "fragment" | "path";
+  readonly allowReserved?: boolean;
+}
+
+export interface PatchOptions {
+  readonly implicitOptionality?: boolean;
+}
+
 /**
  * Specify the status code for this response. Property type must be a status code integer or a union of status code integer.
  *
@@ -57,7 +82,30 @@ export type BodyDecorator = (context: DecoratorContext, target: ModelProperty) =
 export type HeaderDecorator = (
   context: DecoratorContext,
   target: ModelProperty,
-  headerNameOrOptions?: Type
+  headerNameOrOptions?: string | HeaderOptions,
+) => void;
+
+/**
+ * Specify this property is to be sent or received in the cookie.
+ *
+ * @param cookieNameOrOptions Optional name of the cookie in the cookie or cookie options.
+ * By default the cookie name will be the property name converted from camelCase to snake_case. (e.g. `authToken` -> `auth_token`)
+ * @example
+ * ```typespec
+ * op read(@cookie token: string): {data: string[]};
+ * op create(@cookie({name: "auth_token"}) data: string[]): void;
+ * ```
+ * @example Implicit header name
+ *
+ * ```typespec
+ * op read(): {@cookie authToken: string}; // headerName: auth_token
+ * op update(@cookie AuthToken: string): void; // headerName: auth_token
+ * ```
+ */
+export type CookieDecorator = (
+  context: DecoratorContext,
+  target: ModelProperty,
+  cookieNameOrOptions?: string | CookieOptions,
 ) => void;
 
 /**
@@ -67,19 +115,19 @@ export type HeaderDecorator = (
  * @example
  * ```typespec
  * op read(@query select: string, @query("order-by") orderBy: string): void;
- * op list(@query({name: "id", format: "multi"}) ids: string[]): void;
+ * op list(@query(#{name: "id", explode: true}) ids: string[]): void;
  * ```
  */
 export type QueryDecorator = (
   context: DecoratorContext,
   target: ModelProperty,
-  queryNameOrOptions?: Type
+  queryNameOrOptions?: string | QueryOptions,
 ) => void;
 
 /**
  * Explicitly specify that this property is to be interpolated as a path parameter.
  *
- * @param paramName Optional name of the parameter in the url template.
+ * @param paramNameOrOptions Optional name of the parameter in the uri template or options.
  * @example
  * ```typespec
  * @route("/read/{explicit}/things/{implicit}")
@@ -89,7 +137,7 @@ export type QueryDecorator = (
 export type PathDecorator = (
   context: DecoratorContext,
   target: ModelProperty,
-  paramName?: string
+  paramNameOrOptions?: string | PathOptions,
 ) => void;
 
 /**
@@ -166,12 +214,24 @@ export type PostDecorator = (context: DecoratorContext, target: Operation) => vo
 /**
  * Specify the HTTP verb for the target operation to be `PATCH`.
  *
+ * @param options Options for the PATCH operation.
  * @example
  * ```typespec
- * @patch op update(pet: Pet): void
+ * @patch op update(pet: Pet): void;
+ * ```
+ * @example
+ * ```typespec
+ * // Disable implicit optionality, making the body of the PATCH operation use the
+ * // optionality as defined in the `Pet` model.
+ * @patch(#{ implicitOptionality: false })
+ * op update(pet: Pet): void;
  * ```
  */
-export type PatchDecorator = (context: DecoratorContext, target: Operation) => void;
+export type PatchDecorator = (
+  context: DecoratorContext,
+  target: Operation,
+  options?: PatchOptions,
+) => void;
 
 /**
  * Specify the HTTP verb for the target operation to be `DELETE`.
@@ -202,6 +262,13 @@ export type HeadDecorator = (context: DecoratorContext, target: Operation) => vo
  * @example
  * ```typespec
  * @service
+ * @server("https://example.com")
+ * namespace PetStore;
+ * ```
+ * @example With a description
+ *
+ * ```typespec
+ * @service
  * @server("https://example.com", "Single server endpoint")
  * namespace PetStore;
  * ```
@@ -227,8 +294,8 @@ export type ServerDecorator = (
   context: DecoratorContext,
   target: Namespace,
   url: string,
-  description: string,
-  parameters?: Type
+  description?: string,
+  parameters?: Type,
 ) => void;
 
 /**
@@ -245,42 +312,34 @@ export type ServerDecorator = (
 export type UseAuthDecorator = (
   context: DecoratorContext,
   target: Namespace | Interface | Operation,
-  auth: Type
+  auth: Type,
 ) => void;
 
 /**
- * Specify if inapplicable metadata should be included in the payload for the given entity.
- *
- * @param value If true, inapplicable metadata will be included in the payload.
- */
-export type IncludeInapplicableMetadataInPayloadDecorator = (
-  context: DecoratorContext,
-  target: Type,
-  value: boolean
-) => void;
-
-/**
- * Defines the relative route URI for the target operation
- *
- * The first argument should be a URI fragment that may contain one or more path parameter fields.
- * If the namespace or interface that contains the operation is also marked with a `@route` decorator,
- * it will be used as a prefix to the route URI of the operation.
+ * Defines the relative route URI template for the target operation as defined by [RFC 6570](https://datatracker.ietf.org/doc/html/rfc6570#section-3.2.3)
  *
  * `@route` can only be applied to operations, namespaces, and interfaces.
  *
- * @param path Relative route path. Cannot include query parameters.
- * @param options Set of parameters used to configure the route. Supports `{shared: true}` which indicates that the route may be shared by several operations.
- * @example
+ * @param uriTemplate Uri template for this operation.
+ * @example Simple path parameter
+ *
  * ```typespec
- * @route("/widgets")
- * op getWidget(@path id: string): Widget;
+ * @route("/widgets/{id}") op getWidget(@path id: string): Widget;
+ * ```
+ * @example Reserved characters
+ * ```typespec
+ * @route("/files{+path}") op getFile(@path path: string): bytes;
+ * ```
+ * @example Query parameter
+ * ```typespec
+ * @route("/files") op list(select?: string, filter?: string): Files[];
+ * @route("/files{?select,filter}") op listFullUriTemplate(select?: string, filter?: string): Files[];
  * ```
  */
 export type RouteDecorator = (
   context: DecoratorContext,
   target: Namespace | Interface | Operation,
   path: string,
-  options?: Type
 ) => void;
 
 /**
@@ -298,3 +357,25 @@ export type RouteDecorator = (
  * ```
  */
 export type SharedRouteDecorator = (context: DecoratorContext, target: Operation) => void;
+
+export type TypeSpecHttpDecorators = {
+  statusCode: StatusCodeDecorator;
+  body: BodyDecorator;
+  header: HeaderDecorator;
+  cookie: CookieDecorator;
+  query: QueryDecorator;
+  path: PathDecorator;
+  bodyRoot: BodyRootDecorator;
+  bodyIgnore: BodyIgnoreDecorator;
+  multipartBody: MultipartBodyDecorator;
+  get: GetDecorator;
+  put: PutDecorator;
+  post: PostDecorator;
+  patch: PatchDecorator;
+  delete: DeleteDecorator;
+  head: HeadDecorator;
+  server: ServerDecorator;
+  useAuth: UseAuthDecorator;
+  route: RouteDecorator;
+  sharedRoute: SharedRouteDecorator;
+};

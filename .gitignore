@@ -1,13 +1,3 @@
-# User-specific files
-*.suo
-*.user
-*.idea
-*.sln.docstates
-.vs/
-*.lock.json
-developer/
-launch.json
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -57,6 +47,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 test-results.xml
+test-results/
 
 # Translations
 *.mo
@@ -116,7 +107,7 @@ venv.bak/
 .mypy_cache/
 node_modules/
 package-lock.json
-report.xml 
+report.xml
 *.tgz
 
 # Logs
@@ -135,6 +126,9 @@ lib-cov
 
 # Coverage directory used by tools like istanbul
 coverage
+!packages/spector/src/coverage
+spec-coverage.json
+manifest.json
 
 # nyc test coverage
 .nyc_output
@@ -183,11 +177,22 @@ package-deps.json
 # Default TypeSpec output
 tsp-output/
 
+# Story book output
+storybook-static/
+
 # Visual Studio / C#
 bin/
 obj/
 .vs/
 *.binlog
+
+# User-specific files
+*.suo
+*.user
+*.idea
+*.sln.docstates
+*.lock.json
+developer/
 
 # tsc incremental build files
 *.tsbuildinfo
@@ -197,11 +202,36 @@ obj/
 
 *.vsix
 *.zip
+vite.config.ts.timestamp-*
 
+# Astro
+.astro/
 
-docs/**/js-api/
+# Api extractor
+packages/*/etc/
+**/docs/**/js-api/
+
+# VS Code test web temp files
+.vscode-test-web/
 
 # csharp emitter
 !packages/http-client-csharp/package-lock.json
 packages/http-client-csharp/generator/artifacts/
+packages/http-client-csharp/generated-defs/**/*.js
+packages/http-client-csharp/generated-defs/**/*.js.map
+packages/http-client-csharp/generated-defs/**/*.d.ts
+packages/http-client-csharp/generated-defs/**/*.d.ts.map
 BenchmarkDotnet.Artifacts/
+
+# java emitter
+!packages/http-client-java/package-lock.json
+
+# python emitter
+packages/http-client-python/generator/test/**/generated/
+packages/http-client-python/generator/test/**/cadl-ranch-coverage.json
+!packages/http-client-python/package-lock.json
+packages/http-client-python/micropip.lock
+packages/http-client-python/venv_build_wheel/
+
+# http-server-js emitter
+packages/http-server-js/test/e2e/generated

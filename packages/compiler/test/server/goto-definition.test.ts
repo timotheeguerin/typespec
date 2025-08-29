@@ -1,11 +1,8 @@
 import { pathToFileURL } from "url";
 import { describe, expect, it } from "vitest";
 import { Location } from "vscode-languageserver";
-import {
-  createTestServerHost,
-  extractCursor,
-  resolveVirtualPath,
-} from "../../src/testing/index.js";
+import { extractCursor, resolveVirtualPath } from "../../src/testing/index.js";
+import { createTestServerHost } from "../../src/testing/test-server-host.js";
 
 function resolveVirtualPathUri(path: string): string {
   return pathToFileURL(resolveVirtualPath(path)).href;
@@ -13,7 +10,7 @@ function resolveVirtualPathUri(path: string): string {
 
 async function goToDefinitionAtCursor(
   sourceWithCursor: string,
-  otherFiles: Record<string, string> = {}
+  otherFiles: Record<string, string> = {},
 ): Promise<Location[]> {
   const { source, pos } = extractCursor(sourceWithCursor);
 
@@ -34,7 +31,7 @@ describe("go to imports", () => {
       `
     import "./othe┆r.tsp";
   `,
-      { "other.tsp": "model Other {}" }
+      { "other.tsp": "model Other {}" },
     );
     expect(locations).toEqual([
       {
@@ -58,7 +55,7 @@ describe("go to imports", () => {
           tspMain: "./main.tsp",
         }),
         "node_modules/test-lib/main.tsp": "model Other {}",
-      }
+      },
     );
     expect(locations).toEqual([
       {

@@ -1,7 +1,8 @@
 import { deepStrictEqual } from "assert";
 import { describe, it } from "vitest";
 import { MarkupKind, SignatureHelp } from "vscode-languageserver/node.js";
-import { createTestServerHost, extractCursor } from "../../src/testing/test-server-host.js";
+import { extractCursor } from "../../src/testing/source-utils.js";
+import { createTestServerHost } from "../../src/testing/test-server-host.js";
 
 describe("compiler: server: signature help", () => {
   describe("standard decorator", () => {
@@ -9,7 +10,7 @@ describe("compiler: server: signature help", () => {
       const help = await getSignatureHelpAtCursor(
         `
       @single(┆)
-      `
+      `,
       );
       deepStrictEqual(help, {
         activeParameter: 0,
@@ -73,7 +74,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
         @multiple(┆)
-        `
+        `,
         );
         assertHelp(help, 0);
       });
@@ -82,7 +83,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
         @multiple("abc", ┆)
-        `
+        `,
         );
         assertHelp(help, 1);
       });
@@ -91,7 +92,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
         @multiple("abc"┆, "def")
-        `
+        `,
         );
         assertHelp(help, 0);
       });
@@ -100,7 +101,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @multiple("abc", ┆
-          `
+          `,
         );
         assertHelp(help, 1);
       });
@@ -109,7 +110,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @multiple("abc", /*Test*/┆
-          `
+          `,
         );
         assertHelp(help, 1);
       });
@@ -118,7 +119,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @multiple( ┆ /* first arg */ "hello", "world")
-          `
+          `,
         );
         assertHelp(help, 0);
       });
@@ -127,7 +128,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @multiple("hello" /* ┆ test */, "world")
-          `
+          `,
         );
         assertHelp(help, 0);
       });
@@ -170,7 +171,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
         @rest(┆)
-        `
+        `,
         );
         assertHelp(help, 0);
       });
@@ -179,7 +180,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
         @rest("abc", ┆)
-        `
+        `,
         );
         assertHelp(help, 1);
       });
@@ -188,14 +189,14 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
         @rest("abc", "def", ┆)
-        `
+        `,
         );
         assertHelp(help, 1);
       });
     });
 
     async function getSignatureHelpAtCursor(
-      sourceWithCursor: string
+      sourceWithCursor: string,
     ): Promise<SignatureHelp | undefined> {
       const wholeFile = `
       import "./dec-types.js";
@@ -241,7 +242,7 @@ describe("compiler: server: signature help", () => {
       const help = await getSignatureHelpAtCursor(
         `
         @@single(┆)
-        `
+        `,
       );
       deepStrictEqual(help, {
         activeParameter: 0,
@@ -311,7 +312,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@multiple(┆)
-          `
+          `,
         );
         assertHelp(help, 0);
       });
@@ -320,7 +321,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@multiple(target, ┆)
-          `
+          `,
         );
         assertHelp(help, 1);
       });
@@ -329,7 +330,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@multiple(target, "abc", ┆)
-          `
+          `,
         );
         assertHelp(help, 2);
       });
@@ -338,7 +339,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@multiple(target, "abc"┆, "def")
-          `
+          `,
         );
         assertHelp(help, 1);
       });
@@ -347,7 +348,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@multiple(target, "abc", ┆
-          `
+          `,
         );
         assertHelp(help, 2);
       });
@@ -356,7 +357,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@multiple(target, "abc", /* Test */ ┆
-          `
+          `,
         );
         assertHelp(help, 2);
       });
@@ -365,7 +366,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@multiple(target, ┆ /* first arg */ "hello", "world")
-          `
+          `,
         );
         assertHelp(help, 1);
       });
@@ -374,7 +375,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@multiple(target, "hello" /* ┆ test */, "world" )
-          `
+          `,
         );
         assertHelp(help, 1);
       });
@@ -420,7 +421,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
         @@rest(target, ┆)
-        `
+        `,
         );
         assertHelp(help, 1);
       });
@@ -429,7 +430,7 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@rest(target, "abc", ┆)
-          `
+          `,
         );
         assertHelp(help, 2);
       });
@@ -438,14 +439,14 @@ describe("compiler: server: signature help", () => {
         const help = await getSignatureHelpAtCursor(
           `
           @@rest(target, "abc", "def", ┆)
-          `
+          `,
         );
         assertHelp(help, 2);
       });
     });
 
     async function getSignatureHelpAtCursor(
-      sourceWithCursor: string
+      sourceWithCursor: string,
     ): Promise<SignatureHelp | undefined> {
       const wholeFile = `
       import "./dec-types.js";
@@ -493,7 +494,7 @@ describe("compiler: server: signature help", () => {
           const help = await getSignatureHelpAtCursor(
             `
             alias A = ${type}1<┆
-            `
+            `,
           );
           deepStrictEqual(help, {
             activeParameter: 0,
@@ -558,7 +559,7 @@ describe("compiler: server: signature help", () => {
             const help = await getSignatureHelpAtCursor(
               `
               alias A = ${type}2<string, ┆>
-              `
+              `,
             );
             assertHelp(help, 1);
           });
@@ -567,7 +568,7 @@ describe("compiler: server: signature help", () => {
             const help = await getSignatureHelpAtCursor(
               `
               alias A = ${type}2<string┆, int32>
-              `
+              `,
             );
             assertHelp(help, 0);
           });
@@ -576,7 +577,7 @@ describe("compiler: server: signature help", () => {
             const help = await getSignatureHelpAtCursor(
               `
               alias A = ${type}2<"abc", ┆
-              `
+              `,
             );
             assertHelp(help, 1);
           });
@@ -585,7 +586,7 @@ describe("compiler: server: signature help", () => {
             const help = await getSignatureHelpAtCursor(
               `
               alias A = ${type}2<"abc", /*Test*/┆
-              `
+              `,
             );
             assertHelp(help, 1);
           });
@@ -594,7 +595,7 @@ describe("compiler: server: signature help", () => {
             const help = await getSignatureHelpAtCursor(
               `
               alias A = ${type}2< ┆ /* first arg */ "hello", "world">
-              `
+              `,
             );
             assertHelp(help, 0);
           });
@@ -603,7 +604,7 @@ describe("compiler: server: signature help", () => {
             const help = await getSignatureHelpAtCursor(
               `
               alias A = ${type}2<"hello" /* ┆ test */, "world" >
-              `
+              `,
             );
             assertHelp(help, 0);
           });
@@ -611,7 +612,7 @@ describe("compiler: server: signature help", () => {
       });
     }
     async function getSignatureHelpAtCursor(
-      sourceWithCursor: string
+      sourceWithCursor: string,
     ): Promise<SignatureHelp | undefined> {
       const wholeFile = `
       /** 

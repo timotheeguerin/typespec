@@ -1,5 +1,6 @@
 import type { CompilerOptions, Diagnostic } from "@typespec/compiler";
-import { Pane, SplitPane, useControllableValue } from "@typespec/react-components";
+import { $ } from "@typespec/compiler/typekit";
+import { Pane, SplitPane } from "@typespec/react-components";
 import "@typespec/react-components/style.css";
 import debounce from "debounce";
 import { KeyCode, KeyMod, MarkerSeverity, Uri, editor } from "monaco-editor";
@@ -13,10 +14,12 @@ import {
   type ReactNode,
 } from "react";
 import { CompletionItemTag } from "vscode-languageserver";
+import { resolveVirtualPath } from "../browser-host.js";
 import { EditorCommandBar } from "../editor-command-bar/editor-command-bar.js";
 import { getMonacoRange } from "../services.js";
 import type { BrowserHost, PlaygroundSample } from "../types.js";
 import { PlaygroundContextProvider } from "./context/playground-context.js";
+import { debugGlobals, printDebugInfo } from "./debug.js";
 import { DefaultFooter } from "./default-footer.js";
 import { useMonacoModel, type OnMountData } from "./editor.js";
 import { OutputView } from "./output-view/output-view.js";
@@ -24,39 +27,35 @@ import style from "./playground.module.css";
 import { ProblemPane } from "./problem-pane/index.js";
 import type { CompilationState, FileOutputViewer, ProgramViewer } from "./types.js";
 import { TypeSpecEditor } from "./typespec-editor.js";
+import { usePlaygroundState, type PlaygroundState } from "./use-playground-state.js";
+
+// Re-export the PlaygroundState type for convenience
+export type { PlaygroundState };
 
 export interface PlaygroundProps {
   host: BrowserHost;
 
-  /** Default emitter if leaving this unmanaged. */
+  /** Default content if leaving this unmanaged. */
   defaultContent?: string;
 
   /** List of available libraries */
   readonly libraries: readonly string[];
 
-  /** Emitter to use */
-  emitter?: string;
-  /** Default emitter if leaving this unmanaged. */
-  defaultEmitter?: string;
-  /** Callback when emitter change */
-  onEmitterChange?: (emitter: string) => void;
-
-  /** Emitter options */
-  compilerOptions?: CompilerOptions;
-  /** Default emitter options if leaving this unmanaged. */
-  defaultCompilerOptions?: CompilerOptions;
-  /** Callback when emitter options change */
-  onCompilerOptionsChange?: (emitter: CompilerOptions) => void;
-
   /** Samples available */
   samples?: Record<string, PlaygroundSample>;
 
-  /** Sample to use */
-  sampleName?: string;
-  /** Default sample if leaving this unmanaged. */
-  defaultSampleName?: string;
-  /** Callback when sample change */
-  onSampleNameChange?: (sampleName: string) => void;
+  /** Playground state (controlled) */
+  playgroundState?: PlaygroundState;
+  /** Default playground state if leaving this unmanaged */
+  defaultPlaygroundState?: PlaygroundState;
+  /** Callback when playground state changes */
+  onPlaygroundStateChange?: (state: PlaygroundState) => void;
+
+  /**
+   * Default emitter to use if not provided in defaultPlaygroundState.
+   * @deprecated Use defaultPlaygroundState.emitter instead
+   */
+  defaultEmitter?: string;
 
   onFileBug?: () => void;
 
@@ -86,18 +85,12 @@ export interface PlaygroundEditorsOptions {
   theme?: string;
 }
 
-export interface PlaygroundSaveData {
+export interface PlaygroundSaveData extends PlaygroundState {
   /** Current content of the playground.   */
   content: string;
 
   /** Emitter name. */
   emitter: string;
-
-  /** Emitter options. */
-  options?: CompilerOptions;
-
-  /** If a sample is selected and the content hasn't changed since. */
-  sampleName?: string;
 }
 
 export interface PlaygroundLinks {
@@ -105,38 +98,123 @@ export interface PlaygroundLinks {
   documentationUrl?: string;
 }
 
+/**
+ * Playground component for TypeSpec with consolidated state management.
+ *
+ * @example
+ * ```tsx
+ * const [playgroundState, setPlaygroundState] = useState<PlaygroundState>({
+ *   emitter: 'openapi3',
+ *   compilerOptions: {},
+ *   sampleName: 'basic',
+ *   selectedViewer: 'openapi',
+ *   viewerState: {}
+ * });
+ *
+ * <Playground
+ *   host={host}
+ *   playgroundState={playgroundState}
+ *   onPlaygroundStateChange={setPlaygroundState}
+ *   samples={samples}
+ *   viewers={viewers}
+ * />
+ * ```
+ *
+ * For uncontrolled usage, use defaultPlaygroundState:
+ * ```tsx
+ * <Playground
+ *   host={host}
+ *   defaultPlaygroundState={{
+ *     emitter: 'openapi3',
+ *     compilerOptions: {},
+ *   }}
+ *   samples={samples}
+ *   viewers={viewers}
+ * />
+ * ```
+ *
+ * For backward compatibility, you can also use the deprecated defaultEmitter prop:
+ * ```tsx
+ * <Playground
+ *   host={host}
+ *   defaultEmitter="openapi3"
+ *   samples={samples}
+ *   viewers={viewers}
+ * />
+ * ```
+ */
 export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
   const { host, onSave } = props;
   const editorRef = useRef<editor.IStandaloneCodeEditor | undefined>(undefined);
 
-  const [selectedEmitter, onSelectedEmitterChange] = useControllableValue(
-    props.emitter,
-    props.defaultEmitter,
-    props.onEmitterChange
-  );
-  const [compilerOptions, onCompilerOptionsChange] = useControllableValue(
-    props.compilerOptions,
-    props.defaultCompilerOptions ?? {},
-    props.onCompilerOptionsChange
-  );
-  const [selectedSampleName, onSelectedSampleNameChange] = useControllableValue(
-    props.sampleName,
-    props.defaultSampleName,
-    props.onSampleNameChange
-  );
-  const [content, setContent] = useState(props.defaultContent);
-  const isSampleUntouched = useMemo(() => {
-    return Boolean(selectedSampleName && content === props.samples?.[selectedSampleName]?.content);
-  }, [content, selectedSampleName, props.samples]);
+  useEffect(() => {
+    editor.setTheme(props.editorOptions?.theme ?? "typespec");
+  }, [props.editorOptions?.theme]);
+
+  useEffect(() => {
+    printDebugInfo();
+
+    debugGlobals().host = host;
+  }, [host]);
+
   const typespecModel = useMonacoModel("inmemory://test/main.tsp", "typespec");
   const [compilationState, setCompilationState] = useState<CompilationState | undefined>(undefined);
 
+  // Use the playground state hook
+  const state = usePlaygroundState({
+    libraries: props.libraries,
+    samples: props.samples,
+    playgroundState: props.playgroundState,
+    defaultPlaygroundState: props.defaultPlaygroundState,
+    onPlaygroundStateChange: props.onPlaygroundStateChange,
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    defaultEmitter: props.defaultEmitter,
+    defaultContent: props.defaultContent,
+  });
+
+  // Extract values from the state hook
+  const {
+    selectedEmitter,
+    compilerOptions,
+    selectedSampleName,
+    selectedViewer,
+    viewerState,
+    content,
+    onSelectedEmitterChange,
+    onCompilerOptionsChange,
+    onSelectedSampleNameChange,
+    onSelectedViewerChange,
+    onViewerStateChange,
+    onContentChange,
+  } = state;
+
+  // Sync Monaco model with state content
+  useEffect(() => {
+    if (typespecModel.getValue() !== (content ?? "")) {
+      typespecModel.setValue(content ?? "");
+    }
+  }, [content, typespecModel]);
+
+  // Update state when Monaco model changes
+  useEffect(() => {
+    const disposable = typespecModel.onDidChangeContent(() => {
+      const newContent = typespecModel.getValue();
+      if (newContent !== content) {
+        onContentChange(newContent);
+      }
+    });
+    return () => disposable.dispose();
+  }, [typespecModel, content, onContentChange]);
+
+  const isSampleUntouched = useMemo(() => {
+    return Boolean(selectedSampleName && content === props.samples?.[selectedSampleName]?.content);
+  }, [content, selectedSampleName, props.samples]);
+
   const doCompile = useCallback(async () => {
-    const content = typespecModel.getValue();
-    setContent(content);
+    const currentContent = typespecModel.getValue();
     const typespecCompiler = host.compiler;
 
-    const state = await compile(host, content, selectedEmitter, compilerOptions);
+    const state = await compile(host, currentContent, selectedEmitter, compilerOptions);
     setCompilationState(state);
     if ("program" in state) {
       const markers: editor.IMarkerData[] = state.program.diagnostics.map((diag) => ({
@@ -146,44 +224,15 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
         tags: diag.code === "deprecated" ? [CompletionItemTag.Deprecated] : undefined,
       }));
 
+      // Set the program on the window.
+      debugGlobals().program = state.program;
+      debugGlobals().$$ = $(state.program);
+
       editor.setModelMarkers(typespecModel, "owner", markers ?? []);
     } else {
       editor.setModelMarkers(typespecModel, "owner", []);
     }
-  }, [host, selectedEmitter, compilerOptions, typespecModel, setContent]);
-
-  const updateTypeSpec = useCallback(
-    (value: string) => {
-      if (typespecModel.getValue() !== value) {
-        typespecModel.setValue(value);
-      }
-    },
-    [typespecModel]
-  );
-  useEffect(() => {
-    updateTypeSpec(props.defaultContent ?? "");
-  }, [props.defaultContent, updateTypeSpec]);
-
-  useEffect(() => {
-    if (selectedSampleName && props.samples) {
-      const config = props.samples[selectedSampleName];
-      if (config.content) {
-        updateTypeSpec(config.content);
-        if (config.preferredEmitter) {
-          onSelectedEmitterChange(config.preferredEmitter);
-        }
-        if (config.compilerOptions) {
-          onCompilerOptionsChange(config.compilerOptions);
-        }
-      }
-    }
-  }, [
-    updateTypeSpec,
-    selectedSampleName,
-    props.samples,
-    onSelectedEmitterChange,
-    onCompilerOptionsChange,
-  ]);
+  }, [host, selectedEmitter, compilerOptions, typespecModel]);
 
   useEffect(() => {
     const debouncer = debounce(() => doCompile(), 200);
@@ -201,19 +250,23 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
   const saveCode = useCallback(() => {
     if (onSave) {
       onSave({
-        content: typespecModel.getValue(),
+        content: content ?? "",
         emitter: selectedEmitter,
-        options: compilerOptions,
+        compilerOptions,
         sampleName: isSampleUntouched ? selectedSampleName : undefined,
+        selectedViewer,
+        viewerState,
       });
     }
   }, [
-    typespecModel,
+    content,
     onSave,
     selectedEmitter,
     compilerOptions,
     selectedSampleName,
     isSampleUntouched,
+    selectedViewer,
+    viewerState,
   ]);
 
   const formatCode = useCallback(() => {
@@ -232,7 +285,7 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
       // ctrl/cmd+S => save
       { id: "save", label: "Save", keybindings: [KeyMod.CtrlCmd | KeyCode.KeyS], run: saveCode },
     ],
-    [saveCode]
+    [saveCode],
   );
 
   const onTypeSpecEditorMount = useCallback(({ editor }: OnMountData) => {
@@ -240,7 +293,7 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
   }, []);
 
   const [verticalPaneSizes, setVerticalPaneSizes] = useState<(string | number | undefined)[]>(
-    verticalPaneSizesConst.collapsed
+    verticalPaneSizesConst.collapsed,
   );
   const toggleProblemPane = useCallback(() => {
     setVerticalPaneSizes((value) => {
@@ -254,13 +307,13 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
     (sizes: number[]) => {
       setVerticalPaneSizes(sizes);
     },
-    [setVerticalPaneSizes]
+    [setVerticalPaneSizes],
   );
   const handleDiagnosticSelected = useCallback(
     (diagnostic: Diagnostic) => {
       editorRef.current?.setSelection(getMonacoRange(host.compiler, diagnostic.target));
     },
-    [host.compiler]
+    [host.compiler],
   );
 
   const playgroundContext = useMemo(() => {
@@ -268,10 +321,10 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
       host,
       setContent: (val: string) => {
         typespecModel.setValue(val);
-        setContent(val);
+        onContentChange(val);
       },
     };
-  }, [host, setContent, typespecModel]);
+  }, [host, typespecModel, onContentChange]);
 
   return (
     <PlaygroundContextProvider value={playgroundContext}>
@@ -307,7 +360,13 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
                   compilationState={compilationState}
                   editorOptions={props.editorOptions}
                   viewers={props.viewers}
-                  fileViewers={props.emitterViewers?.[selectedEmitter]}
+                  fileViewers={
+                    selectedEmitter ? props.emitterViewers?.[selectedEmitter] : undefined
+                  }
+                  selectedViewer={selectedViewer}
+                  onViewerChange={onSelectedViewerChange}
+                  viewerState={viewerState}
+                  onViewerStateChange={onViewerStateChange}
                 />
               </Pane>
             </SplitPane>
@@ -331,28 +390,28 @@ const verticalPaneSizesConst = {
   collapsed: [undefined, 30],
   expanded: [undefined, 200],
 };
-const outputDir = "./tsp-output";
+const outputDir = resolveVirtualPath("tsp-output");
 
 async function compile(
   host: BrowserHost,
   content: string,
   selectedEmitter: string,
-  options: CompilerOptions
+  options: CompilerOptions,
 ): Promise<CompilationState> {
   await host.writeFile("main.tsp", content);
   await emptyOutputDir(host);
   try {
     const typespecCompiler = host.compiler;
-    const program = await typespecCompiler.compile(host, "main.tsp", {
+    const program = await typespecCompiler.compile(host, resolveVirtualPath("main.tsp"), {
       ...options,
       options: {
         ...options.options,
         [selectedEmitter]: {
           ...options.options?.[selectedEmitter],
-          "emitter-output-dir": "tsp-output",
+          "emitter-output-dir": outputDir,
         },
       },
-      outputDir: "tsp-output",
+      outputDir,
       emit: selectedEmitter ? [selectedEmitter] : [],
     });
     const outputFiles = await findOutputFiles(host);

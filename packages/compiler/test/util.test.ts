@@ -1,6 +1,6 @@
 import { deepStrictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
-import { RekeyableMap } from "../src/core/index.js";
+import { RekeyableMap } from "../src/index.js";
 import { createRekeyableMap } from "../src/utils/misc.js";
 
 describe("compiler: util", () => {
@@ -18,7 +18,7 @@ describe("compiler: util", () => {
           ["a", "pos 1"],
           ["b", "pos 2"],
           ["c", "pos 3"],
-        ]
+        ],
       );
     });
 
@@ -40,7 +40,7 @@ describe("compiler: util", () => {
             ["b", "pos 2"],
             ["c", "pos 3"],
             ["aa", "pos 4"],
-          ]
+          ],
         );
       });
 
@@ -70,7 +70,7 @@ describe("compiler: util", () => {
           ["renamed", "pos 2"],
           ["c", "pos 3"],
           ["d", "pos 4"],
-        ]
+        ],
       );
     });
 
@@ -90,7 +90,7 @@ describe("compiler: util", () => {
           ["a", "pos 1"],
           ["b", "pos 3"],
           ["d", "pos 4"],
-        ]
+        ],
       );
     });
   });

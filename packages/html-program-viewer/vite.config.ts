@@ -21,9 +21,9 @@ export default defineConfig({
       entry: {
         "react/index": "src/react/index.ts",
       },
+      cssFileName: "style",
       formats: ["es"],
     },
-
     rollupOptions: {
       external: externals,
     },
@@ -32,9 +32,12 @@ export default defineConfig({
     react(),
     dts({
       logLevel: "silent", // checker reports the errors
+      tsconfigPath: "./tsconfig.build.json",
     }),
     checker({
-      typescript: true,
+      typescript: {
+        tsconfigPath: "./tsconfig.build.json",
+      },
     }),
   ],
 });

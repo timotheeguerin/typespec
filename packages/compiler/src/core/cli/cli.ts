@@ -7,8 +7,9 @@ try {
 }
 
 import yargs from "yargs";
-import { typespecVersion } from "../../utils/misc.js";
-import { installTypeSpecDependencies } from "../install.js";
+import { installTypeSpecDependencies } from "../../install/install.js";
+import { typespecVersion } from "../../manifest.js";
+import { getTypeSpecEngine } from "../engine.js";
 import { compileAction } from "./actions/compile/compile.js";
 import { formatAction } from "./actions/format.js";
 import { printInfoAction } from "./actions/info.js";
@@ -28,9 +29,6 @@ import {
 } from "./utils.js";
 
 async function main() {
-  // eslint-disable-next-line no-console
-  console.log(`TypeSpec compiler v${typespecVersion}\n`);
-
   await yargs(process.argv.slice(2))
     .scriptName("tsp")
     .help()
@@ -39,9 +37,14 @@ async function main() {
       "greedy-arrays": false,
       "boolean-negation": false,
     })
+    .option("trace", {
+      type: "array",
+      string: true,
+      describe: "List of areas that should have the trace shown. e.g. `import-resolution.*`",
+    })
     .option("debug", {
       type: "boolean",
-      description: "Output debug log messages.",
+      description: `Enable all tracing. Same as --trace='*'`,
       default: false,
     })
     .option("pretty", {
@@ -59,11 +62,6 @@ async function main() {
             description: "The path to the main.tsp file or directory containing main.tsp.",
             type: "string",
             demandOption: true,
-          })
-          .option("output-path", {
-            type: "string",
-            deprecated: "Use `output-dir` instead.",
-            hidden: true,
           })
           .option("output-dir", {
             type: "string",
@@ -93,16 +91,22 @@ async function main() {
             default: false,
             describe: "Watch project files for changes and recompile.",
           })
+          .option("stats", {
+            type: "boolean",
+            default: false,
+            describe: "Print statistics about the compilation.",
+          })
           .option("emit", {
             type: "array",
             string: true,
             describe: "Name of the emitters",
           })
-          .option("trace", {
-            type: "array",
-            string: true,
-            describe: "List of areas that should have the trace shown. e.g. `import-resolution.*`",
+          .option("list-files", {
+            type: "boolean",
+            default: false,
+            describe: "List paths of emitted files.",
           })
+
           .option("config", {
             type: "string",
             describe:
@@ -114,7 +118,12 @@ async function main() {
           })
           .option("no-emit", {
             type: "boolean",
-            describe: "Run emitters but do not emit any output.",
+            describe: "Do not run any emitters.",
+          })
+          .option("dry-run", {
+            type: "boolean",
+            describe:
+              "Run emitters but do not emit any output. (Only run emitters supporting this feature)",
           })
           .option("ignore-deprecated", {
             type: "boolean",
@@ -128,7 +137,7 @@ async function main() {
             describe: "Key/value of arguments that are used in the configuration.",
           });
       },
-      withCliHost((host, args) => compileAction(host, args))
+      withCliHost((host, args) => compileAction(host, args)),
     )
     .command("code", "Manage VS Code Extension.", (cmd) => {
       return cmd
@@ -143,16 +152,16 @@ async function main() {
           "Install VS Code Extension",
           () => {},
           withCliHostAndDiagnostics<CliHostArgs & InstallVSCodeExtensionOptions>((host, args) =>
-            installVSCodeExtension(host, args)
-          )
+            installVSCodeExtension(host, args),
+          ),
         )
         .command(
           "uninstall",
           "Uninstall VS Code Extension",
           () => {},
           withCliHostAndDiagnostics<CliHostArgs & UninstallVSCodeExtensionOptions>((host, args) =>
-            uninstallVSCodeExtension(host, args)
-          )
+            uninstallVSCodeExtension(host, args),
+          ),
         );
     })
     .command("vs", "Manage Visual Studio Extension.", (cmd) => {
@@ -162,13 +171,13 @@ async function main() {
           "install",
           "Install Visual Studio Extension.",
           () => {},
-          withCliHostAndDiagnostics((host) => installVSExtension(host))
+          withCliHostAndDiagnostics((host) => installVSExtension(host)),
         )
         .command(
           "uninstall",
           "Uninstall VS Extension",
           () => {},
-          withCliHostAndDiagnostics((host) => uninstallVSExtension(host))
+          withCliHostAndDiagnostics((host) => uninstallVSExtension(host)),
         );
     })
     .command(
@@ -194,7 +203,7 @@ async function main() {
             describe: "Verify the files are formatted.",
           });
       },
-      withCliHost((host, args) => formatAction(host, args))
+      withCliHost((host, args) => formatAction(host, args)),
     )
     .command(
       "init [templatesUrl]",
@@ -208,22 +217,64 @@ async function main() {
           .option("template", {
             type: "string",
             description: "Name of the template to use",
+          })
+          .option("no-prompt", {
+            description:
+              "Automatically accept all prompts unless a prompt is required and doesn't have a default value.",
+            type: "boolean",
+            default: false,
+            alias: "y",
+          })
+          .option("project-name", {
+            description: "Name of the project",
+            type: "string",
+          })
+          .option("arg", {
+            type: "array",
+            alias: "args",
+            string: true,
+            describe: "Key/value of arguments that are used in the configuration.",
+          })
+          .option("template-emitters", {
+            description:
+              "Emitters to include in the project. Emitters not specified by the template will be ignored. Default emitters are always included.",
+            type: "array",
+            string: true,
+          })
+          .option("output-dir", {
+            type: "string",
+            describe: "The output path for generated artifacts. It must already exist.",
           }),
-      withCliHostAndDiagnostics((host, args) => initAction(host, args))
+      withCliHostAndDiagnostics((host, args) =>
+        initAction(host, {
+          ...args,
+          emitters: args["template-emitters"],
+          outputDir: args["output-dir"],
+        }),
+      ),
     )
     .command(
       "install",
       "Install TypeSpec dependencies",
-      () => {},
-      withCliHost((host) => installTypeSpecDependencies(host, process.cwd()))
+      (cmd) =>
+        cmd.option("save-package-manager", {
+          type: "boolean",
+          description: "Update the packageManager field with the package manger version and hash",
+        }),
+      withCliHostAndDiagnostics((host, args) =>
+        installTypeSpecDependencies(host, {
+          directory: process.cwd(),
+          savePackageManager: args["save-package-manager"],
+        }),
+      ),
     )
     .command(
       "info",
       "Show information about the current TypeSpec compiler.",
       () => {},
-      withCliHostAndDiagnostics((host) => printInfoAction(host))
+      withCliHostAndDiagnostics((host) => printInfoAction(host)),
     )
-    .version(typespecVersion)
+    .version(getTypeSpecEngine() === "tsp" ? `${typespecVersion} standalone` : typespecVersion)
     .demandCommand(1, "You must use one of the supported commands.").argv;
 }
 

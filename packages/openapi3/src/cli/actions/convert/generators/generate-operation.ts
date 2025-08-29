@@ -4,11 +4,12 @@ import {
   TypeSpecOperationParameter,
   TypeSpecRequestBody,
 } from "../interfaces.js";
+import { Context } from "../utils/context.js";
 import { generateDocs } from "../utils/docs.js";
 import { generateDecorators } from "./generate-decorators.js";
-import { generateTypeFromSchema, getRefName } from "./generate-types.js";
+import { generateOperationReturnType } from "./generate-response-expressions.js";
 
-export function generateOperation(operation: TypeSpecOperation): string {
+export function generateOperation(operation: TypeSpecOperation, context: Context): string {
   const definitions: string[] = [];
 
   if (operation.doc) {
@@ -21,27 +22,28 @@ export function generateOperation(operation: TypeSpecOperation): string {
 
   // generate parameters
   const parameters: string[] = [
-    ...operation.parameters.map(generateOperationParameter),
-    ...generateRequestBodyParameters(operation.requestBodies),
+    ...operation.parameters.map((p) => generateOperationParameter(operation, p, context)),
+    ...generateRequestBodyParameters(operation.requestBodies, context),
   ];
 
-  const responseTypes = operation.responseTypes.length
-    ? operation.responseTypes.join(" | ")
-    : "void";
+  const responses = generateOperationReturnType(operation, context);
 
-  definitions.push(`op ${operation.name}(${parameters.join(", ")}): ${responseTypes};`);
+  if (operation.fixmes?.length) {
+    definitions.push("\n", ...operation.fixmes.map((f) => `// FIXME: ${f}\n`));
+  }
+
+  definitions.push(`op ${operation.name}(${parameters.join(", ")}): ${responses};`);
 
   return definitions.join(" ");
 }
 
-function generateOperationParameter(parameter: Refable<TypeSpecOperationParameter>) {
+function generateOperationParameter(
+  operation: TypeSpecOperation,
+  parameter: Refable<TypeSpecOperationParameter>,
+  context: Context,
+) {
   if ("$ref" in parameter) {
-    // check if referencing a model or a property
-    const refName = getRefName(parameter.$ref);
-    const paramName = refName.indexOf(".") >= 0 ? refName.split(".").pop() : refName;
-    // when refName and paramName match, we're referencing a model and can spread
-    // TODO: Handle optionality
-    return refName === paramName ? `...${refName}` : `${paramName}: ${refName}`;
+    return `...${context.getRefName(parameter.$ref, operation.scope)}`;
   }
 
   const definitions: string[] = [];
@@ -53,13 +55,16 @@ function generateOperationParameter(parameter: Refable<TypeSpecOperationParamete
   definitions.push(...generateDecorators(parameter.decorators));
 
   definitions.push(
-    `${parameter.name}${parameter.isOptional ? "?" : ""}: ${generateTypeFromSchema(parameter.schema)}`
+    `${parameter.name}${parameter.isOptional ? "?" : ""}: ${context.generateTypeFromRefableSchema(parameter.schema, operation.scope)}`,
   );
 
   return definitions.join(" ");
 }
 
-function generateRequestBodyParameters(requestBodies: TypeSpecRequestBody[]): string[] {
+function generateRequestBodyParameters(
+  requestBodies: TypeSpecRequestBody[],
+  context: Context,
+): string[] {
   if (!requestBodies.length) {
     return [];
   }
@@ -72,13 +77,26 @@ function generateRequestBodyParameters(requestBodies: TypeSpecRequestBody[]): st
     definitions.push(`@header contentType: ${contentTypes.map((c) => `"${c}"`).join(" | ")}`);
   }
 
+  const isMultipart = contentTypes.includes("multipart/form-data");
   // Get the set of referenced types
   const body = Array.from(
-    new Set(requestBodies.filter((r) => !!r.schema).map((r) => generateTypeFromSchema(r.schema!)))
+    new Set(
+      requestBodies
+        .filter((r) => !!r.schema)
+        .map((r) => context.generateTypeFromRefableSchema(r.schema!, [], isMultipart, r.encoding)),
+    ),
   ).join(" | ");
 
   if (body) {
-    definitions.push(`@bodyRoot body: ${body}`);
+    let doc = "";
+    if (requestBodies[0].doc) {
+      doc = generateDocs(requestBodies[0].doc);
+    }
+    if (isMultipart) {
+      definitions.push(`${doc}@multipartBody body: ${body}`);
+    } else {
+      definitions.push(`${doc}@body body: ${body}`);
+    }
   }
 
   return definitions;

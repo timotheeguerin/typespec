@@ -14,30 +14,26 @@ import {
   Program,
   Type,
 } from "@typespec/compiler";
+import { $ } from "@typespec/compiler/typekit";
 import { getStatusCodeDescription, getStatusCodesWithDiagnostics } from "./decorators.js";
 import { HttpProperty } from "./http-property.js";
 import { HttpStateKeys, reportDiagnostic } from "./lib.js";
 import { Visibility } from "./metadata.js";
-import { resolveHttpPayload } from "./payload.js";
-import {
-  HttpOperationBody,
-  HttpOperationMultipartBody,
-  HttpOperationResponse,
-  HttpStatusCodes,
-  HttpStatusCodesEntry,
-} from "./types.js";
+import { HttpPayloadDisposition, resolveHttpPayload } from "./payload.js";
+import { HttpOperationResponse, HttpStatusCodes, HttpStatusCodesEntry } from "./types.js";
 
 /**
  * Get the responses for a given operation.
  */
 export function getResponsesForOperation(
   program: Program,
-  operation: Operation
+  operation: Operation,
 ): [HttpOperationResponse[], readonly Diagnostic[]] {
   const diagnostics = createDiagnosticCollector();
   const responseType = operation.returnType;
   const responses = new ResponseIndex();
-  if (responseType.kind === "Union") {
+  const tk = $(program);
+  if (tk.union.is(responseType) && !tk.union.getDiscriminatedUnion(responseType)) {
     for (const option of responseType.variants.values()) {
       if (isNullType(option.type)) {
         // TODO how should we treat this? https://github.com/microsoft/typespec/issues/356
@@ -84,15 +80,15 @@ function processResponseType(
   diagnostics: DiagnosticCollector,
   operation: Operation,
   responses: ResponseIndex,
-  responseType: Type
+  responseType: Type,
 ) {
   // Get body
   let { body: resolvedBody, metadata } = diagnostics.pipe(
-    resolveHttpPayload(program, responseType, Visibility.Read, "response")
+    resolveHttpPayload(program, responseType, Visibility.Read, HttpPayloadDisposition.Response),
   );
   // Get explicity defined status codes
   const statusCodes: HttpStatusCodes = diagnostics.pipe(
-    getResponseStatusCodes(program, responseType, metadata)
+    getResponseStatusCodes(program, responseType, metadata),
   );
 
   // Get response headers
@@ -118,16 +114,9 @@ function processResponseType(
     // the first model for this statusCode/content type pair carries the
     // description for the endpoint. This could probably be improved.
     const response: HttpOperationResponse = responses.get(statusCode) ?? {
-      statusCode: typeof statusCode === "object" ? "*" : (String(statusCode) as any),
       statusCodes: statusCode,
       type: responseType,
-      description: getResponseDescription(
-        program,
-        operation,
-        responseType,
-        statusCode,
-        resolvedBody
-      ),
+      description: getResponseDescription(program, operation, responseType, statusCode, metadata),
       responses: [],
     };
 
@@ -135,9 +124,10 @@ function processResponseType(
       response.responses.push({
         body: resolvedBody,
         headers,
+        properties: metadata,
       });
     } else {
-      response.responses.push({ headers });
+      response.responses.push({ headers, properties: metadata });
     }
     responses.set(statusCode, response);
   }
@@ -151,7 +141,7 @@ function processResponseType(
 function getResponseStatusCodes(
   program: Program,
   responseType: Type,
-  metadata: HttpProperty[]
+  metadata: HttpProperty[],
 ): [HttpStatusCodes, readonly Diagnostic[]] {
   const codes: HttpStatusCodes = [];
   const diagnostics = createDiagnosticCollector();
@@ -190,7 +180,7 @@ function getExplicitSetStatusCode(program: Program, entity: Model | ModelPropert
  */
 function getResponseHeaders(
   program: Program,
-  metadata: HttpProperty[]
+  metadata: HttpProperty[],
 ): Record<string, ModelProperty> {
   const responseHeaders: Record<string, ModelProperty> = {};
   for (const prop of metadata) {
@@ -201,12 +191,22 @@ function getResponseHeaders(
   return responseHeaders;
 }
 
+function isResponseEnvelope(metadata: HttpProperty[]): boolean {
+  return metadata.some(
+    (prop) =>
+      prop.kind === "body" ||
+      prop.kind === "bodyRoot" ||
+      prop.kind === "multipartBody" ||
+      prop.kind === "statusCode",
+  );
+}
+
 function getResponseDescription(
   program: Program,
   operation: Operation,
   responseType: Type,
   statusCode: HttpStatusCodes[number],
-  body: HttpOperationBody | HttpOperationMultipartBody | undefined
+  metadata: HttpProperty[],
 ): string | undefined {
   // NOTE: If the response type is an envelope and not the same as the body
   // type, then use its @doc as the response description. However, if the
@@ -215,7 +215,7 @@ function getResponseDescription(
   // as the response description. This allows more freedom to change how
   // TypeSpec is expressed in semantically equivalent ways without causing
   // the output to change unnecessarily.
-  if (body === undefined || body.property) {
+  if (isResponseEnvelope(metadata)) {
     const desc = getDoc(program, responseType);
     if (desc) {
       return desc;

@@ -1,9 +1,9 @@
 import { expectDiagnosticEmpty, expectDiagnostics } from "@typespec/compiler/testing";
 import { deepStrictEqual, ok, strictEqual } from "assert";
 import { describe, expect, it } from "vitest";
-import { checkFor, openApiFor } from "./test-host.js";
+import { worksFor } from "./works-for.js";
 
-describe("openapi3: return types", () => {
+worksFor(["3.0.0", "3.1.0"], ({ checkFor, openApiFor, objectSchemaIndexer }) => {
   it("model used with @body and without shouldn't conflict if it contains no metadata", async () => {
     const res = await openApiFor(
       `
@@ -12,7 +12,7 @@ describe("openapi3: return types", () => {
       }
       @route("c1") op c1(): Foo;
       @route("c2") op c2(): {@body _: Foo};
-      `
+      `,
     );
     deepStrictEqual(res.paths["/c1"].get.responses["200"].content["application/json"].schema, {
       $ref: "#/components/schemas/Foo",
@@ -32,7 +32,7 @@ describe("openapi3: return types", () => {
         key: string;
       }
       @get() op read(): Key & ETagHeader;
-      `
+      `,
     );
     ok(res.paths["/"].get.responses["200"].headers);
     ok(res.paths["/"].get.responses["200"].headers["e-tag"]);
@@ -41,7 +41,7 @@ describe("openapi3: return types", () => {
   it("defines responses with status codes", async () => {
     const res = await openApiFor(
       `
-      @service({ name:"Test" })
+      @service
       namespace Test {
         model CreatedResponse {
           @statusCode code: "201";
@@ -51,7 +51,7 @@ describe("openapi3: return types", () => {
         }
         @put op create(): CreatedResponse & Key;  
       }
-      `
+      `,
     );
     ok(res.paths["/"].put.responses["201"]);
     ok(res.paths["/"].put.responses["201"].content["application/json"].schema);
@@ -60,7 +60,7 @@ describe("openapi3: return types", () => {
   it("defines responses with numeric status codes", async () => {
     const res = await openApiFor(
       `
-      @service({ name:"Test" })
+      @service
       namespace Test {
         model CreatedResponse {
           @statusCode code: 201;
@@ -70,16 +70,33 @@ describe("openapi3: return types", () => {
         }
         @put op create(): CreatedResponse & Key;
       }
-      `
+      `,
     );
     ok(res.paths["/"].put.responses["201"]);
     ok(res.paths["/"].put.responses["201"].content["application/json"].schema);
   });
 
+  it("handle @statusCode decorator with void return type", async () => {
+    const res = await openApiFor(`
+      model TestResult<T> {
+        @statusCode statusCode: 201;
+        @body body: T;
+      }
+
+      interface Test {
+        test(): TestResult<void>;
+      }
+      `);
+    ok(res.paths["/"].get.responses["201"]);
+    deepStrictEqual(res.paths["/"].get.responses["201"], {
+      description: "The request has succeeded and a new resource has been created as a result.",
+    });
+  });
+
   it("defines responses with headers and status codes", async () => {
     const res = await openApiFor(
       `
-      @service({ name:"Test" })
+      @service
       namespace Test {
         model ETagHeader {
           @header eTag: string;
@@ -92,7 +109,7 @@ describe("openapi3: return types", () => {
         }
         @put op create(): { ...CreatedResponse, ...ETagHeader, @body body: Key};
       }
-      `
+      `,
     );
     ok(res.paths["/"].put.responses["201"]);
     ok(res.paths["/"].put.responses["201"].headers["e-tag"]);
@@ -105,7 +122,7 @@ describe("openapi3: return types", () => {
     const res = await openApiFor(
       `
       @put op create(): {@header eTag: string};
-      `
+      `,
     );
     ok(res.paths["/"].put.responses["200"]);
     ok(res.paths["/"].put.responses["200"].headers["e-tag"]);
@@ -116,7 +133,7 @@ describe("openapi3: return types", () => {
     const res = await openApiFor(
       `
       @put op create(): {@header eTag?: string};
-      `
+      `,
     );
     ok(res.paths["/"].put.responses["200"]);
     ok(res.paths["/"].put.responses["200"].headers["e-tag"]);
@@ -126,7 +143,7 @@ describe("openapi3: return types", () => {
   it("defines responses with headers and status codes in base model", async () => {
     const res = await openApiFor(
       `
-      @service({ name:"Test" })
+      @service
       namespace Test {
         model CreatedResponse {
           @statusCode code: "201";
@@ -141,7 +158,7 @@ describe("openapi3: return types", () => {
         }
         @put op create(): CreatePageResponse;
       }
-      `
+      `,
     );
     ok(res.paths["/"].put.responses["201"]);
     ok(res.paths["/"].put.responses["201"].headers["location"]);
@@ -163,18 +180,18 @@ describe("openapi3: return types", () => {
         key: string;
       }
       @put op create(): CreatedOrUpdatedResponse & DateHeader & Key;
-      `
+      `,
     );
     ok(res.paths["/"].put.responses["200"]);
     ok(res.paths["/"].put.responses["201"]);
     // Note: 200 and 201 response should be equal except for description
     deepStrictEqual(
       res.paths["/"].put.responses["200"].headers,
-      res.paths["/"].put.responses["201"].headers
+      res.paths["/"].put.responses["201"].headers,
     );
     deepStrictEqual(
       res.paths["/"].put.responses["200"].content,
-      res.paths["/"].put.responses["201"].content
+      res.paths["/"].put.responses["201"].content,
     );
   });
 
@@ -191,7 +208,7 @@ describe("openapi3: return types", () => {
         key: string;
       }
       @get op read(): Key | Error;
-      `
+      `,
     );
     ok(res.paths["/"].get.responses["200"]);
     ok(res.components.schemas.Key);
@@ -201,6 +218,32 @@ describe("openapi3: return types", () => {
     ok(res.components.schemas.Error);
     deepStrictEqual(res.paths["/"].get.responses["default"].content["application/json"].schema, {
       $ref: "#/components/schemas/Error",
+    });
+  });
+
+  it("defines single responses for a discriminated union return type", async () => {
+    const res = await openApiFor(
+      `
+      model HeavyWidget {
+        heavy: string;
+      }
+
+      model LightWidget {
+        light: string;
+      }
+
+      @discriminated
+      union Widget {
+        heavy: HeavyWidget,
+        light: LightWidget,
+      }
+      @get op read(): Widget;
+      `,
+    );
+    ok(res.paths["/"].get.responses["200"]);
+    ok(res.components.schemas.Widget);
+    deepStrictEqual(res.paths["/"].get.responses["200"].content["application/json"].schema, {
+      $ref: "#/components/schemas/Widget",
     });
   });
 
@@ -222,7 +265,7 @@ describe("openapi3: return types", () => {
       
       // Note: & takes precedence over |
       @get op read(): Key & TextPlain | Error;
-      `
+      `,
     );
     ok(res.paths["/"].get.responses["200"]);
     ok(res.paths["/"].get.responses["200"].content["text/plain"].schema);
@@ -239,7 +282,7 @@ describe("openapi3: return types", () => {
         @header contentType: "text/plain" | "text/html" | "text/csv";
       }
       @get op read(): { ...TextMulti, @body body: string };
-    `
+    `,
     );
     ok(res.paths["/"].get.responses["200"]);
     ok(res.paths["/"].get.responses["200"].content["text/plain"]);
@@ -253,10 +296,7 @@ describe("openapi3: return types", () => {
       `);
     ok(res.paths["/"].get.responses["200"]);
     ok(res.paths["/"].get.responses["200"].content);
-    strictEqual(
-      res.paths["/"].get.responses["200"].content["application/json"].schema.type,
-      "string"
-    );
+    strictEqual(res.paths["/"].get.responses["200"].content["text/plain"].schema.type, "string");
   });
 
   it("defines responses with top-level array type", async () => {
@@ -266,21 +306,21 @@ describe("openapi3: return types", () => {
         foo: string;
       }
       @get() op read(): Foo[];
-      `
+      `,
     );
     ok(res.paths["/"].get.responses["200"]);
     ok(res.paths["/"].get.responses["200"].content);
     strictEqual(
       res.paths["/"].get.responses["200"].content["application/json"].schema.type,
-      "array"
+      "array",
     );
   });
 
-  it("produce additionalProperties schema if response is Record<T>", async () => {
+  it(`produce ${objectSchemaIndexer} schema if response is Record<T>`, async () => {
     const res = await openApiFor(
       `
       @get op test(): Record<string>;
-      `
+      `,
     );
 
     const responses = res.paths["/"].get.responses;
@@ -289,7 +329,7 @@ describe("openapi3: return types", () => {
       "application/json": {
         schema: {
           type: "object",
-          additionalProperties: {
+          [objectSchemaIndexer]: {
             type: "string",
           },
         },
@@ -321,7 +361,7 @@ describe("openapi3: return types", () => {
       }
 
       @get op get(): Foo | Error;
-      `
+      `,
     );
     const responses = res.paths["/"].get.responses;
     ok(responses["200"]);
@@ -349,7 +389,7 @@ describe("openapi3: return types", () => {
       }
 
       @get op get(): Foo | Error;
-      `
+      `,
     );
     const responses = res.paths["/"].get.responses;
     ok(responses["200"]);
@@ -359,7 +399,7 @@ describe("openapi3: return types", () => {
     });
     ok(responses["default"]);
     ok(responses["default"].content);
-    deepStrictEqual(responses["default"].content["application/json"].schema, {
+    deepStrictEqual(responses["default"].content["text/plain"].schema, {
       type: "string",
     });
   });
@@ -378,7 +418,7 @@ describe("openapi3: return types", () => {
       }
 
       @get op get(): Foo | Error;
-      `
+      `,
     );
     const responses = res.paths["/"].get.responses;
     ok(responses["200"]);
@@ -398,7 +438,7 @@ describe("openapi3: return types", () => {
     const res = await openApiFor(
       `
       @delete op delete(): { @header date: string, @body body: {} };
-      `
+      `,
     );
     const responses = res.paths["/"].delete.responses;
     ok(responses["204"] === undefined);
@@ -435,6 +475,8 @@ describe("openapi3: return types", () => {
         #suppress "@typespec/http/metadata-ignored"
         @header header: string,
         #suppress "@typespec/http/metadata-ignored"
+        @cookie cookie: string,
+        #suppress "@typespec/http/metadata-ignored"
         @query query: string,
         #suppress "@typespec/http/metadata-ignored"
         @statusCode code: 201,
@@ -444,20 +486,21 @@ describe("openapi3: return types", () => {
       type: "object",
       properties: {
         header: { type: "string" },
+        cookie: { type: "string" },
         query: { type: "string" },
         code: { type: "number", enum: [201] },
       },
-      required: ["header", "query", "code"],
+      required: ["header", "cookie", "query", "code"],
     });
   });
 
   describe("response model resolving to no property in the body produce no body", () => {
-    it.each(["{}", "{@header prop: string}", `{@visibility("none") prop: string}`])(
+    it.each(["{}", "{@header prop: string}", `{@invisible(Lifecycle) prop: string}`])(
       "%s",
       async (body) => {
         const res = await openApiFor(`op test(): ${body};`);
         strictEqual(res.paths["/"].get.responses["200"].content, undefined);
-      }
+      },
     );
   });
 
@@ -496,13 +539,31 @@ describe("openapi3: return types", () => {
     });
   });
 
+  it("invalid metadata properties in body should still be included but response cookies should not be included", async () => {
+    const res = await openApiFor(`op read(): {
+        @header header: string;
+        #suppress "@typespec/http/response-cookie-not-supported"
+        @cookie cookie: string;
+        @query query: string;
+        name: string;
+      };`);
+    expect(res.paths["/"].get.responses["200"].content["application/json"].schema).toEqual({
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        name: { type: "string" },
+      },
+      required: ["query", "name"],
+    });
+  });
+
   describe("multiple content types", () => {
     it("handles multiple content types for the same status code", async () => {
       const res = await openApiFor(
         `@get op read():
           | { @body body: {} }
           | {@header contentType: "text/plain", @body body: string };
-        `
+        `,
       );
       ok(res.paths["/"].get.responses[200].content["application/json"]);
       ok(res.paths["/"].get.responses[200].content["text/plain"]);
@@ -513,7 +574,7 @@ describe("openapi3: return types", () => {
         `@get op read():
           | { @body body: {}, @header foo: string }
           | {@header contentType: "text/plain", @body body: string, @header bar: string };
-        `
+        `,
       );
       ok(res.paths["/"].get.responses[200].headers["foo"]);
       ok(res.paths["/"].get.responses[200].headers["bar"]);
@@ -524,7 +585,7 @@ describe("openapi3: return types", () => {
         `@get op read():
           | { @body body: {}, @header foo: string }
           | {@header contentType: "text/plain", @body body: string, @header foo: int16 };
-        `
+        `,
       );
       expectDiagnostics(diagnostics, [{ code: "@typespec/openapi3/duplicate-header" }]);
     });
@@ -533,59 +594,9 @@ describe("openapi3: return types", () => {
       const diagnostics = await checkFor(
         `@get op read():
            {@header contentType: "text/plain" | "application/json", @body body: string, @header foo: string };
-        `
+        `,
       );
       expectDiagnosticEmpty(diagnostics);
-    });
-  });
-
-  describe("binary responses", () => {
-    it("bytes responses should default to application/json with byte format", async () => {
-      const res = await openApiFor(`
-        @get op read(): bytes;
-      `);
-
-      const response = res.paths["/"].get.responses["200"];
-      ok(response);
-      ok(response.content);
-      strictEqual(response.content["application/json"].schema.type, "string");
-      strictEqual(response.content["application/json"].schema.format, "byte");
-    });
-
-    it("@body body: bytes responses default to application/json with bytes format", async () => {
-      const res = await openApiFor(`
-        @get op read(): {@body body: bytes};
-      `);
-
-      const response = res.paths["/"].get.responses["200"];
-      ok(response);
-      ok(response.content);
-      strictEqual(response.content["application/json"].schema.type, "string");
-      strictEqual(response.content["application/json"].schema.format, "byte");
-    });
-
-    it("@header contentType text/plain should keep format to byte", async () => {
-      const res = await openApiFor(`
-        @get op read(): {@header contentType: "text/plain", @body body: bytes};
-      `);
-
-      const response = res.paths["/"].get.responses["200"];
-      ok(response);
-      ok(response.content);
-      strictEqual(response.content["text/plain"].schema.type, "string");
-      strictEqual(response.content["text/plain"].schema.format, "byte");
-    });
-
-    it("@header contentType not json or text should set format to binary", async () => {
-      const res = await openApiFor(`
-        @get op read(): {@header contentType: "image/png", @body body: bytes};
-      `);
-
-      const response = res.paths["/"].get.responses["200"];
-      ok(response);
-      ok(response.content);
-      strictEqual(response.content["image/png"].schema.type, "string");
-      strictEqual(response.content["image/png"].schema.format, "binary");
     });
   });
 
@@ -694,6 +705,147 @@ describe("openapi3: return types", () => {
           description: "An unexpected error response.",
         },
       });
+    });
+  });
+});
+
+worksFor(["3.0.0"], ({ openApiFor }) => {
+  describe("open api 3.0.0 binary responses", () => {
+    it("bytes responses should default to application/octet-stream with binary format", async () => {
+      const res = await openApiFor(`
+        @get op read(): bytes;
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      strictEqual(response.content["application/octet-stream"].schema.type, "string");
+      strictEqual(response.content["application/octet-stream"].schema.format, "binary");
+    });
+
+    it("@body body: bytes responses default to application/octet-stream with binary format", async () => {
+      const res = await openApiFor(`
+        @get op read(): {@body body: bytes};
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      strictEqual(response.content["application/octet-stream"].schema.type, "string");
+      strictEqual(response.content["application/octet-stream"].schema.format, "binary");
+    });
+
+    it("@header contentType text/plain should keep format to byte", async () => {
+      const res = await openApiFor(`
+        @get op read(): {@header contentType: "text/plain", @body body: bytes};
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      strictEqual(response.content["text/plain"].schema.type, "string");
+      strictEqual(response.content["text/plain"].schema.format, "byte");
+    });
+
+    it("@header contentType not json or text should set format to binary", async () => {
+      const res = await openApiFor(`
+        @get op read(): {@header contentType: "image/png", @body body: bytes};
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      strictEqual(response.content["image/png"].schema.type, "string");
+      strictEqual(response.content["image/png"].schema.format, "binary");
+    });
+  });
+});
+
+worksFor(["3.1.0"], ({ openApiFor }) => {
+  describe("open api 3.1.0 binary responses", () => {
+    it("bytes responses should default to application/octet-stream with the same contentMediaType", async () => {
+      const res = await openApiFor(`
+        @get op read(): bytes;
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      deepStrictEqual(response.content["application/octet-stream"].schema, {
+        contentMediaType: "application/octet-stream",
+      });
+    });
+
+    it("@body body: bytes responses default to application/octet-stream with the same contentMediaType", async () => {
+      const res = await openApiFor(`
+        @get op read(): {@body body: bytes};
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      deepStrictEqual(response.content["application/octet-stream"].schema, {
+        contentMediaType: "application/octet-stream",
+      });
+    });
+
+    it("@bodyRoot body: bytes responses can be overridden to application/json", async () => {
+      const res = await openApiFor(`
+        @get op read(): {
+          @header contentType: "application/json";
+          @bodyRoot body: bytes;
+        };
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      deepStrictEqual(response.content["application/json"].schema, {
+        contentEncoding: "base64",
+        type: "string",
+      });
+    });
+
+    it("@body body: bytes responses can be overridden to application/json", async () => {
+      const res = await openApiFor(`
+        @get op read(): {
+          @header contentType: "application/json";
+          @body body: bytes;
+        };
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      deepStrictEqual(response.content["application/json"].schema, {
+        contentEncoding: "base64",
+        type: "string",
+      });
+    });
+
+    it("@header contentType text/plain should set contentEncoding to base64", async () => {
+      const res = await openApiFor(`
+        @get op read(): {@header contentType: "text/plain", @body body: bytes};
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      deepStrictEqual(response.content["text/plain"].schema, {
+        type: "string",
+        contentEncoding: "base64",
+      });
+    });
+
+    it("@header contentType not json or text should set contentMediaType", async () => {
+      const res = await openApiFor(`
+        @get op read(): {@header contentType: "image/png", @body body: bytes};
+      `);
+
+      const response = res.paths["/"].get.responses["200"];
+      ok(response);
+      ok(response.content);
+      deepStrictEqual(response.content["image/png"].schema, { contentMediaType: "image/png" });
     });
   });
 });

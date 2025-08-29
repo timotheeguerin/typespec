@@ -1,5 +1,161 @@
 # Change Log - @typespec/json-schema
 
+## 1.3.0
+
+### Bump dependencies
+
+- [#7978](https://github.com/microsoft/typespec/pull/7978) Upgrade dependencies
+
+
+## 1.2.0
+
+### Bump dependencies
+
+- [#7674](https://github.com/microsoft/typespec/pull/7674) Upgrade dependencies
+
+
+## 1.1.0
+
+### Bug Fixes
+
+- [#7501](https://github.com/microsoft/typespec/pull/7501) Json schema emitter conflict with other emitters
+
+
+## 1.0.0
+
+No changes, version bump only.
+
+## 1.0.0-rc.1
+
+### Bug Fixes
+
+- [#6947](https://github.com/microsoft/typespec/pull/6947) Fix crash when using enum values in extension
+- [#6887](https://github.com/microsoft/typespec/pull/6887) Fix using union templates
+
+
+## 1.0.0-rc.0
+
+### Bump dependencies
+
+- [#6595](https://github.com/microsoft/typespec/pull/6595) Upgrade dependencies
+
+
+## 0.67.0
+
+### Breaking Changes
+
+- [#5977](https://github.com/microsoft/typespec/pull/5977) Minimum node version is now 20
+
+### Bump dependencies
+
+- [#6266](https://github.com/microsoft/typespec/pull/6266) Update dependencies
+
+### Bug Fixes
+
+- [#6411](https://github.com/microsoft/typespec/pull/6411) Add support for new `dryRun` emitter option
+
+
+## 0.66.0
+
+### Features
+
+- [#5994](https://github.com/microsoft/typespec/pull/5994) Adds `seal-object-schemas` emitter option to automatically set additionalProperties/unevaluatedProperties to `{ not: {} }` wherever possible
+- [#5961](https://github.com/microsoft/typespec/pull/5961) Updates JsonSchema and Open API 3.1 emitters to use unevaluatedProperties instead of additionalProperties, and updates Open API 3 emitters to match JsonSchema behavior of treating `Record<never>` as setting `additionalProperties: { not: {} }`
+
+
+## 0.65.0
+
+### Bump dependencies
+
+- [#5690](https://github.com/microsoft/typespec/pull/5690) Upgrade dependencies
+
+### Features
+
+- [#5699](https://github.com/microsoft/typespec/pull/5699) Promote `unsafe_useStateMap` and `unsafe_useStateSet` experimental APIs to stable version `useStateMap` and `useStateSet`. Old ones are deprecated
+
+
+## 0.64.0
+
+No changes, version bump only.
+
+## 0.63.0
+
+### Bug Fixes
+
+- [#5189](https://github.com/microsoft/typespec/pull/5189) Fixes crash that occurred when a template instantiation's template argument was a union that references a declaration.
+
+
+## 0.62.0
+
+### Bug Fixes
+
+- [#4732](https://github.com/microsoft/typespec/pull/4732) Document exported types
+
+### Bump dependencies
+
+- [#4679](https://github.com/microsoft/typespec/pull/4679) Upgrade dependencies - October 2024
+
+
+## 0.61.0
+
+### Bump dependencies
+
+- [#4424](https://github.com/microsoft/typespec/pull/4424) Bump dependencies
+
+### Features
+
+- [#4447](https://github.com/microsoft/typespec/pull/4447) Example set with `@example` decorator will populate the schema `examples` property
+
+
+## 0.60.0
+
+### Bug Fixes
+
+- [#4150](https://github.com/microsoft/typespec/pull/4150) Stop json schema from crashing on unknown scalar and handle `unixTimestamp32`
+
+### Features
+
+- [#4139](https://github.com/microsoft/typespec/pull/4139) Internals: Migrate to new api for declaring decorator implementation
+
+
+## 0.59.0
+
+### Bump dependencies
+
+- [#3948](https://github.com/microsoft/typespec/pull/3948) Update dependencies
+
+### Breaking Changes
+
+- [#3558](https://github.com/microsoft/typespec/pull/3558) Updates `@extension` decorator to support TypeSpec values in addition to types.
+
+In previous versions of the json-schema emitter, the `@extension` decorator only accepted types as the value. These are emitted as JSON schemas. In order to add extensions as raw values, types had to be wrapped in the `Json<>` template when being passed to the `@extension` decorator.
+
+This change allows setting TypeSpec values (introduced in TypeSpec 0.57.0) directly instead.
+
+The following example demonstrates using values directly:
+
+```tsp
+@extension("x-example", #{ foo: "bar" })
+model Foo {}
+```
+
+This change results in scalars being treated as values instead of types. This will result in the `@extension` decorator emitting raw values for scalar types instead of JSON schema. To preserve the previous behavior, use `typeof` when passing in a scalar value.
+
+The following example demonstrates how to pass a scalar value that emits a JSON schema:
+
+```tsp
+@extension("x-example", "foo")
+model Foo {}
+```
+
+To preserve this same behavior, the above example can be updated to the following:
+
+```tsp
+@extension("x-example", typeof "foo")
+model Foo {}
+```
+
+
 ## 0.58.0
 
 ### Bug Fixes

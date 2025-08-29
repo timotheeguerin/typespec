@@ -1,21 +1,21 @@
 import { deepStrictEqual, ok } from "assert";
-import { describe, it } from "vitest";
-import { oapiForModel } from "./test-host.js";
+import { it } from "vitest";
+import { worksFor } from "./works-for.js";
 
-describe("openapi3: Record", () => {
+worksFor(["3.0.0", "3.1.0"], ({ oapiForModel, objectSchemaIndexer }) => {
   it("defines record inline", async () => {
     const res = await oapiForModel(
       "Pet",
       `
       model Pet { foodScores: Record<int32> };
-      `
+      `,
     );
 
     ok(res.isRef);
     ok(res.schemas.Pet, "expected definition named Pet");
     deepStrictEqual(res.schemas.Pet.properties.foodScores, {
       type: "object",
-      additionalProperties: { type: "integer", format: "int32" },
+      [objectSchemaIndexer]: { type: "integer", format: "int32" },
     });
   });
 
@@ -25,7 +25,7 @@ describe("openapi3: Record", () => {
       `
       model FoodScores is Record<int32> {}
       model Pet { foodScores: FoodScores };
-      `
+      `,
     );
 
     ok(res.isRef);
@@ -33,38 +33,38 @@ describe("openapi3: Record", () => {
     ok(res.schemas.Pet, "expected definition named Pet");
     deepStrictEqual(res.schemas.FoodScores, {
       type: "object",
-      additionalProperties: { type: "integer", format: "int32" },
+      [objectSchemaIndexer]: { type: "integer", format: "int32" },
     });
   });
 
-  it("specify additionalProperties when `...Record<T>`", async () => {
+  it(`specify ${objectSchemaIndexer} when "...Record<T>"`, async () => {
     const res = await oapiForModel(
       "Person",
       `
       model Person {age: int32, ...Record<string>}
-      `
+      `,
     );
 
     deepStrictEqual(res.schemas.Person, {
       type: "object",
       properties: { age: { type: "integer", format: "int32" } },
-      additionalProperties: { type: "string" },
+      [objectSchemaIndexer]: { type: "string" },
       required: ["age"],
     });
   });
 
-  it("specify additionalProperties of anyOf when multiple `...Record<T>`", async () => {
+  it(`specify ${objectSchemaIndexer} of anyOf when multiple "...Record<T>"`, async () => {
     const res = await oapiForModel(
       "Person",
       `
       model Person {age: int32, ...Record<string>, ...Record<boolean>}
-      `
+      `,
     );
 
     deepStrictEqual(res.schemas.Person, {
       type: "object",
       properties: { age: { type: "integer", format: "int32" } },
-      additionalProperties: { anyOf: [{ type: "string" }, { type: "boolean" }] },
+      [objectSchemaIndexer]: { anyOf: [{ type: "string" }, { type: "boolean" }] },
       required: ["age"],
     });
   });

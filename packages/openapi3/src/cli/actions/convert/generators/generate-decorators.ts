@@ -1,13 +1,26 @@
-import { TypeSpecDecorator } from "../interfaces.js";
+import { TSValue, TypeSpecDecorator } from "../interfaces.js";
 
 function generateDecorator({ name, args }: TypeSpecDecorator): string {
   const hasArgs = args.length;
-  const stringifiedArguments = hasArgs ? `(${args.map((a) => JSON.stringify(a)).join(", ")})` : "";
+  const stringifiedArguments = hasArgs
+    ? `(${args.map((a) => (isTSValue(a) ? a.value : JSON.stringify(a))).join(", ")})`
+    : "";
 
   return `@${name}${stringifiedArguments}`;
 }
 
-export function generateDecorators(decorators: TypeSpecDecorator[]): string[] {
-  const uniqueDecorators = new Set<string>(decorators.map(generateDecorator));
+export function generateDecorators(
+  decorators: TypeSpecDecorator[],
+  namesToExclude: string[] = [],
+): string[] {
+  const uniqueDecorators = new Set<string>(
+    decorators.filter((d) => !namesToExclude.includes(d.name)).map(generateDecorator),
+  );
   return Array.from(uniqueDecorators);
+}
+
+function isTSValue(value: unknown): value is TSValue {
+  return Boolean(
+    value && typeof value === "object" && "__kind" in value && value["__kind"] === "value",
+  );
 }

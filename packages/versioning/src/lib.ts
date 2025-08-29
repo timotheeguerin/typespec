@@ -1,10 +1,6 @@
 import { createTypeSpecLibrary, paramMessage } from "@typespec/compiler";
 
-export const {
-  reportDiagnostic,
-  createStateSymbol,
-  stateKeys: VersioningStateKeys,
-} = createTypeSpecLibrary({
+export const $lib = createTypeSpecLibrary({
   name: "@typespec/versioning",
   diagnostics: {
     "versioned-dependency-tuple": {
@@ -25,12 +21,6 @@ export const {
         default: `Versioned dependency mapping must all point to the same namespace but 2 versions have different namespaces '${"namespace1"}' and '${"namespace2"}'.`,
       },
     },
-    "versioned-dependency-record-not-mapping": {
-      severity: "error",
-      messages: {
-        default: paramMessage`The versionedDependency decorator must provide a model mapping local versions to dependency '${"dependency"}' versions`,
-      },
-    },
     "versioned-dependency-not-picked": {
       severity: "error",
       messages: {
@@ -49,22 +39,10 @@ export const {
         default: paramMessage`Multiple versions from '${"name"}' resolve to the same value. Version enums must resolve to unique values.`,
       },
     },
-    "using-versioned-library": {
-      severity: "error",
-      messages: {
-        default: paramMessage`Namespace '${"sourceNs"}' is referencing types from versioned namespace '${"targetNs"}' but didn't specify which versions with @useDependency.`,
-      },
-    },
     "invalid-renamed-from-value": {
       severity: "error",
       messages: {
         default: "@renamedFrom.oldName cannot be empty string.",
-      },
-    },
-    "no-service-fixed-version": {
-      severity: "error",
-      messages: {
-        default: paramMessage`Namespace '${"name"}' cannot specify a fixed service version with @service({version: ${"version"}}) while using @versioned. Remove the version argument from @service.`,
       },
     },
     "incompatible-versioned-reference": {
@@ -75,8 +53,8 @@ export const {
         dependentAddedAfter: paramMessage`'${"sourceName"}' was added in version '${"sourceAddedOn"}' but contains type '${"targetName"}' added in version '${"targetAddedOn"}'.`,
         removedBefore: paramMessage`'${"sourceName"}' was removed in version '${"sourceRemovedOn"}' but referencing type '${"targetName"}' removed in version '${"targetRemovedOn"}'.`,
         dependentRemovedBefore: paramMessage`'${"sourceName"}' was removed in version '${"sourceRemovedOn"}' but contains type '${"targetName"}' removed in version '${"targetRemovedOn"}'.`,
-        versionedDependencyAddedAfter: paramMessage`'${"sourceName"}' is referencing type '${"targetName"}' added in version '${"targetAddedOn"}' but version used is ${"dependencyVersion"}.`,
-        versionedDependencyRemovedBefore: paramMessage`'${"sourceName"}' is referencing type '${"targetName"}' removed in version '${"targetAddedOn"}' but version used is ${"dependencyVersion"}.`,
+        versionedDependencyAddedAfter: paramMessage`'${"sourceName"}' is referencing type '${"targetName"}' added in version '${"targetAddedOn"}' but version used is '${"dependencyVersion"}'.`,
+        versionedDependencyRemovedBefore: paramMessage`'${"sourceName"}' is referencing type '${"targetName"}' removed in version '${"targetAddedOn"}' but version used is '${"dependencyVersion"}'.`,
         doesNotExist: paramMessage`'${"sourceName"}' is referencing type '${"targetName"}' which does not exist in version '${"version"}'.`,
       },
     },
@@ -121,3 +99,5 @@ export const {
     returnTypeChangedFrom: { description: "State for @returnTypeChangedFrom decorator" },
   },
 });
+
+export const { reportDiagnostic, createStateSymbol, stateKeys: VersioningStateKeys } = $lib;

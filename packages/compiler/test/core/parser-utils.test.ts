@@ -1,17 +1,17 @@
 import { deepStrictEqual, ok, strictEqual, throws } from "assert";
 import { describe, it } from "vitest";
-import { Comment } from "../../src/core/index.js";
 import { getCommentAtPosition, getPositionBeforeTrivia } from "../../src/core/parser-utils.js";
 import { parse } from "../../src/core/parser.js";
 import { TypeSpecScriptNode } from "../../src/core/types.js";
-import { extractCursor } from "../../src/testing/test-server-host.js";
+import { Comment } from "../../src/index.js";
+import { extractCursor } from "../../src/testing/source-utils.js";
 import { dumpAST } from "../ast-test-utils.js";
 
 describe("compiler: parser-utils", () => {
   describe("getCommentAtPosition", () => {
     function getCommentAtCursor(
       sourceWithCursor: string,
-      comments = true
+      comments = true,
     ): {
       root: TypeSpecScriptNode;
       comment: Comment | undefined;
@@ -62,7 +62,7 @@ describe("compiler: parser-utils", () => {
   describe("getPositionBeforeTrivia", () => {
     function getPositionBeforeTriviaAtCursor(
       sourceWithCursor: string,
-      comments = true
+      comments = true,
     ): {
       pos: number;
       root: TypeSpecScriptNode;
@@ -101,7 +101,7 @@ describe("compiler: parser-utils", () => {
 
         /** 
          * Inside the last comment ┆ over here
-         */`
+         */`,
       );
       strictEqual(pos, testSourceWithoutTrailingTrivia.length);
     });

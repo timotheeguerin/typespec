@@ -1,15 +1,15 @@
 import { deepStrictEqual } from "assert";
-import { describe, it } from "vitest";
-import { openApiFor } from "./test-host.js";
+import { it } from "vitest";
+import { worksFor } from "./works-for.js";
 
-describe("openapi3: metadata", () => {
+worksFor(["3.0.0", "3.1.0"], ({ openApiFor }) => {
   it("will expose all properties on unreferenced models but filter properties on referenced models", async () => {
     const res = await openApiFor(`
       model M {
-        @visibility("read") r: string;
-        @visibility("create", "update") uc?: string;
-        @visibility("read", "create") rc?: string;
-        @visibility("read", "update", "create") ruc?: string;
+        @visibility(Lifecycle.Read) r: string;
+        @visibility(Lifecycle.Create, Lifecycle.Update) uc?: string;
+        @visibility(Lifecycle.Read, Lifecycle.Create) rc?: string;
+        @visibility(Lifecycle.Read, Lifecycle.Update, Lifecycle.Create) ruc?: string;
       }
     `);
 
@@ -30,19 +30,19 @@ describe("openapi3: metadata", () => {
   it("prioritizes read visibility when referenced and unreferenced models share schemas", async () => {
     const res = await openApiFor(`
       model Shared {
-        @visibility("create", "update") password: string;
+        @visibility(Lifecycle.Create, Lifecycle.Update) password: string;
         prop: string;
       }
 
       model Unreferenced {
-        @visibility("read") r: string;
-        @visibility("create") c: string;
+        @visibility(Lifecycle.Read) r: string;
+        @visibility(Lifecycle.Create) c: string;
         shared: Shared;
       }
 
       model Referenced {
-        @visibility("read") r: string;
-        @visibility("create") c: string;
+        @visibility(Lifecycle.Read) r: string;
+        @visibility(Lifecycle.Create) c: string;
         shared: Shared;
       }
 
@@ -91,15 +91,15 @@ describe("openapi3: metadata", () => {
     });
   });
 
-  it("will expose create visibility properties on PATCH model using @requestVisibility", async () => {
+  it("will expose create visibility properties on PATCH model using (legacy implicitOptionality)", async () => {
     const res = await openApiFor(`
       model M {
-        @visibility("read") r: string;
-        @visibility("read", "create") rc?: string;
-        @visibility("read", "update", "create") ruc?: string;
+        @visibility(Lifecycle.Read) r: string;
+        @visibility(Lifecycle.Read, Lifecycle.Create) rc?: string;
+        @visibility(Lifecycle.Read, Lifecycle.Update, Lifecycle.Create) ruc?: string;
       }
-      @parameterVisibility("create", "update")
-      @route("/") @patch op createOrUpdate(...M): M; 
+      @parameterVisibility(Lifecycle.Create, Lifecycle.Update)
+      @route("/") @patch(#{implicitOptionality: true}) op createOrUpdate(...M): M; 
     `);
 
     const response = res.paths["/"].patch.responses["200"].content["application/json"].schema;
@@ -130,9 +130,9 @@ describe("openapi3: metadata", () => {
   it("will expose create visibility properties on PUT model", async () => {
     const res = await openApiFor(`
       model M {
-        @visibility("read") r: string;
-        @visibility("read", "create") rc?: string;
-        @visibility("read", "update", "create") ruc?: string;
+        @visibility(Lifecycle.Read) r: string;
+        @visibility(Lifecycle.Read, Lifecycle.Create) rc?: string;
+        @visibility(Lifecycle.Read, Lifecycle.Update, Lifecycle.Create) ruc?: string;
       }
       @route("/") @put op createOrUpdate(...M): M; 
     `);
@@ -155,20 +155,20 @@ describe("openapi3: metadata", () => {
     });
   });
 
-  it("ensures properties are required for array updates", async () => {
+  it("ensures properties are required for array updates (legacy implicitOptionality)", async () => {
     const res = await openApiFor(`
       model Person {
-        @visibility("read") id: string;
-        @visibility("create") secret: string;
+        @visibility(Lifecycle.Read) id: string;
+        @visibility(Lifecycle.Create) secret: string;
         name: string;
       
-        @visibility("read", "create")
+        @visibility(Lifecycle.Read, Lifecycle.Create)
         test: string;
       
-        @visibility("other", "read", "update")
+        @visibility(Lifecycle.Read, Lifecycle.Update)
         other: string;
       
-        @visibility("read", "create", "update")
+        @visibility(Lifecycle.Read, Lifecycle.Create, Lifecycle.Update)
         relatives: PersonRelative[];
       }
       
@@ -176,7 +176,7 @@ describe("openapi3: metadata", () => {
         person: Person;
         relationship: string;
       }
-      @route("/") @patch op update(...Person): Person; 
+      @route("/") @patch(#{implicitOptionality: true}) op update(...Person): Person; 
     `);
 
     const response = res.paths["/"].patch.responses["200"].content["application/json"].schema;
@@ -206,7 +206,7 @@ describe("openapi3: metadata", () => {
     });
   });
 
-  it("can make properties optional", async () => {
+  it("can make properties optional (legacy implicitOptionality)", async () => {
     const res = await openApiFor(`
       model Widget { 
         name: string; 
@@ -217,7 +217,7 @@ describe("openapi3: metadata", () => {
         weight: float64;
       }
       @post op create(...Widget): void;
-      @patch op update(...Widget): void;
+      @patch(#{implicitOptionality: true}) op update(...Widget): void;
   `);
 
     const requestSchema = res.paths["/"].patch.requestBody.content["application/json"].schema;
@@ -232,7 +232,7 @@ describe("openapi3: metadata", () => {
   it("can share readonly properties", async () => {
     const res = await openApiFor(`
       model M {
-        @visibility("read") r?: string;
+        @visibility(Lifecycle.Read) r?: string;
         d?: string;
       }
       @route("/") @post op create(...M): M; 
@@ -258,9 +258,9 @@ describe("openapi3: metadata", () => {
   it("does not emit invisible, unshared readonly properties", async () => {
     const res = await openApiFor(`
     model M {
-      @visibility("read") r?: string;
-      @visibility("create") c?: string;
-      @visibility("update") u?: string;
+      @visibility(Lifecycle.Read) r?: string;
+      @visibility(Lifecycle.Create) c?: string;
+      @visibility(Lifecycle.Update) u?: string;
     }
     @route("/") @post op create(...M): M; 
   `);
@@ -289,12 +289,12 @@ describe("openapi3: metadata", () => {
 
   it("emits the appropriate properties for ResourceCreateModel", async () => {
     const res = await openApiFor(`
-    using TypeSpec.Rest.Resource;
+    using Rest.Resource;
 
     model M {
-      @visibility("read") r?: string;
-      @visibility("create") c?: string;
-      @visibility("update") u?: string;
+      @visibility(Lifecycle.Read) r?: string;
+      @visibility(Lifecycle.Create) c?: string;
+      @visibility(Lifecycle.Update) u?: string;
       all: string;
     }
 
@@ -328,11 +328,11 @@ describe("openapi3: metadata", () => {
     const res = await openApiFor(
       `
     model M {
-      @visibility("read") r?: string;
-      @visibility("create") c?: string;
-      @visibility("update") u?: string;
-      @visibility("delete") d?: string;
-      @visibility("query") q?: string;
+      @visibility(Lifecycle.Read) r?: string;
+      @visibility(Lifecycle.Create) c?: string;
+      @visibility(Lifecycle.Update) u?: string;
+      @visibility(Lifecycle.Delete) d?: string;
+      @visibility(Lifecycle.Query) q?: string;
     }
 
     // base model
@@ -358,7 +358,7 @@ describe("openapi3: metadata", () => {
       @get get(...M): M;
       @post create(...M): M;
       @put createOrUpdate(...M): M;
-      @patch update(...M): M;
+      @patch(#{implicitOptionality: true}) update(...M): M;
       @delete delete(...M): void; 
     }
 
@@ -367,7 +367,7 @@ describe("openapi3: metadata", () => {
       @get get(...D): D;
       @post create(...D): D;
       @put createOrUpdate(...D): D;
-      @patch update(...D): D;
+      @patch(#{implicitOptionality: true}) update(...D): D;
       @delete delete(...D): void; 
     }
   
@@ -376,7 +376,7 @@ describe("openapi3: metadata", () => {
       @get op get(id: string): R;
       @post op create(...R): R;
       @put op createOrUpdate(...R): R;
-      @patch op update(...R): R;
+      @patch(#{implicitOptionality: true}) op update(...R): R;
       @delete op delete(...D): void; 
     }
 
@@ -384,12 +384,11 @@ describe("openapi3: metadata", () => {
       @get op get(id: string): U;
       @post op create(...U): U;
       @put op createOrUpdate(...U): U;
-      @patch op update(...U): U;
+      @patch(#{implicitOptionality: true}) op update(...U): U;
       @delete op delete(...U): void;
     }
     `,
-      undefined,
-      { "omit-unreachable-types": true }
+      { "omit-unreachable-types": true },
     );
 
     deepStrictEqual(res.components.schemas, {
@@ -610,10 +609,11 @@ describe("openapi3: metadata", () => {
        @query q: string;
        @path p: string;
        @header h: string;
+       @cookie c: string;
       }
       @route("/single") @get op single(...Parameters): string;
       @route("/batch") @get op batch(@bodyRoot _: Parameters[]): string;
-      `
+      `,
     );
     deepStrictEqual(res.paths, {
       "/single/{p}": {
@@ -623,11 +623,12 @@ describe("openapi3: metadata", () => {
             { $ref: "#/components/parameters/Parameters.q" },
             { $ref: "#/components/parameters/Parameters.p" },
             { $ref: "#/components/parameters/Parameters.h" },
+            { $ref: "#/components/parameters/Parameters.c" },
           ],
           responses: {
             "200": {
               description: "The request has succeeded.",
-              content: { "application/json": { schema: { type: "string" } } },
+              content: { "text/plain": { schema: { type: "string" } } },
             },
           },
         },
@@ -639,7 +640,7 @@ describe("openapi3: metadata", () => {
           responses: {
             "200": {
               description: "The request has succeeded.",
-              content: { "application/json": { schema: { type: "string" } } },
+              content: { "text/plain": { schema: { type: "string" } } },
             },
           },
           requestBody: {
@@ -661,6 +662,7 @@ describe("openapi3: metadata", () => {
         "Parameters.q": {
           name: "q",
           in: "query",
+          explode: false,
           required: true,
           schema: { type: "string" },
         },
@@ -676,10 +678,20 @@ describe("openapi3: metadata", () => {
           required: true,
           schema: { type: "string" },
         },
+        "Parameters.c": {
+          name: "c",
+          in: "cookie",
+          explode: false,
+          required: true,
+          schema: { type: "string" },
+        },
       },
       schemas: {
         Parameters: {
           properties: {
+            c: {
+              type: "string",
+            },
             h: {
               type: "string",
             },
@@ -690,7 +702,7 @@ describe("openapi3: metadata", () => {
               type: "string",
             },
           },
-          required: ["q", "p", "h"],
+          required: ["q", "p", "h", "c"],
           type: "object",
         },
       },
@@ -703,10 +715,11 @@ describe("openapi3: metadata", () => {
       @route("/test") @post op test(
         @query q: string;
         @header h: string;
+        @cookie c: string;
         foo: string;
         bar: int32;
       ): string;
-      `
+      `,
     );
     deepStrictEqual(res.paths, {
       "/test": {
@@ -717,6 +730,7 @@ describe("openapi3: metadata", () => {
               name: "q",
               in: "query",
               required: true,
+              explode: false,
               schema: { type: "string" },
             },
             {
@@ -725,11 +739,18 @@ describe("openapi3: metadata", () => {
               required: true,
               schema: { type: "string" },
             },
+            {
+              name: "c",
+              in: "cookie",
+              required: true,
+              explode: false,
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "The request has succeeded.",
-              content: { "application/json": { schema: { type: "string" } } },
+              content: { "text/plain": { schema: { type: "string" } } },
             },
           },
           requestBody: {
@@ -764,9 +785,10 @@ describe("openapi3: metadata", () => {
         @query q: string;
         @path p: string;
         @header h: string;
+        @cookie c: string;
       }
       @route("/batch") @post op batch(@bodyRoot body?: Parameters[]): string;
-      `
+      `,
     );
     deepStrictEqual(res.paths, {
       "/batch": {
@@ -776,7 +798,7 @@ describe("openapi3: metadata", () => {
           responses: {
             "200": {
               description: "The request has succeeded.",
-              content: { "application/json": { schema: { type: "string" } } },
+              content: { "text/plain": { schema: { type: "string" } } },
             },
           },
           requestBody: {
@@ -797,6 +819,9 @@ describe("openapi3: metadata", () => {
       schemas: {
         Parameters: {
           properties: {
+            c: {
+              type: "string",
+            },
             h: {
               type: "string",
             },
@@ -807,7 +832,7 @@ describe("openapi3: metadata", () => {
               type: "string",
             },
           },
-          required: ["q", "p", "h"],
+          required: ["q", "p", "h", "c"],
           type: "object",
         },
       },
@@ -820,10 +845,10 @@ describe("openapi3: metadata", () => {
       model Thing {
         @header etag: string;
         name: string;
-        @visibility("delete") d: string;
+        @visibility(Lifecycle.Delete) d: string;
       }
       @route("/") @post op createMultiple(...Thing): Thing[];
-      `
+      `,
     );
 
     const request = res.paths["/"].post.requestBody.content["application/json"].schema;
@@ -871,7 +896,7 @@ describe("openapi3: metadata", () => {
        inner?: Thing;
       }
       @route("/") @get op get(): Thing;
-      `
+      `,
     );
 
     const response = res.paths["/"].get.responses["200"].content["application/json"].schema;
@@ -893,13 +918,13 @@ describe("openapi3: metadata", () => {
     const res = await openApiFor(
       `
       model Thing {
-        @visibility("update") u?: string;
-        @visibility("create") c?: string;
+        @visibility(Lifecycle.Update) u?: string;
+        @visibility(Lifecycle.Create) c?: string;
         inner?: Thing;
       }
 
       @route("/") @post op create(...Thing): Thing;
-      `
+      `,
     );
 
     const request = res.paths["/"].post.requestBody.content["application/json"].schema;
@@ -943,7 +968,7 @@ describe("openapi3: metadata", () => {
       
       @route("/pets")
       @post op create(...Pet): Pet;
-      `
+      `,
     );
 
     deepStrictEqual(res.paths, {
@@ -951,9 +976,6 @@ describe("openapi3: metadata", () => {
         post: {
           operationId: "create",
           parameters: [
-            {
-              $ref: "#/components/parameters/Pet.id",
-            },
             {
               name: "h1",
               in: "header",
@@ -969,6 +991,9 @@ describe("openapi3: metadata", () => {
               schema: {
                 type: "string",
               },
+            },
+            {
+              $ref: "#/components/parameters/Pet.id",
             },
           ],
           responses: {
@@ -1054,41 +1079,7 @@ describe("openapi3: metadata", () => {
     });
   });
 
-  it("supports nested bodies", async () => {
-    const res = await openApiFor(
-      `
-      model Image {
-        @header contentType: "application/octet-stream";
-        @body body: bytes;
-      }
-      op doStuffWithBytes(data: Image): int32;
-      `
-    );
-
-    const requestSchema =
-      res.paths["/"].post.requestBody.content["application/octet-stream"].schema;
-
-    deepStrictEqual(requestSchema, { format: "binary", type: "string" });
-  });
-
-  it("supports deeply nested bodies", async () => {
-    const res = await openApiFor(
-      `
-      model Image {
-        @header contentType: "application/octet-stream";
-        moreNesting: { @body body: bytes };
-      }
-      op doStuffWithBytes(data: Image): int32;
-      `
-    );
-
-    const requestSchema =
-      res.paths["/"].post.requestBody.content["application/octet-stream"].schema;
-
-    deepStrictEqual(requestSchema, { format: "binary", type: "string" });
-  });
-
-  it("don't create multiple scalars with different visibility if they are the same", async () => {
+  it("don't create multiple scalars with different visibility if they are the same (legacy implicitOptionality)", async () => {
     const res = await openApiFor(`
       scalar uuid extends string;
 
@@ -1096,7 +1087,7 @@ describe("openapi3: metadata", () => {
         id: uuid;
       }
       
-      @patch op test(...Bar): Bar;
+      @patch(#{implicitOptionality: true}) op test(...Bar): Bar;
     `);
 
     deepStrictEqual(Object.keys(res.components.schemas), ["Bar", "BarUpdate", "uuid"]);
@@ -1111,7 +1102,7 @@ describe("openapi3: metadata", () => {
         id: string;
       }
       
-      @patch op test(bar: Bar): void;
+      @patch(#{implicitOptionality: true}) op test(bar: Bar): void;
 
       model Foo {
         bar: Bar;
@@ -1151,7 +1142,7 @@ describe("openapi3: metadata", () => {
   it("base models used in different visibility gets distinct names", async () => {
     const res = await openApiFor(`
       model Widget {
-        @visibility("read", "update")
+        @visibility(Lifecycle.Read, Lifecycle.Update)
         @path
         id: string;
       
@@ -1214,5 +1205,77 @@ describe("openapi3: metadata", () => {
       },
       required: ["name"],
     });
+  });
+});
+
+worksFor(["3.0.0"], ({ openApiFor }) => {
+  it("supports nested bodies (binary payloads)", async () => {
+    const res = await openApiFor(
+      `
+      model Image {
+        @header contentType: "application/octet-stream";
+        @body body: bytes;
+      }
+      op doStuffWithBytes(data: Image): int32;
+      `,
+    );
+
+    const requestSchema =
+      res.paths["/"].post.requestBody.content["application/octet-stream"].schema;
+
+    deepStrictEqual(requestSchema, { format: "binary", type: "string" });
+  });
+
+  it("supports deeply nested bodies (binary payloads)", async () => {
+    const res = await openApiFor(
+      `
+      model Image {
+        @header contentType: "application/octet-stream";
+        moreNesting: { @body body: bytes };
+      }
+      op doStuffWithBytes(data: Image): int32;
+      `,
+    );
+
+    const requestSchema =
+      res.paths["/"].post.requestBody.content["application/octet-stream"].schema;
+
+    deepStrictEqual(requestSchema, { format: "binary", type: "string" });
+  });
+});
+
+worksFor(["3.1.0"], ({ openApiFor }) => {
+  it("supports nested bodies (unencoded binary payloads)", async () => {
+    const res = await openApiFor(
+      `
+      model Image {
+        @header contentType: "application/octet-stream";
+        @body body: bytes;
+      }
+      op doStuffWithBytes(data: Image): int32;
+      `,
+    );
+
+    const requestSchema =
+      res.paths["/"].post.requestBody.content["application/octet-stream"].schema;
+
+    deepStrictEqual(requestSchema, { contentMediaType: "application/octet-stream" });
+  });
+
+  it("supports deeply nested bodies (unencoded binary payloads)", async () => {
+    const res = await openApiFor(
+      `
+      model Image {
+        @header contentType: "application/octet-stream";
+        moreNesting: { @body body: bytes };
+      }
+      op doStuffWithBytes(data: Image): int32;
+      `,
+    );
+
+    const requestSchema =
+      res.paths["/"].post.requestBody.content["application/octet-stream"].schema;
+
+    deepStrictEqual(requestSchema, { contentMediaType: "application/octet-stream" });
   });
 });

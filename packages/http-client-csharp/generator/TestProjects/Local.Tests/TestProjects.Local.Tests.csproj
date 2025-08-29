@@ -13,4 +13,8 @@
     <Compile Include="../Local/**/*.cs" Exclude="../Local/**/Properties/**/*.cs" Link="Projects/%(RecursiveDir)/%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Projects\Sample-TypeSpec\src\Custom\" />
+  </ItemGroup>
+
 </Project>

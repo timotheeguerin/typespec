@@ -1,11 +1,6 @@
 import { deepStrictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
-import {
-  Interface,
-  ListOperationOptions,
-  Namespace,
-  listOperationsIn,
-} from "../../src/core/index.js";
+import { Interface, ListOperationOptions, Namespace, listOperationsIn } from "../../src/index.js";
 import { BasicTestRunner, createTestRunner } from "../../src/testing/index.js";
 
 describe("compiler: operation-utils", () => {
@@ -16,7 +11,7 @@ describe("compiler: operation-utils", () => {
 
   async function listOperationNames(
     container: Namespace | Interface,
-    options?: ListOperationOptions
+    options?: ListOperationOptions,
   ): Promise<string[]> {
     return listOperationsIn(container, options).map((x) => x.name);
   }

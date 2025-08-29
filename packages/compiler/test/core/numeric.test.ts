@@ -8,7 +8,7 @@ describe("instantiate", () => {
   });
   it("prevent new Numeric()", () => {
     // @ts-expect-error 'new' expression, whose target lacks a construct signature
-    expect(() => new Numeric("123")).toThrow(new TypeError("Numeric is not a constructor"));
+    expect(() => new Numeric("123")).toThrow(new Error("Numeric is not a constructor"));
   });
 });
 describe("parsing", () => {
@@ -61,8 +61,16 @@ describe("parsing", () => {
       expectNumericData("-123.456", 123456n, 3, -1);
     });
 
-    it("decimal with leading 0", () => {
-      expectNumericData("123.00456", 12300456n, 3);
+    describe("decimal with leading 0", () => {
+      it.each([
+        ["0.1", 1n, 0],
+        ["0.01", 1n, -1],
+        ["0.41", 41n, 0],
+        ["0.041", 41n, -1],
+        ["123.00456", 12300456n, 3],
+      ])(`%s`, (a, b, c) => {
+        expectNumericData(a, b, c);
+      });
     });
 
     it("large integer (> Number.MAX_SAFE_INTEGER)", () => {
@@ -73,7 +81,7 @@ describe("parsing", () => {
       expectNumericData(
         "123456789123456789.112233445566778899",
         123456789123456789112233445566778899n,
-        18
+        18,
       );
     });
   });
@@ -91,7 +99,7 @@ describe("parsing", () => {
       expectNumericData(
         "0b1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         9903520314283042199192993792n,
-        28
+        28,
       );
     });
   });
@@ -146,13 +154,20 @@ describe("parsing", () => {
       expectNumericData(
         "5e64",
         50000000000000000000000000000000000000000000000000000000000000000n,
-        65
+        65,
       );
     });
   });
 });
 
 describe("asString", () => {
+  it("0 is 0", () => {
+    expect(Numeric("0.0").toString()).toEqual("0");
+  });
+  it("1.0 is 1", () => {
+    expect(Numeric("1.0").toString()).toEqual("1");
+  });
+
   it("doesn't include decimal if is an integer", () => {
     expect(Numeric("123").toString()).toEqual("123");
   });
@@ -194,10 +209,13 @@ describe("asNumber", () => {
     ["0.0", 0],
     ["0.1", 0.1],
     ["0.01", 0.01],
+    ["0.041", 0.041],
+    ["1e-2", 0.01],
     ["123", 123],
     ["123.456", 123.456],
     ["123.00", 123],
     ["123456789123456789123456789123456789", null],
+    ["-123456789123456789123456789123456789", null],
     ["123456789123456789.123456789123456789", null],
   ])("%s => %d", (a, b) => {
     const numeric = Numeric(a);
@@ -212,6 +230,7 @@ describe("asBigInt", () => {
     ["123.456", null],
     ["123.00", 123n],
     ["123456789123456789123456789123456789", 123456789123456789123456789123456789n],
+    ["-123456789123456789123456789123456789", -123456789123456789123456789123456789n],
     ["123456789123456789.123456789123456789", null],
   ])("%s => %d", (a, b) => {
     const numeric = Numeric(a);

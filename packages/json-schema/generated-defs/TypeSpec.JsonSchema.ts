@@ -20,18 +20,18 @@ import type {
 export type JsonSchemaDecorator = (
   context: DecoratorContext,
   target: Type,
-  baseUri?: string
+  baseUri?: string,
 ) => void;
 
 /**
  * Set the base URI for any schemas emitted from types within this namespace.
  *
- * @param baseUri the base URI. Schema IDs inside this namespace are relative to this URI.
+ * @param baseUri The base URI. Schema IDs inside this namespace are relative to this URI.
  */
 export type BaseUriDecorator = (
   context: DecoratorContext,
   target: Namespace,
-  baseUri: string
+  baseUri: string,
 ) => void;
 
 /**
@@ -40,7 +40,7 @@ export type BaseUriDecorator = (
  *
  * By default, the id will be constructed based on the declaration's name.
  *
- * @param id the id of the JSON schema for this declaration.
+ * @param id The id of the JSON schema for this declaration.
  */
 export type IdDecorator = (context: DecoratorContext, target: Type, id: string) => void;
 
@@ -57,7 +57,7 @@ export type OneOfDecorator = (context: DecoratorContext, target: Union | ModelPr
 export type MultipleOfDecorator = (
   context: DecoratorContext,
   target: Scalar | ModelProperty,
-  value: Numeric
+  value: Numeric,
 ) => void;
 
 /**
@@ -69,31 +69,31 @@ export type MultipleOfDecorator = (
 export type ContainsDecorator = (
   context: DecoratorContext,
   target: Type | ModelProperty,
-  value: Type
+  value: Type,
 ) => void;
 
 /**
- * Specify that the array must contain at least some number of the types provided
- * by the contains decorator.
+ * Used in conjunction with the `@contains` decorator,
+ * specifies that the array must contain at least a certain number of the types provided by the `@contains` decorator.
  *
  * @param value The minimum number of instances the array must contain
  */
 export type MinContainsDecorator = (
   context: DecoratorContext,
   target: Type | ModelProperty,
-  value: number
+  value: number,
 ) => void;
 
 /**
- * Specify that the array must contain at most some number of the types provided
- * by the contains decorator.
+ * Used in conjunction with the `@contains` decorator,
+ * specifies that the array must contain at most a certain number of the types provided by the `@contains` decorator.
  *
  * @param value The maximum number of instances the array must contain
  */
 export type MaxContainsDecorator = (
   context: DecoratorContext,
   target: Type | ModelProperty,
-  value: number
+  value: number,
 ) => void;
 
 /**
@@ -101,7 +101,7 @@ export type MaxContainsDecorator = (
  */
 export type UniqueItemsDecorator = (
   context: DecoratorContext,
-  target: Type | ModelProperty
+  target: Type | ModelProperty,
 ) => void;
 
 /**
@@ -112,7 +112,7 @@ export type UniqueItemsDecorator = (
 export type MinPropertiesDecorator = (
   context: DecoratorContext,
   target: Type | ModelProperty,
-  value: number
+  value: number,
 ) => void;
 
 /**
@@ -123,7 +123,7 @@ export type MinPropertiesDecorator = (
 export type MaxPropertiesDecorator = (
   context: DecoratorContext,
   target: Type | ModelProperty,
-  value: number
+  value: number,
 ) => void;
 
 /**
@@ -136,56 +136,84 @@ export type MaxPropertiesDecorator = (
 export type ContentEncodingDecorator = (
   context: DecoratorContext,
   target: Scalar | ModelProperty,
-  value: string
+  value: string,
 ) => void;
 
 /**
  * Specify that the target array must begin with the provided types.
  *
- * @param value a tuple containing the types that must be present at the start of the array
+ * @param value A tuple containing the types that must be present at the start of the array
  */
 export type PrefixItemsDecorator = (
   context: DecoratorContext,
   target: Type | ModelProperty,
-  value: Type
+  value: Type,
 ) => void;
 
 /**
  * Specify the content type of content stored in a string.
  *
- * @param value the media type of the string contents
+ * @param value The media type of the string contents
  */
 export type ContentMediaTypeDecorator = (
   context: DecoratorContext,
   target: Scalar | ModelProperty,
-  value: string
+  value: string,
 ) => void;
 
 /**
  * Specify the schema for the contents of a string when interpreted according to the content's
  * media type and encoding.
  *
- * @param value the schema of the string contents
+ * @param value The schema of the string contents
  */
 export type ContentSchemaDecorator = (
   context: DecoratorContext,
   target: Scalar | ModelProperty,
-  value: Type
+  value: Type,
 ) => void;
 
 /**
- * Specify a custom property to add to the emitted schema. Useful for adding custom keywords
- * and other vendor-specific extensions. The value will be converted to a schema unless the parameter
- * is wrapped in the `Json<Data>` template. For example, `@extension("x-schema", { x: "value" })` will
- * emit a JSON schema value for `x-schema`, whereas `@extension("x-schema", Json<{x: "value"}>)` will
- * emit the raw JSON code `{x: "value"}`.
+ * Specify a custom property to add to the emitted schema. This is useful for adding custom keywords
+ * and other vendor-specific extensions. Scalar values need to be specified using `typeof` to be converted to a schema.
  *
- * @param key the name of the keyword of vendor extension, e.g. `x-custom`.
- * @param value the value of the keyword. Will be converted to a schema unless wrapped in `Json<Data>`.
+ * For example, `@extension("x-schema", typeof "foo")` will emit a JSON schema value for `x-schema`,
+ * whereas `@extension("x-schema", "foo")` will emit the raw code `"foo"`.
+ *
+ * The value will be treated as a raw value if any of the following are true:
+ * - The value is a scalar value (e.g. string, number, boolean, etc.)
+ * - The value is wrapped in the `Json<Data>` template
+ * - The value is provided using the value syntax (e.g. `#{}`, `#[]`)
+ *
+ * For example, `@extension("x-schema", { x: "value" })` will emit a JSON schema value for `x-schema`,
+ * whereas `@extension("x-schema", #{x: "value"})` and `@extension("x-schema", Json<{x: "value"}>)`
+ * will emit the raw JSON code `{x: "value"}`.
+ *
+ * @param key The name of the keyword of vendor extension, e.g. `x-custom`.
+ * @param value The value of the keyword.
  */
 export type ExtensionDecorator = (
   context: DecoratorContext,
   target: Type,
   key: string,
-  value: Type
+  value: Type | unknown,
 ) => void;
+
+export type TypeSpecJsonSchemaDecorators = {
+  jsonSchema: JsonSchemaDecorator;
+  baseUri: BaseUriDecorator;
+  id: IdDecorator;
+  oneOf: OneOfDecorator;
+  multipleOf: MultipleOfDecorator;
+  contains: ContainsDecorator;
+  minContains: MinContainsDecorator;
+  maxContains: MaxContainsDecorator;
+  uniqueItems: UniqueItemsDecorator;
+  minProperties: MinPropertiesDecorator;
+  maxProperties: MaxPropertiesDecorator;
+  contentEncoding: ContentEncodingDecorator;
+  prefixItems: PrefixItemsDecorator;
+  contentMediaType: ContentMediaTypeDecorator;
+  contentSchema: ContentSchemaDecorator;
+  extension: ExtensionDecorator;
+};

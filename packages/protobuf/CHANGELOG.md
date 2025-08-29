@@ -1,5 +1,110 @@
 # Change Log - @typespec/protobuf
 
+## 0.73.0
+
+### Bump dependencies
+
+- [#7978](https://github.com/microsoft/typespec/pull/7978) Upgrade dependencies
+
+
+## 0.72.0
+
+### Bump dependencies
+
+- [#7674](https://github.com/microsoft/typespec/pull/7674) Upgrade dependencies
+
+
+## 0.71.0
+
+No changes, version bump only.
+
+## 0.70.0
+
+### Features
+
+- [#7199](https://github.com/microsoft/typespec/pull/7199) Add "capitalize" string helper to compiler
+
+
+## 0.69.0
+
+### Bug Fixes
+
+- [#7069](https://github.com/microsoft/typespec/pull/7069) Handle types without node
+
+
+## 0.68.0
+
+### Bump dependencies
+
+- [#6595](https://github.com/microsoft/typespec/pull/6595) Upgrade dependencies
+
+
+## 0.67.0
+
+### Features
+
+- [#6327](https://github.com/microsoft/typespec/pull/6327) Remove reference to delete projection feature
+
+### Bump dependencies
+
+- [#6266](https://github.com/microsoft/typespec/pull/6266) Update dependencies
+
+### Bug Fixes
+
+- [#6411](https://github.com/microsoft/typespec/pull/6411) Add support for new `dryRun` emitter option
+
+
+## 0.66.0
+
+No changes, version bump only.
+
+## 0.65.0
+
+### Bump dependencies
+
+- [#5690](https://github.com/microsoft/typespec/pull/5690) Upgrade dependencies
+
+
+## 0.64.0
+
+No changes, version bump only.
+
+## 0.63.0
+
+No changes, version bump only.
+
+## 0.62.0
+
+### Bump dependencies
+
+- [#4679](https://github.com/microsoft/typespec/pull/4679) Upgrade dependencies - October 2024
+
+
+## 0.61.0
+
+### Bump dependencies
+
+- [#4424](https://github.com/microsoft/typespec/pull/4424) Bump dependencies
+
+
+## 0.60.0
+
+### Features
+
+- [#4139](https://github.com/microsoft/typespec/pull/4139) Internals: Migrate to new api for declaring decorator implementation
+
+
+## 0.59.0
+
+### Bug Fixes
+
+- [#3933](https://github.com/microsoft/typespec/pull/3933) Fix some diagnostic not showing the right message
+
+### Bump dependencies
+
+- [#3948](https://github.com/microsoft/typespec/pull/3948) Update dependencies
+
+
 ## 0.58.0
 
 ### Bump dependencies

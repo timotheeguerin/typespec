@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { resolvePath, typespecVersion } from "@typespec/compiler";
+import { resolvePath } from "@typespec/compiler";
 import yargs from "yargs";
 import { bundleTypeSpecLibrary } from "./bundler.js";
 
@@ -12,7 +12,7 @@ try {
 }
 
 async function main() {
-  console.log(`TypeSpec Developer Tools v${typespecVersion}\n`);
+  console.log(`TypeSpec Developer Tools`);
 
   await yargs(process.argv.slice(2))
     .scriptName("tspd")
@@ -45,11 +45,10 @@ async function main() {
         const resolvedRoot = resolvePath(process.cwd(), args.entrypoint);
         await bundleTypeSpecLibrary(
           resolvedRoot,
-          args["output-dir"] ?? resolvePath(resolvedRoot, "out/browser")
+          args["output-dir"] ?? resolvePath(resolvedRoot, "out/browser"),
         );
-      }
+      },
     )
-    .version(typespecVersion)
     .demandCommand(1, "You must use one of the supported commands.").argv;
 }
 

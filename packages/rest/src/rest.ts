@@ -12,19 +12,24 @@ import {
   Type,
 } from "@typespec/compiler";
 import {
-  DefaultRouteProducer,
+  addQueryParamsToUriTemplate,
   getOperationParameters,
   getOperationVerb,
   getRoutePath,
-  getRouteProducer,
+  getUriTemplatePathParam,
   HttpOperation,
   HttpOperationParameter,
   HttpOperationParameters,
   HttpVerb,
-  RouteOptions,
-  RouteProducerResult,
-  setRouteProducer,
+  joinPathSegments,
 } from "@typespec/http";
+import {
+  unsafe_DefaultRouteProducer as DefaultRouteProducer,
+  unsafe_getRouteProducer as getRouteProducer,
+  unsafe_RouteOptions as RouteOptions,
+  unsafe_RouteProducerResult as RouteProducerResult,
+  unsafe_setRouteProducer as setRouteProducer,
+} from "@typespec/http/experimental";
 import {
   ActionDecorator,
   AutoRouteDecorator,
@@ -85,7 +90,7 @@ const resourceOperationToVerb: any = {
 
 function getResourceOperationHttpVerb(
   program: Program,
-  operation: Operation
+  operation: Operation,
 ): HttpVerb | undefined {
   const resourceOperation = getResourceOperation(program, operation);
   return (
@@ -102,23 +107,24 @@ function autoRouteProducer(
   operation: Operation,
   parentSegments: string[],
   overloadBase: HttpOperation | undefined,
-  options: RouteOptions
+  options: RouteOptions,
 ): DiagnosticResult<RouteProducerResult> {
   const diagnostics = createDiagnosticCollector();
   const routePath = getRoutePath(program, operation)?.path;
   const segments = [...parentSegments, ...(routePath ? [routePath] : [])];
   const filteredParameters: HttpOperationParameter[] = [];
+  const filteredParamProperties = new Set<ModelProperty>();
   const paramOptions = {
     ...(options?.paramOptions ?? {}),
     verbSelector: getResourceOperationHttpVerb,
   };
 
   const parameters: HttpOperationParameters = diagnostics.pipe(
-    getOperationParameters(program, operation, undefined, [], paramOptions)
+    getOperationParameters(program, operation, "", undefined, paramOptions),
   );
 
   for (const httpParam of parameters.parameters) {
-    const { type, param, name } = httpParam;
+    const { type, param } = httpParam;
     if (type === "path") {
       addSegmentFragment(program, param, segments);
 
@@ -133,20 +139,31 @@ function autoRouteProducer(
       } else {
         // Add the path variable for the parameter
         if (param.type.kind === "String") {
-          segments.push(`/${param.type.value}`);
+          segments.push(`${param.type.value}`);
           continue; // Skip adding to the parameter list
         } else {
-          segments.push(`/{${name}}`);
+          segments.push(`${getUriTemplatePathParam(httpParam)}`);
         }
       }
     }
 
     // Push all usable parameters to the filtered list
     filteredParameters.push(httpParam);
+    filteredParamProperties.add(httpParam.param);
   }
 
   // Replace the original parameters with filtered set
   parameters.parameters = filteredParameters;
+  // Remove any header/query/path/cookie properties that aren't in the filtered list
+  for (let i = parameters.properties.length - 1; i >= 0; i--) {
+    const httpProp = parameters.properties[i];
+    if (!["header", "query", "path", "cookie"].includes(httpProp.kind)) {
+      continue;
+    }
+    if (!filteredParamProperties.has(httpProp.property)) {
+      parameters.properties.splice(i, 1);
+    }
+  }
 
   // Add the operation's own segment if present
   addSegmentFragment(program, operation, segments);
@@ -154,8 +171,10 @@ function autoRouteProducer(
   // Add the operation's action segment if present
   addActionFragment(program, operation, segments);
 
+  const pathPart = joinPathSegments(segments);
+
   return diagnostics.wrap({
-    segments,
+    uriTemplate: addQueryParamsToUriTemplate(pathPart, filteredParameters),
     parameters: {
       ...parameters,
       parameters: filteredParameters,
@@ -174,7 +193,7 @@ const autoRouteKey = createStateSymbol("autoRoute");
  */
 export const $autoRoute: AutoRouteDecorator = (
   context: DecoratorContext,
-  entity: Interface | Operation
+  entity: Interface | Operation,
 ) => {
   if (entity.kind === "Operation") {
     setRouteProducer(context.program, entity, autoRouteProducer);
@@ -214,7 +233,7 @@ const segmentsKey = createStateSymbol("segments");
 export function $segment(
   context: DecoratorContext,
   entity: Model | ModelProperty | Operation,
-  name: string
+  name: string,
 ) {
   context.program.stateMap(segmentsKey).set(entity, name);
 }
@@ -230,7 +249,7 @@ function getResourceSegment(program: Program, resourceType: Model): string | und
 export const $segmentOf: SegmentOfDecorator = (
   context: DecoratorContext,
   entity: Operation,
-  resourceType: Model
+  resourceType: Model,
 ) => {
   if ((resourceType.kind as any) === "TemplateParameter") {
     // Skip it, this operation is in a templated interface
@@ -259,7 +278,7 @@ const actionSeparatorKey = createStateSymbol("actionSeparator");
 export function $actionSeparator(
   context: DecoratorContext,
   entity: Model | ModelProperty | Operation,
-  separator: "/" | ":" | "/:"
+  separator: "/" | ":" | "/:",
 ) {
   context.program.stateMap(actionSeparatorKey).set(entity, separator);
 }
@@ -285,7 +304,7 @@ export function getActionSeparator(program: Program, entity: Type): string | und
 export const $resource: ResourceDecorator = (
   context: DecoratorContext,
   entity: Model,
-  collectionName: string
+  collectionName: string,
 ) => {
   // Ensure type has a key property
   const key = getResourceTypeKey(context.program, entity);
@@ -336,7 +355,7 @@ function resourceRouteProducer(
   operation: Operation,
   parentSegments: string[],
   overloadBase: HttpOperation | undefined,
-  options: RouteOptions
+  options: RouteOptions,
 ): DiagnosticResult<RouteProducerResult> {
   // NOTE: The purpose of this producer is to pass along the behavior of the
   // DefaultRouteProducer while setting the appropriate HTTP verb based on any
@@ -360,7 +379,7 @@ export function setResourceOperation(
   context: DecoratorContext,
   entity: Operation,
   resourceType: Model,
-  operation: ResourceOperations
+  operation: ResourceOperations,
 ) {
   if ((resourceType as any).kind === "TemplateParameter") {
     // Skip it, this operation is in a templated interface
@@ -382,7 +401,7 @@ export function setResourceOperation(
 
 export function getResourceOperation(
   program: Program,
-  typespecOperation: Operation
+  typespecOperation: Operation,
 ): ResourceOperation | undefined {
   return program.stateMap(resourceOperationsKey).get(typespecOperation);
 }
@@ -390,7 +409,7 @@ export function getResourceOperation(
 export const $readsResource: ReadsResourceDecorator = (
   context: DecoratorContext,
   entity: Operation,
-  resourceType: Model
+  resourceType: Model,
 ) => {
   setResourceOperation(context, entity, resourceType, "read");
 };
@@ -398,7 +417,7 @@ export const $readsResource: ReadsResourceDecorator = (
 export function $createsResource(
   context: DecoratorContext,
   entity: Operation,
-  resourceType: Model
+  resourceType: Model,
 ) {
   // Add path segment for resource type key
   context.call($segmentOf, entity, resourceType);
@@ -409,7 +428,7 @@ export function $createsResource(
 export function $createsOrReplacesResource(
   context: DecoratorContext,
   entity: Operation,
-  resourceType: Model
+  resourceType: Model,
 ) {
   setResourceOperation(context, entity, resourceType, "createOrReplace");
 }
@@ -417,7 +436,7 @@ export function $createsOrReplacesResource(
 export function $createsOrUpdatesResource(
   context: DecoratorContext,
   entity: Operation,
-  resourceType: Model
+  resourceType: Model,
 ) {
   setResourceOperation(context, entity, resourceType, "createOrUpdate");
 }
@@ -425,7 +444,7 @@ export function $createsOrUpdatesResource(
 export function $updatesResource(
   context: DecoratorContext,
   entity: Operation,
-  resourceType: Model
+  resourceType: Model,
 ) {
   setResourceOperation(context, entity, resourceType, "update");
 }
@@ -433,7 +452,7 @@ export function $updatesResource(
 export function $deletesResource(
   context: DecoratorContext,
   entity: Operation,
-  resourceType: Model
+  resourceType: Model,
 ) {
   setResourceOperation(context, entity, resourceType, "delete");
 }
@@ -441,7 +460,7 @@ export function $deletesResource(
 export const $listsResource: ListsResourceDecorator = (
   context: DecoratorContext,
   entity: Operation,
-  resourceType: Model
+  resourceType: Model,
 ) => {
   // Add path segment for resource type key
   context.call($segmentOf, entity, resourceType);
@@ -475,7 +494,7 @@ const actionsSegmentKey = createStateSymbol("actionSegment");
 export const $actionSegment: ActionSegmentDecorator = (
   context: DecoratorContext,
   entity: Operation,
-  name: string
+  name: string,
 ) => {
   context.program.stateMap(actionsSegmentKey).set(entity, name);
 };
@@ -504,7 +523,7 @@ const actionsKey = createStateSymbol("actions");
 export const $action: ActionDecorator = (
   context: DecoratorContext,
   entity: Operation,
-  name?: string
+  name?: string,
 ) => {
   if (name === "") {
     reportDiagnostic(context.program, {
@@ -524,7 +543,7 @@ export const $action: ActionDecorator = (
  */
 export function getActionDetails(
   program: Program,
-  operation: Operation
+  operation: Operation,
 ): ActionDetails | undefined {
   return program.stateMap(actionsKey).get(operation);
 }
@@ -542,7 +561,7 @@ export const $collectionAction: CollectionActionDecorator = (
   context: DecoratorContext,
   entity: Operation,
   resourceType: Model,
-  name?: string
+  name?: string,
 ) => {
   if ((resourceType as Type).kind === "TemplateParameter") {
     // Skip it, this operation is in a templated interface
@@ -568,7 +587,7 @@ export const $collectionAction: CollectionActionDecorator = (
  */
 export function getCollectionActionDetails(
   program: Program,
-  operation: Operation
+  operation: Operation,
 ): ActionDetails | undefined {
   return program.stateMap(collectionActionsKey).get(operation);
 }
@@ -578,7 +597,7 @@ export function getCollectionActionDetails(
  */
 export function getCollectionAction(
   program: Program,
-  operation: Operation
+  operation: Operation,
 ): string | null | undefined {
   return getCollectionActionDetails(program, operation)?.name;
 }
@@ -588,7 +607,7 @@ const resourceLocationsKey = createStateSymbol("resourceLocations");
 export const $resourceLocation: ResourceLocationDecorator = (
   context: DecoratorContext,
   entity: Scalar,
-  resourceType: Model
+  resourceType: Model,
 ) => {
   if ((resourceType as Type).kind === "TemplateParameter") {
     // Skip it, this operation is in a templated interface

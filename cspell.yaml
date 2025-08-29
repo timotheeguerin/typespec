@@ -5,71 +5,169 @@ dictionaries:
   - node
   - typescript
 words:
+  - Adoptium
+  - agentic
+  - aiohttp
+  - alzimmer
+  - amqp
   - AQID
+  - arraya
+  - astimezone
+  - astro
+  - astrojs
+  - asyncio
   - atrule
+  - atteo
   - autorest
   - azsdk
   - azsdkengsys
   - azurecr
   - azuresdk
+  - azurev
+  - azurevnext
   - bifilter
+  - blib
   - blockful
   - blockless
+  - buongiorno
   - cadl
   - cadleditor
   - cadleng
   - cadlplayground
   - clsx
   - cobertura
+  - codehaus
   - codeql
   - Contoso
   - CORGE
   - createsorreplacesresource
   - createsorupdatesresource
   - CRUDL
+  - ctxt
   - dbaeumer
+  - Dcodegen
   - debouncer
+  - debugpy
+  - Declipse
+  - dedented
+  - Dedupes
+  - deps
   - destructures
   - devdiv
   - Diagnoser
+  - Dlog
+  - docutils
   - dogfood
+  - Dorg
+  - Dosgi
+  - dotenv
+  - Dskip
+  - duplicative
+  - Dyns
   - eastus
   - ecmarkup
+  - elif
+  - EMBEDME
+  - Entra
+  - enumdiscriminator
+  - equalto
   - esbenp
   - esbuild
   - espt
   - ESRP
+  - etree
+  - fastify
   - fluentui
+  - français
+  - freadme
+  - fslib
   - genproto
+  - getpgid
+  - giacamo
   - globby
+  - graalvm
+  - Gson
+  - Hdvcmxk
+  - headasbooleanfalse
+  - headasbooleantrue
+  - hresult
+  - hscs
+  - hsjs
+  - HSTS
+  - httpx
+  - imple
   - Infima
+  - initcs
+  - Initializable
   - inlines
   - inmemory
   - instanceid
   - interner
   - intrinsics
+  - ints
+  - IOHTTP
+  - isdigit
+  - isinstance
+  - issubclass
+  - itertype
+  - itor
+  - ivar
+  - Jacoco
+  - javac
+  - jdwp
+  - jobject
+  - Johan
   - jsyaml
   - keyer
+  - killpg
+  - kwargs
+  - labelledby
+  - libc
   - lifecyle
+  - LINUXARMVMIMAGE
   - LINUXNEXTVMIMAGE
   - LINUXOS
   - LINUXVMIMAGE
+  - ljust
+  - lmazuel
+  - lropaging
+  - lstrip
   - lzutf
   - MACVMIMAGE
+  - MACVMIMAGEM
+  - mday
+  - mgmt
+  - mgmtplane
   - mocharc
+  - mqtt
+  - mros
   - msbuild
+  - mspaint
   - MSRC
+  - msrest
   - multis
   - munge
   - mylib
+  - myname
+  - mypy
   - nanos
+  - nexted
+  - nihao
+  - nint
+  - NODEFS
   - noformat
   - noopener
   - noreferrer
+  - nosec
   - nostdlib
+  - noverify
+  - npath
   - npmjs
+  - nspkg
+  - nuint
   - nupkg
   - oapi
+  - ODATA
   - OIDC
   - oneds
   - oneof
@@ -78,29 +176,72 @@ words:
   - onwarn
   - openapi
   - openapiv
+  - Packument
   - Perfolizer
   - picocolors
+  - pnpx
+  - posargs
+  - primitivea
   - prismjs
   - proto
   - protobuf
   - protoc
+  - pscore
   - psscriptanalyzer
+  - ptvsd
   - pwsh
+  - pycache
+  - pyexpat
+  - pygen
+  - pyimport
+  - pylint
+  - pylintrc
+  - pyodide
+  - pyproject
+  - pyright
+  - pyrightconfig
+  - pytest
+  - pytyped
+  - pyyaml
+  - rcfile
+  - reactivex
   - recase
+  - recorda
   - regen
+  - rehype
+  - reinjected
+  - repr
   - respecify
+  - rjust
   - rpaas
+  - rsplit
+  - rstrip
+  - rtype
   - rushx
   - safeint
+  - sdkcore
   - segmentof
+  - serde
+  - setuppy
   - sfixed
+  - shiki
   - sint
+  - snakeyaml
+  - srnagar
+  - ssdlrs
+  - sses
   - ssvs
+  - statment
   - strs
+  - swaggerui
   - syncpack
   - TCGC
+  - terlson
+  - timegm
+  - tomli
   - triaging
   - TRYIT
+  - tsconfigs
   - tsdoc
   - TSES
   - tspd
@@ -108,12 +249,14 @@ words:
   - tsvs
   - typespec
   - typespecvs
+  - tzname
   - Uhoh
   - uitestresults
   - unassignable
   - Uncapitalize
-  - undifferentiable
   - uncollapsed
+  - undifferentiable
+  - Ungroup
   - uninstantiated
   - unioned
   - unparented
@@ -122,16 +265,30 @@ words:
   - unrepresentable
   - unsourced
   - unversioned
+  - venv
+  - venvtools
   - VITE
   - vitest
+  - VNEXT
   - vsix
+  - vsmarketplace
   - VSSDK
   - Vsts
   - vswhere
+  - wday
+  - weidxu
   - westus
+  - WINDOWSARMVMIMAGE
   - WINDOWSVMIMAGE
+  - xiangyan
+  - xiaofei
   - xlarge
+  - Xlint
+  - xmsclientrequestid
+  - xors
   - xplat
+  - xxsubtype
+  - yamls
 ignorePaths:
   - "**/node_modules/**"
   - "**/dist/**"
@@ -144,8 +301,14 @@ ignorePaths:
   - common/scripts/*
   - "**/ThirdPartyNotices.txt"
   - packages/compiler/test/formatter/scenarios/**
+  - packages/http-client-java/generator/http-client-generator/src/main/resources/PerfAutomation.jfc
+  - packages/http-client-java/generator/http-client-generator-test/**
+  - packages/http-client-java/generator/http-client-generator-clientcore-test/**
+  - packages/http-client-js/test/e2e/**
+  - packages/http-client-js/sample/**
   - pnpm-lock.yaml
   - "**/*.mp4"
+  - "**/*.plist"
   - .git/**
   - .gitignore
   - .vscode/**

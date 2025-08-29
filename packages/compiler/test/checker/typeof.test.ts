@@ -1,8 +1,8 @@
 import { ok, strictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
 import { expectDiagnostics } from "../../src/testing/expect.js";
+import { extractSquiggles } from "../../src/testing/source-utils.js";
 import { createTestHost, createTestRunner } from "../../src/testing/test-host.js";
-import { extractSquiggles } from "../../src/testing/test-server-host.js";
 import { BasicTestRunner } from "../../src/testing/types.js";
 import { defineTest } from "../test-utils.js";
 
@@ -19,7 +19,7 @@ const { compile: compileTypeOf, diagnose: diagnoseTypeOf } = defineTest(
     ok(target, `Expected a property tagged with @test("target")`);
     strictEqual(target.kind, "ModelProperty");
     return [target.type, diagnostics];
-  }
+  },
 );
 
 describe("get the type of a const", () => {

@@ -1,14 +1,14 @@
 import { deepStrictEqual } from "assert";
-import { describe, it } from "vitest";
-import { oapiForModel } from "./test-host.js";
+import { it } from "vitest";
+import { worksFor } from "./works-for.js";
 
-describe("openapi3: circular reference", () => {
+worksFor(["3.0.0", "3.1.0"], ({ oapiForModel }) => {
   it("can reference itself via a property", async () => {
     const res = await oapiForModel(
       "Pet",
       `
       model Pet { parent?: Pet };
-      `
+      `,
     );
 
     deepStrictEqual(res.schemas.Pet, {
@@ -24,7 +24,7 @@ describe("openapi3: circular reference", () => {
       "Pet",
       `
       model Pet { parents?: Pet[] };
-      `
+      `,
     );
 
     deepStrictEqual(res.schemas.Pet, {
@@ -40,7 +40,7 @@ describe("openapi3: circular reference", () => {
       "Pet",
       `
       model Pet { parents?: string | Pet };
-      `
+      `,
     );
 
     deepStrictEqual(res.schemas.Pet, {

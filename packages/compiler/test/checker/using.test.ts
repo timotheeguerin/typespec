@@ -21,21 +21,21 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
       `
       namespace N;
       model X { x: int32 }
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "b.tsp",
       `
       using N;
       @test model Y { ... X }
-      `
+      `,
     );
 
     const { Y } = (await testHost.compile("./")) as {
@@ -51,14 +51,14 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
       `
       namespace N;
       model X { x: int32 }
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "b.tsp",
@@ -66,7 +66,7 @@ describe("compiler: using statements", () => {
       namespace Z;
       using N;
       @test model Y { ... X }
-      `
+      `,
     );
 
     const { Y } = (await testHost.compile("./")) as {
@@ -82,21 +82,21 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
       `
       namespace N.M;
       model X { x: int32 }
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "b.tsp",
       `
       using N.M;
       @test model Y { ... X }
-      `
+      `,
     );
 
     const { Y } = (await testHost.compile("./")) as {
@@ -106,27 +106,50 @@ describe("compiler: using statements", () => {
     strictEqual(Y.properties.size, 1);
   });
 
+  // This is checking a case where when using a namespace it would start linking its content
+  // before the using of the file were resolved themself causing invalid refs.
+  it("using a namespace won't start linking it", async () => {
+    testHost.addTypeSpecFile(
+      "main.tsp",
+      `
+      import "./a.tsp";
+      using A;
+      `,
+    );
+    testHost.addTypeSpecFile(
+      "a.tsp",
+      `
+      import "./b.tsp";
+      using B;
+      namespace A { @test model AModel { b: BModel } }
+      `,
+    );
+    testHost.addTypeSpecFile("b.tsp", `namespace B { model BModel {} }`);
+
+    expectDiagnosticEmpty(await testHost.diagnose("./"));
+  });
+
   it("TypeSpec.Xyz namespace doesn't need TypeSpec prefix in using", async () => {
     testHost.addTypeSpecFile(
       "main.tsp",
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
       `
       namespace TypeSpec.Xyz;
       model X { x: int32 }
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "b.tsp",
       `
       using Xyz;
       @test model Y { ... X }
-      `
+      `,
     );
 
     const { Y } = (await testHost.compile("./")) as {
@@ -142,7 +165,7 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
@@ -154,7 +177,7 @@ describe("compiler: using statements", () => {
       namespace M.A {
         model B { }
       }
-      `
+      `,
     );
 
     testHost.addTypeSpecFile(
@@ -162,41 +185,65 @@ describe("compiler: using statements", () => {
       `
       using N.A;
       using M.A;
-      `
+      `,
     );
 
     const diagnostics = await testHost.diagnose("./");
     expectDiagnosticEmpty(diagnostics);
   });
 
-  it("throws errors for duplicate imported usings", async () => {
-    testHost.addTypeSpecFile(
-      "main.tsp",
-      `
+  describe("duplicate usings", () => {
+    it("doesn't consider using scoped in namespace as duplicate", async () => {
+      testHost.addTypeSpecFile(
+        "main.tsp",
+        `
+          import "./a.tsp";
+          using A;
+
+          namespace B {
+            using A;
+          }
+          namespace C {
+            using A;
+          }
+        `,
+      );
+      testHost.addTypeSpecFile("a.tsp", `namespace A { model AModel {} }`);
+
+      const diagnostics = await testHost.diagnose("./");
+      expectDiagnosticEmpty(diagnostics);
+    });
+
+    it("throws errors for duplicate imported usings", async () => {
+      testHost.addTypeSpecFile(
+        "main.tsp",
+        `
       import "./a.tsp";
       import "./b.tsp";
-      `
-    );
-    testHost.addTypeSpecFile(
-      "a.tsp",
-      `
+      `,
+      );
+      testHost.addTypeSpecFile(
+        "a.tsp",
+        `
       namespace N.M;
       model X { x: int32 }
-      `
-    );
+      `,
+      );
 
-    testHost.addTypeSpecFile(
-      "b.tsp",
-      `
+      testHost.addTypeSpecFile(
+        "b.tsp",
+        `
       using N.M;
       using N.M;
-      `
-    );
+      `,
+      );
 
-    const diagnostics = await testHost.diagnose("./");
-    strictEqual(diagnostics.length, 1);
-    strictEqual(diagnostics[0].code, "duplicate-using");
-    strictEqual(diagnostics[0].message, 'duplicate using of "N.M" namespace');
+      const diagnostics = await testHost.diagnose("./");
+      expectDiagnostics(diagnostics, [
+        { code: "duplicate-using", message: 'duplicate using of "N.M" namespace' },
+        { code: "duplicate-using", message: 'duplicate using of "N.M" namespace' },
+      ]);
+    });
   });
 
   it("does not throws errors for different usings with the same bindings if not used", async () => {
@@ -205,7 +252,7 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
@@ -217,7 +264,7 @@ describe("compiler: using statements", () => {
       namespace M {
         model A { }
       }
-      `
+      `,
     );
 
     testHost.addTypeSpecFile(
@@ -225,7 +272,7 @@ describe("compiler: using statements", () => {
       `
       using N;
       using M;
-      `
+      `,
     );
 
     const diagnostics = await testHost.diagnose("./");
@@ -238,7 +285,7 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
@@ -250,7 +297,7 @@ describe("compiler: using statements", () => {
       namespace M {
         model A { }
       }
-      `
+      `,
     );
 
     testHost.addTypeSpecFile(
@@ -260,7 +307,7 @@ describe("compiler: using statements", () => {
       using M;
 
       model B extends A {}
-      `
+      `,
     );
     const diagnostics = await testHost.diagnose("./", { nostdlib: true });
     expectDiagnostics(diagnostics, [
@@ -278,7 +325,7 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
@@ -288,7 +335,7 @@ describe("compiler: using statements", () => {
       using B;
       
       model Q extends M {}
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "b.tsp",
@@ -296,7 +343,7 @@ describe("compiler: using statements", () => {
       namespace B {
         model M { }
       }
-      `
+      `,
     );
 
     const diagnostics = await testHost.diagnose("./", { nostdlib: true });
@@ -324,7 +371,7 @@ describe("compiler: using statements", () => {
 
       @doc
       namespace Foo {}
-      `
+      `,
     );
 
     testHost.addJsFile("doc.js", {
@@ -338,7 +385,6 @@ describe("compiler: using statements", () => {
         code: "ambiguous-symbol",
         message: `"doc" is an ambiguous name between TypeSpec.doc, Test.A.doc. Try using fully qualified name instead: TypeSpec.doc, Test.A.doc`,
       },
-      { code: "unknown-decorator" },
     ]);
   });
 
@@ -356,7 +402,7 @@ describe("compiler: using statements", () => {
 
       @doc
       namespace Foo {}
-      `
+      `,
     );
 
     const diagnostics = await testHost.diagnose("./");
@@ -365,7 +411,6 @@ describe("compiler: using statements", () => {
         code: "ambiguous-symbol",
         message: `"doc" is an ambiguous name between TypeSpec.doc, Test.A.doc. Try using fully qualified name instead: TypeSpec.doc, Test.A.doc`,
       },
-      { code: "unknown-decorator" },
       { code: "missing-implementation" },
     ]);
   });
@@ -377,7 +422,7 @@ describe("compiler: using statements", () => {
       import "./a.tsp";
       import "./ambiguous.tsp";
       import "./notambiguous.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
@@ -389,7 +434,7 @@ describe("compiler: using statements", () => {
       namespace M {
         model A { }
       }
-      `
+      `,
     );
 
     testHost.addTypeSpecFile(
@@ -399,7 +444,7 @@ describe("compiler: using statements", () => {
       using M;
 
       model Ambiguous extends A {}
-      `
+      `,
     );
 
     testHost.addTypeSpecFile(
@@ -408,7 +453,7 @@ describe("compiler: using statements", () => {
       using N;
 
       model NotAmbiguous extends A {}
-      `
+      `,
     );
     const diagnostics = await testHost.diagnose("./");
     expectDiagnostics(diagnostics, [
@@ -427,14 +472,14 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
       `
       namespace N;
       model A { a: string }
-      `
+      `,
     );
 
     testHost.addTypeSpecFile(
@@ -445,7 +490,7 @@ describe("compiler: using statements", () => {
         model A { a: int32 | string }
         @test model B { ... A }
       }
-      `
+      `,
     );
 
     const { B } = (await testHost.compile("./")) as {
@@ -461,14 +506,14 @@ describe("compiler: using statements", () => {
       `
       import "./a.tsp";
       import "./b.tsp";
-      `
+      `,
     );
     testHost.addTypeSpecFile(
       "a.tsp",
       `
       namespace N;
       model A { a: string }
-      `
+      `,
     );
 
     testHost.addTypeSpecFile(
@@ -481,7 +526,7 @@ describe("compiler: using statements", () => {
       namespace M {
         model X { a: A };
       }
-      `
+      `,
     );
 
     await rejects(testHost.compile("./"));
@@ -492,7 +537,7 @@ describe("compiler: using statements", () => {
       `
       namespace Foo;
       model test { x: int32 };
-    `
+    `,
     );
 
     await testHost.compile("./");
@@ -508,7 +553,7 @@ describe("compiler: using statements", () => {
       model Thing {
         other: OtherModel;
       }
-    `
+    `,
     );
     testHost.addTypeSpecFile(
       "other.tsp",
@@ -517,12 +562,36 @@ describe("compiler: using statements", () => {
 
       model OtherModel {
       }
-    `
+    `,
     );
     await testHost.compile("./");
   });
+});
 
-  describe("emit diagnostic when using non-namespace types", () => {
+describe("emit diagnostics", () => {
+  async function diagnose(code: string) {
+    const testHost = await createTestHost();
+    testHost.addTypeSpecFile(
+      "main.tsp",
+      `
+      ${code}
+    `,
+    );
+
+    return testHost.diagnose("main.tsp");
+  }
+
+  it("unknown identifier", async () => {
+    const diagnostics = await diagnose(`
+      using NotDefined;
+    `);
+    expectDiagnostics(diagnostics, {
+      code: "invalid-ref",
+      message: "Unknown identifier NotDefined",
+    });
+  });
+
+  describe("when using non-namespace types", () => {
     [
       ["model", "model Target {}"],
       ["enum", "enum Target {}"],
@@ -532,15 +601,10 @@ describe("compiler: using statements", () => {
       ["operation", "op Target(): void;"],
     ].forEach(([name, code]) => {
       it(name, async () => {
-        testHost.addTypeSpecFile(
-          "main.tsp",
-          `
+        const diagnostics = await diagnose(`
           using Target;
           ${code}
-        `
-        );
-
-        const diagnostics = await testHost.diagnose("./");
+        `);
         expectDiagnostics(diagnostics, {
           code: "using-invalid-ref",
           message: "Using must refer to a namespace",

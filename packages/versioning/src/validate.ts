@@ -1,7 +1,5 @@
 import {
-  NoTarget,
   getNamespaceFullName,
-  getService,
   getTypeName,
   isTemplateInstance,
   isType,
@@ -22,16 +20,25 @@ import {
   getReturnTypeChangedFrom,
   getTypeChangedFrom,
   getUseDependencies,
-  getVersion,
 } from "./decorators.js";
 import { reportDiagnostic } from "./lib.js";
 import type { Version } from "./types.js";
+import { getVersionAdditionCodefixes, getVersionRemovalCodeFixes } from "./validate.codefix.js";
 import {
   Availability,
+  getAllVersions,
   getAvailabilityMap,
   getVersionDependencies,
   getVersions,
 } from "./versioning.js";
+
+const relationCacheKey = Symbol.for("TypeSpec.Versioning.NamespaceRelationCache");
+
+export function getCachedNamespaceDependencies(
+  program: Program,
+): Map<Namespace | undefined, Set<Namespace>> | undefined {
+  return (program as any)[relationCacheKey];
+}
 
 export function $onValidate(program: Program) {
   const namespaceDependencies = new Map<Namespace | undefined, Set<Namespace>>();
@@ -46,6 +53,7 @@ export function $onValidate(program: Program) {
     }
     namespaceDependencies.set(source, set);
   }
+  (program as any)[relationCacheKey] = namespaceDependencies;
 
   navigateProgram(
     program,
@@ -112,6 +120,21 @@ export function $onValidate(program: Program) {
         for (const sourceModel of op.parameters.sourceModels) {
           validateReference(program, op, sourceModel.model);
         }
+
+        for (const prop of op.parameters.properties.values()) {
+          // Validate op -> property have correct versioning
+          validateTargetVersionCompatible(program, op, prop, {
+            isTargetADependent: true,
+          });
+
+          // Validate model property -> type have correct versioning
+          const typeChangedFrom = getTypeChangedFrom(program, prop);
+          if (typeChangedFrom !== undefined) {
+            validateMultiTypeReference(program, prop);
+          } else {
+            validateReference(program, [prop, op], prop.type);
+          }
+        }
       },
       interface: (iface) => {
         for (const source of iface.sourceInterfaces) {
@@ -119,21 +142,7 @@ export function $onValidate(program: Program) {
         }
       },
       namespace: (namespace) => {
-        const [_, versionMap] = getVersions(program, namespace);
         validateVersionEnumValuesUnique(program, namespace);
-        const serviceProps = getService(program, namespace);
-        // eslint-disable-next-line deprecation/deprecation
-        if (serviceProps?.version !== undefined && versionMap !== undefined) {
-          reportDiagnostic(program, {
-            code: "no-service-fixed-version",
-            format: {
-              name: getNamespaceFullName(namespace),
-              // eslint-disable-next-line deprecation/deprecation
-              version: serviceProps.version,
-            },
-            target: namespace,
-          });
-        }
         const versionedNamespace = findVersionedNamespace(program, namespace);
         const dependencies = getVersionDependencies(program, namespace);
         if (dependencies === undefined) {
@@ -146,12 +155,6 @@ export function $onValidate(program: Program) {
             if (usingUseDependency) {
               reportDiagnostic(program, {
                 code: "incompatible-versioned-namespace-use-dependency",
-                target: namespace,
-              });
-            } else if (!(value instanceof Map)) {
-              reportDiagnostic(program, {
-                code: "versioned-dependency-record-not-mapping",
-                format: { dependency: getNamespaceFullName(dependencyNs) },
                 target: namespace,
               });
             }
@@ -188,16 +191,8 @@ export function $onValidate(program: Program) {
         }
       },
     },
-    { includeTemplateDeclaration: true }
+    { includeTemplateDeclaration: true },
   );
-  validateVersionedNamespaceUsage(program, namespaceDependencies);
-}
-
-function getAllVersions(p: Program, t: Type): Version[] | undefined {
-  const [namespace, _] = getVersions(p, t);
-  if (namespace === undefined) return undefined;
-
-  return getVersion(p, namespace)?.getVersions();
 }
 
 /**
@@ -208,21 +203,65 @@ function validateMultiTypeReference(program: Program, source: Type, options?: Ty
   if (versionTypeMap === undefined) return;
   for (const [version, type] of versionTypeMap!) {
     if (type === undefined) continue;
+    validateTypeAvailability(program, version, type, source, options);
+  }
+}
+
+/**
+ * Ensures that a type is available in a given version.
+ * For types that may wrap other types, e.g. unions, tuples, or template instances,
+ * this function will recursively check the wrapped types.
+ */
+function validateTypeAvailability(
+  program: Program,
+  version: Version,
+  targetType: Type,
+  source: Type,
+  options?: TypeNameOptions,
+) {
+  const typesToCheck: Type[] = [targetType];
+  while (typesToCheck.length) {
+    const type = typesToCheck.pop()!;
     const availMap = getAvailabilityMap(program, type);
-    const availability = availMap?.get(version.name) ?? Availability.Available;
-    if ([Availability.Added, Availability.Available].includes(availability)) {
-      continue;
+    const availability = availMap?.get(version?.name) ?? Availability.Available;
+    if (![Availability.Added, Availability.Available].includes(availability)) {
+      reportDiagnostic(program, {
+        code: "incompatible-versioned-reference",
+        messageId: "doesNotExist",
+        format: {
+          sourceName: getTypeName(source, options),
+          targetName: getTypeName(type, options),
+          version: prettyVersion(version),
+        },
+        target: source,
+        codefixes: getVersionAdditionCodefixes(version, type, program, options),
+      });
     }
-    reportDiagnostic(program, {
-      code: "incompatible-versioned-reference",
-      messageId: "doesNotExist",
-      format: {
-        sourceName: getTypeName(source, options),
-        targetName: getTypeName(type, options),
-        version: prettyVersion(version),
-      },
-      target: source,
-    });
+
+    if (isTemplateInstance(type)) {
+      for (const arg of type.templateMapper.args) {
+        if (isType(arg)) {
+          typesToCheck.push(arg);
+        }
+      }
+    } else if (type.kind === "Union") {
+      for (const variant of type.variants.values()) {
+        if (type.expression) {
+          // Union expressions don't have decorators applied,
+          // so we need to check the type directly.
+          typesToCheck.push(variant.type);
+        } else {
+          // Named unions can have decorators applied,
+          // so we need to check that the variant type is valid
+          // for whatever decoration the variant has.
+          validateTargetVersionCompatible(program, variant, variant.type);
+        }
+      }
+    } else if (type.kind === "Tuple") {
+      for (const value of type.values) {
+        typesToCheck.push(value);
+      }
+    }
   }
 }
 
@@ -231,7 +270,7 @@ function validateMultiTypeReference(program: Program, source: Type, options?: Ty
  */
 function getVersionedNameMap(
   program: Program,
-  source: Type
+  source: Type,
 ): Map<Version, string | undefined> | undefined {
   const allVersions = getAllVersions(program, source);
   if (allVersions === undefined) return undefined;
@@ -297,7 +336,7 @@ function getVersionedNameMap(
  */
 function getVersionedTypeMap(
   program: Program,
-  source: Type
+  source: Type,
 ): Map<Version, Type | undefined> | undefined {
   const allVersions = getAllVersions(program, source);
   if (allVersions === undefined) return undefined;
@@ -365,32 +404,6 @@ function validateVersionEnumValuesUnique(program: Program, namespace: Namespace)
   }
 }
 
-function validateVersionedNamespaceUsage(
-  program: Program,
-  namespaceDependencies: Map<Namespace | undefined, Set<Namespace>>
-) {
-  for (const [source, targets] of namespaceDependencies.entries()) {
-    const dependencies = source && getVersionDependencies(program, source);
-    for (const target of targets) {
-      const targetVersionedNamespace = findVersionedNamespace(program, target);
-      if (
-        targetVersionedNamespace !== undefined &&
-        !(source && (isSubNamespace(target, source) || isSubNamespace(source, target))) &&
-        dependencies?.get(targetVersionedNamespace) === undefined
-      ) {
-        reportDiagnostic(program, {
-          code: "using-versioned-library",
-          format: {
-            sourceNs: source ? getNamespaceFullName(source) : "global",
-            targetNs: getNamespaceFullName(target),
-          },
-          target: source ?? NoTarget,
-        });
-      }
-    }
-  }
-}
-
 function validateVersionedPropertyNames(program: Program, source: Type) {
   const allVersions = getAllVersions(program, source);
   if (allVersions === undefined) return;
@@ -437,19 +450,6 @@ function validateVersionedPropertyNames(program: Program, source: Type) {
       }
     }
   }
-}
-
-function isSubNamespace(parent: Namespace, child: Namespace): boolean {
-  let current: Namespace | undefined = child;
-
-  while (current && current.name !== "") {
-    if (current === parent) {
-      return true;
-    }
-    current = current.namespace;
-  }
-
-  return false;
 }
 
 function validateMadeOptional(program: Program, target: Type) {
@@ -503,56 +503,77 @@ interface IncompatibleVersionValidateOptions {
  * @param source Source type referencing the target type.
  * @param target Type being referenced from the source
  */
-function validateReference(program: Program, source: Type, target: Type) {
+function validateReference(program: Program, source: Type | Type[], target: Type) {
   validateTargetVersionCompatible(program, source, target);
 
   if ("templateMapper" in target) {
     for (const param of target.templateMapper?.args ?? []) {
       if (isType(param)) {
-        validateTargetVersionCompatible(program, source, param);
+        validateReference(program, source, param);
       }
     }
   }
 
   switch (target.kind) {
     case "Union":
-      for (const variant of target.variants.values()) {
-        validateTargetVersionCompatible(program, source, variant.type);
+      if (typeof target.name !== "string") {
+        for (const variant of target.variants.values()) {
+          validateReference(program, source, variant.type);
+        }
       }
       break;
     case "Tuple":
       for (const value of target.values) {
-        validateTargetVersionCompatible(program, source, value);
+        validateReference(program, source, value);
       }
       break;
   }
 }
 
-function getAvailabilityMapWithParentInfo(
-  program: Program,
-  type: Type
-): Map<string, Availability> | undefined {
-  const base = getAvailabilityMap(program, type);
+interface ResolvedAvailability {
+  map?: Map<string, Availability>;
+  type: Type;
+}
 
-  // get any parent availability information
-  let parentMap: Map<string, Availability> | undefined = undefined;
-  switch (type.kind) {
-    case "Operation":
-      const parentInterface = type.interface;
-      if (parentInterface) {
-        parentMap = getAvailabilityMap(program, parentInterface);
+/**
+ * Return the availability map for a type using the stack to include parent annotations.
+ */
+function resolveAvailabilityForStack(program: Program, type: Type | Type[]): ResolvedAvailability {
+  const types = Array.isArray(type) ? type : [type];
+  const first = types[0];
+  const map = getAvailabilityMapFromStack(program, types);
+  return { type: first, map };
+}
+/**
+ * Return the availability map for a type using the stack to include parent annotations.
+ */
+function getAvailabilityMapFromStack(
+  program: Program,
+  typeStack: Type[],
+): Map<string, Availability> | undefined {
+  for (const type of typeStack) {
+    const map = getAvailabilityMap(program, type);
+    if (map) {
+      return map;
+    }
+    switch (type.kind) {
+      case "Operation": {
+        const parentMap = type.interface && getAvailabilityMap(program, type.interface);
+        if (parentMap) {
+          return parentMap;
+        }
+        break;
       }
-      break;
-    case "ModelProperty":
-      const parentModel = type.model;
-      if (parentModel) {
-        parentMap = getAvailabilityMapWithParentInfo(program, parentModel);
+      case "ModelProperty": {
+        const parentMap = type.model && getAvailabilityMap(program, type.model);
+        if (parentMap) {
+          return parentMap;
+        }
+        break;
       }
-      break;
-    default:
-      break;
+    }
   }
-  return base ?? parentMap;
+  return undefined;
 }
 
 /**
@@ -563,30 +584,41 @@ function getAvailabilityMapWithParentInfo(
  */
 function validateTargetVersionCompatible(
   program: Program,
-  source: Type,
-  target: Type,
-  validateOptions: IncompatibleVersionValidateOptions = {}
+  source: Type | Type[],
+  target: Type | Type[],
+  validateOptions: IncompatibleVersionValidateOptions = {},
 ) {
-  const sourceAvailability = getAvailabilityMapWithParentInfo(program, source);
-  const [sourceNamespace] = getVersions(program, source);
+  const sourceAvailability = resolveAvailabilityForStack(program, source);
+  const [sourceNamespace] = getVersions(program, sourceAvailability.type);
+  // If we cannot get source availability check if there is some different versioning across the stack which would mean we verify across namespace and is causing issues.
+  if (sourceAvailability.map === undefined) {
+    const sources = Array.isArray(source) ? source : [source];
+    const baseNs = getVersions(program, sources[0]);
+    for (const type of sources) {
+      const ns = getVersions(program, type);
+      if (ns !== baseNs) {
+        return undefined;
+      }
+    }
+  }
+  const targetAvailability = resolveAvailabilityForStack(program, target);
+  const [targetNamespace] = getVersions(program, targetAvailability.type);
+  if (!targetAvailability.map || !targetNamespace) return;
 
-  let targetAvailability = getAvailabilityMapWithParentInfo(program, target);
-  const [targetNamespace] = getVersions(program, target);
-  if (!targetAvailability || !targetNamespace) return;
-
+  let versionMap: Map<Version, Version> | Version | undefined;
   if (sourceNamespace !== targetNamespace) {
     const dependencies = sourceNamespace && getVersionDependencies(program, sourceNamespace);
-    const versionMap = dependencies?.get(targetNamespace);
+    versionMap = dependencies?.get(targetNamespace);
     if (versionMap === undefined) return;
 
-    targetAvailability = translateAvailability(
+    targetAvailability.map = translateAvailability(
       program,
-      targetAvailability,
+      targetAvailability.map,
       versionMap,
-      source,
-      target
+      sourceAvailability.type,
+      targetAvailability.type,
     );
-    if (!targetAvailability) {
+    if (!targetAvailability.map) {
       return;
     }
   }
@@ -594,13 +626,20 @@ function validateTargetVersionCompatible(
   if (validateOptions.isTargetADependent) {
     validateAvailabilityForContains(
       program,
-      sourceAvailability,
-      targetAvailability,
-      source,
-      target
+      sourceAvailability.map,
+      targetAvailability.map,
+      sourceAvailability.type,
+      targetAvailability.type,
     );
   } else {
-    validateAvailabilityForRef(program, sourceAvailability, targetAvailability, source, target);
+    validateAvailabilityForRef(
+      program,
+      sourceAvailability.map,
+      targetAvailability.map,
+      sourceAvailability.type,
+      targetAvailability.type,
+      versionMap instanceof Map ? versionMap : undefined,
+    );
   }
 }
 
@@ -609,7 +648,7 @@ function translateAvailability(
   avail: Map<string, Availability>,
   versionMap: Map<Version, Version> | Version,
   source: Type,
-  target: Type
+  target: Type,
 ): Map<string, Availability> | undefined {
   if (!(versionMap instanceof Map)) {
     const version = versionMap;
@@ -618,7 +657,7 @@ function translateAvailability(
       const removedBefore = findAvailabilityOnOrBeforeVersion(
         version.name,
         Availability.Removed,
-        avail
+        avail,
       );
       if (addedAfter) {
         reportDiagnostic(program, {
@@ -631,6 +670,7 @@ function translateAvailability(
             targetAddedOn: addedAfter,
           },
           target: source,
+          codefixes: getVersionAdditionCodefixes(version, target, program),
         });
       }
       if (removedBefore) {
@@ -644,6 +684,7 @@ function translateAvailability(
             targetAddedOn: removedBefore,
           },
           target: source,
+          codefixes: getVersionAdditionCodefixes(version, target, program),
         });
       }
     }
@@ -661,7 +702,7 @@ function translateAvailability(
 function findAvailabilityAfterVersion(
   version: string,
   status: Availability,
-  avail: Map<string, Availability>
+  avail: Map<string, Availability>,
 ): string | undefined {
   let search = false;
   for (const [key, val] of avail) {
@@ -678,7 +719,7 @@ function findAvailabilityAfterVersion(
 function findAvailabilityOnOrBeforeVersion(
   version: string,
   status: Availability,
-  avail: Map<string, Availability>
+  avail: Map<string, Availability>,
 ): string | undefined {
   let search = false;
   for (const [key, val] of avail) {
@@ -702,12 +743,16 @@ function validateAvailabilityForRef(
   targetAvail: Map<string, Availability>,
   source: Type,
   target: Type,
-  sourceOptions?: TypeNameOptions,
-  targetOptions?: TypeNameOptions
+  versionMap?: Map<Version, Version>,
 ) {
   // if source is unversioned and target is versioned
   if (sourceAvail === undefined) {
     if (!isAvailableInAllVersion(targetAvail)) {
+      const firstAvailableVersion = Array.from(targetAvail.entries())
+        .filter(([_, val]) => val === Availability.Available || val === Availability.Added)
+        .map(([key, _]) => key)
+        .sort()
+        .shift();
       reportDiagnostic(program, {
         code: "incompatible-versioned-reference",
         messageId: "default",
@@ -716,6 +761,9 @@ function validateAvailabilityForRef(
           targetName: getTypeName(target),
         },
         target: source,
+        codefixes: firstAvailableVersion
+          ? getVersionAdditionCodefixes(firstAvailableVersion, source, program)
+          : undefined,
       });
     }
     return;
@@ -729,7 +777,7 @@ function validateAvailabilityForRef(
   const sourceReturnTypeChanged = getReturnTypeChangedFrom(program, source);
   if (sourceReturnTypeChanged !== undefined) {
     const sourceReturnTypeChangedKeys = [...sourceReturnTypeChanged.keys()].map(
-      (item) => item.name
+      (item) => item.name,
     );
     keyValSource = [...keyValSource, ...sourceReturnTypeChangedKeys];
   }
@@ -743,6 +791,12 @@ function validateAvailabilityForRef(
       [Availability.Removed, Availability.Unavailable].includes(targetVal)
     ) {
       const targetAddedOn = findAvailabilityAfterVersion(key, Availability.Added, targetAvail);
+      let targetVersion: Version | string = key;
+      if (versionMap) {
+        // the `key` here could have already been converted to source version string, thus we need to find the
+        // original target version so that we can provide the correct codefix
+        targetVersion = findMatchingTargetVersion(key, versionMap) ?? key;
+      }
 
       reportDiagnostic(program, {
         code: "incompatible-versioned-reference",
@@ -754,6 +808,7 @@ function validateAvailabilityForRef(
           targetAddedOn: targetAddedOn!,
         },
         target: source,
+        codefixes: getVersionAdditionCodefixes(targetVersion, target, program),
       });
     }
     if (
@@ -763,18 +818,25 @@ function validateAvailabilityForRef(
       const targetRemovedOn = findAvailabilityOnOrBeforeVersion(
         key,
         Availability.Removed,
-        targetAvail
+        targetAvail,
       );
+
+      let targetVersion: Version | string = key;
+      if (versionMap) {
+        targetVersion = findMatchingTargetVersion(key, versionMap) ?? key;
+      }
+
       reportDiagnostic(program, {
         code: "incompatible-versioned-reference",
         messageId: "removedBefore",
         format: {
-          sourceName: getTypeName(source, sourceOptions),
-          targetName: getTypeName(target, targetOptions),
+          sourceName: getTypeName(source),
+          targetName: getTypeName(target),
           sourceRemovedOn: key,
           targetRemovedOn: targetRemovedOn!,
         },
         target: source,
+        codefixes: getVersionAdditionCodefixes(targetVersion, target, program),
       });
     }
   }
@@ -789,7 +851,7 @@ function canIgnoreDependentVersioning(type: Type, versioning: "added" | "removed
 
 function canIgnoreVersioningOnProperty(
   prop: ModelProperty,
-  versioning: "added" | "removed"
+  versioning: "added" | "removed",
 ): boolean {
   if (prop.sourceProperty === undefined) {
     return false;
@@ -799,7 +861,7 @@ function canIgnoreVersioningOnProperty(
   // Check if the decorator was defined on this property or a source property. If source property ignore.
   const selfDecorators = prop.decorators.filter((x) => x.decorator === decoratorFn);
   const sourceDecorators = prop.sourceProperty.decorators.filter(
-    (x) => x.decorator === decoratorFn
+    (x) => x.decorator === decoratorFn,
   );
   return !selfDecorators.some((x) => !sourceDecorators.some((y) => x.node === y.node));
 }
@@ -811,7 +873,7 @@ function validateAvailabilityForContains(
   source: Type,
   target: Type,
   sourceOptions?: TypeNameOptions,
-  targetOptions?: TypeNameOptions
+  targetOptions?: TypeNameOptions,
 ) {
   if (!sourceAvail) return;
 
@@ -837,6 +899,7 @@ function validateAvailabilityForContains(
           targetAddedOn: key,
         },
         target: target,
+        codefixes: getVersionAdditionCodefixes(key, source, program, targetOptions),
       });
     }
     if (
@@ -855,6 +918,7 @@ function validateAvailabilityForContains(
           targetRemovedOn: targetRemovedOn!,
         },
         target: target,
+        codefixes: getVersionRemovalCodeFixes(key, target, program, targetOptions),
       });
     }
   }
@@ -869,4 +933,16 @@ function isAvailableInAllVersion(avail: Map<string, Availability>): boolean {
 
 function prettyVersion(version: Version | undefined): string {
   return version?.value ?? "<n/a>";
+}
+
+function findMatchingTargetVersion(
+  sourceVersion: string,
+  versionMap: Map<Version, Version>,
+): Version | undefined {
+  for (const [source, target] of versionMap.entries()) {
+    if (source.value === sourceVersion) {
+      return target;
+    }
+  }
+  return undefined;
 }

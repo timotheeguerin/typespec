@@ -1,4 +1,4 @@
-import oaParser from "@readme/openapi-parser";
+import OpenAPIParser from "@apidevtools/swagger-parser";
 import { formatTypeSpec, resolvePath } from "@typespec/compiler";
 import { OpenAPI3Document } from "../../../types.js";
 import { CliHost } from "../../types.js";
@@ -6,15 +6,18 @@ import { handleInternalCompilerError } from "../../utils.js";
 import { ConvertCliArgs } from "./args.js";
 import { generateMain } from "./generators/generate-main.js";
 import { transform } from "./transforms/transforms.js";
+import { createContext } from "./utils/context.js";
 
 export async function convertAction(host: CliHost, args: ConvertCliArgs) {
   // attempt to read the file
   const fullPath = resolvePath(process.cwd(), args.path);
-  const model = await parseOpenApiFile(fullPath);
-  const program = transform(model);
+  const parser = new OpenAPIParser();
+  const model = await parser.bundle(fullPath);
+  const context = createContext(parser, model as OpenAPI3Document, console);
+  const program = transform(context);
   let mainTsp: string;
   try {
-    mainTsp = generateMain(program);
+    mainTsp = generateMain(program, context);
   } catch (err) {
     handleInternalCompilerError(err);
   }
@@ -38,8 +41,4 @@ export async function convertAction(host: CliHost, args: ConvertCliArgs) {
   if (formatError) {
     handleInternalCompilerError(formatError);
   }
-}
-
-function parseOpenApiFile(path: string): Promise<OpenAPI3Document> {
-  return oaParser.bundle(path) as Promise<OpenAPI3Document>;
 }

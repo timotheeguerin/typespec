@@ -1,11 +1,8 @@
 import { deepStrictEqual, strictEqual } from "assert";
 import { describe, it } from "vitest";
 import { Range } from "vscode-languageserver/node.js";
-import {
-  createTestServerHost,
-  extractCursor,
-  getTestIdentifiers,
-} from "../../src/testing/test-server-host.js";
+import { extractCursor } from "../../src/testing/source-utils.js";
+import { createTestServerHost, getTestIdentifiers } from "../../src/testing/test-server-host.js";
 
 describe("compiler: server: rename and find references", () => {
   // `┆` marks where the cursor is positioned
@@ -31,7 +28,7 @@ describe("compiler: server: rename and find references", () => {
       }
 
       model C<MyModel> {} // template parameter name
-      `
+      `,
   );
 
   test(
@@ -45,7 +42,7 @@ describe("compiler: server: rename and find references", () => {
     model AnotherTemplate<T> { 
       prop: T;
     }
-    `
+    `,
   );
 
   test(
@@ -63,13 +60,13 @@ describe("compiler: server: rename and find references", () => {
     // different namespace
     namespace B {
     }
-    `
+    `,
   );
 
   test(
     "aliases",
     `alias Alias┆/**/ = string;
-    op foo(): Alias/**/;`
+    op foo(): Alias/**/;`,
   );
 
   test("enum members", `enum A { B┆/**/, C, D }; model M { prop: A.B/**/;}`);
@@ -84,7 +81,7 @@ describe("compiler: server: rename and find references", () => {
 
   test(
     "namespace operations",
-    `namespace A { op test┆/**/(): void }; model M { prop: A.test/**/;}`
+    `namespace A { op test┆/**/(): void }; model M { prop: A.test/**/;}`,
   );
 
   test("union variants", `union A { b┆/**/: B, c: C, d: D }; model M { prop: A.b/**/;}`);
@@ -111,7 +108,7 @@ async function testFindReferences(sourceWithCursor: string) {
     getTestIdentifiers(source).map((id) => ({
       uri: doc.uri,
       range: Range.create(doc.positionAt(id.pos), doc.positionAt(id.end)),
-    }))
+    })),
   );
 }
 
@@ -137,6 +134,6 @@ async function testRename(sourceWithCursor: string) {
     getTestIdentifiers(source).map((id) => ({
       newText: "NewName",
       range: Range.create(doc.positionAt(id.pos), doc.positionAt(id.end)),
-    }))
+    })),
   );
 }

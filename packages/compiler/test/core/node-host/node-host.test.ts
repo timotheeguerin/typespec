@@ -3,7 +3,8 @@ import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { beforeAll, describe, it } from "vitest";
-import { InvalidEncodingError, NodeHost } from "../../../src/core/node-host.js";
+import { NodeHost } from "../../../src/core/node-host.js";
+import { InvalidEncodingError } from "../../../src/core/node-system-host.js";
 import { getDirectoryPath, resolvePath } from "../../../src/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -18,7 +19,7 @@ describe("compiler: node host", () => {
   async function writeFixture(
     path: string,
     content: string,
-    encoding: "utf8" | "utf8bom" | "utf16le" | "utf16be"
+    encoding: "utf8" | "utf8bom" | "utf16le" | "utf16be",
   ): Promise<string> {
     const resolvedPath = fixturePath(path);
     const directory = getDirectoryPath(resolvedPath);
@@ -64,7 +65,7 @@ describe("compiler: node host", () => {
 
         await rejects(
           () => NodeHost.readFile(fixture),
-          (error) => error instanceof InvalidEncodingError
+          (error) => error instanceof InvalidEncodingError,
         );
       });
 
@@ -73,7 +74,7 @@ describe("compiler: node host", () => {
 
         await rejects(
           () => NodeHost.readFile(fixture),
-          (error) => error instanceof InvalidEncodingError
+          (error) => error instanceof InvalidEncodingError,
         );
       });
     });

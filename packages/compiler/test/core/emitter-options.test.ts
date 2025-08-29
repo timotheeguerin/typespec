@@ -21,7 +21,7 @@ const fakeEmitter = createTypeSpecLibrary({
 
 describe("compiler: emitter options", () => {
   async function runWithEmitterOptions(
-    options: Record<string, unknown>
+    options: Record<string, unknown>,
   ): Promise<[EmitContext | undefined, readonly Diagnostic[]]> {
     let emitContext: EmitContext | undefined;
     const host = await createTestHost();
@@ -30,7 +30,7 @@ describe("compiler: emitter options", () => {
       "node_modules/fake-emitter/package.json",
       JSON.stringify({
         main: "index.js",
-      })
+      }),
     );
     host.addJsFile("node_modules/fake-emitter/index.js", {
       $lib: fakeEmitter,
@@ -49,7 +49,7 @@ describe("compiler: emitter options", () => {
   }
 
   async function diagnoseEmitterOptions(
-    options: Record<string, unknown>
+    options: Record<string, unknown>,
   ): Promise<readonly Diagnostic[]> {
     const [_, diagnostics] = await runWithEmitterOptions(options);
     return diagnostics;
@@ -115,6 +115,17 @@ describe("compiler: emitter options", () => {
       expectDiagnostics(diagnostics, {
         code: "config-path-absolute",
         message: `Path "assets" cannot be relative. Use {cwd} or {project-root} to specify what the path should be relative to.`,
+      });
+    });
+
+    // This was disabled due to making it impossible to use windows path via the cli https://github.com/microsoft/typespec/pull/4173
+    it.skip("emit diagnostic if passing windows style path", async () => {
+      const diagnostics = await diagnoseEmitterOptions({
+        "asset-dir": "C:\\abc\\def",
+      });
+      expectDiagnostics(diagnostics, {
+        code: "path-unix-style",
+        message: `Path should use unix style separators. Use "/" instead of "\\".`,
       });
     });
   });

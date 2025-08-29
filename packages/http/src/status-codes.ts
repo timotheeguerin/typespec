@@ -8,10 +8,10 @@ import {
   createDiagnosticCollector,
   getMaxValue,
   getMinValue,
-  ignoreDiagnostics,
 } from "@typespec/compiler";
+import { $ } from "@typespec/compiler/typekit";
 import { createDiagnostic } from "./lib.js";
-import { HttpStatusCodeRange, HttpStatusCodes } from "./types.js";
+import type { HttpStatusCodeRange, HttpStatusCodes } from "./types.js";
 
 function error(target: DiagnosticTarget): [HttpStatusCodes, readonly Diagnostic[]] {
   return [
@@ -29,7 +29,7 @@ function error(target: DiagnosticTarget): [HttpStatusCodes, readonly Diagnostic[
 // Issue a diagnostic if not valid
 export function validateStatusCode(
   code: number | string,
-  diagnosticTarget: DiagnosticTarget
+  diagnosticTarget: DiagnosticTarget,
 ): [HttpStatusCodes, readonly Diagnostic[]] {
   const codeAsNumber = typeof code === "string" ? parseInt(code, 10) : code;
 
@@ -48,7 +48,7 @@ export function validateStatusCode(
 export function getStatusCodesFromType(
   program: Program,
   type: Type,
-  diagnosticTarget: DiagnosticTarget
+  diagnosticTarget: DiagnosticTarget,
 ): [HttpStatusCodes, readonly Diagnostic[]] {
   switch (type.kind) {
     case "String":
@@ -77,7 +77,7 @@ function validateStatusCodeRange(
   program: Program,
   type: Scalar | ModelProperty,
   scalar: Scalar,
-  diagnosticTarget: DiagnosticTarget
+  diagnosticTarget: DiagnosticTarget,
 ): [HttpStatusCodes, readonly Diagnostic[]] {
   if (!isInt32(program, scalar)) {
     return error(diagnosticTarget);
@@ -97,7 +97,7 @@ function isRangeComplete(range: Partial<HttpStatusCodeRange>): range is HttpStat
 function getStatusCodesRange(
   program: Program,
   type: Scalar | ModelProperty,
-  diagnosticTarget: DiagnosticTarget
+  diagnosticTarget: DiagnosticTarget,
 ): Partial<HttpStatusCodeRange> {
   const start = getMinValue(program, type);
   const end = getMaxValue(program, type);
@@ -116,11 +116,6 @@ function getStatusCodesRange(
 }
 
 function isInt32(program: Program, type: Type) {
-  return ignoreDiagnostics(
-    program.checker.isTypeAssignableTo(
-      type.projectionBase ?? type,
-      program.checker.getStdType("int32"),
-      type
-    )
-  );
+  const tk = $(program);
+  return tk.type.isAssignableTo(type, tk.builtin.int32, type);
 }

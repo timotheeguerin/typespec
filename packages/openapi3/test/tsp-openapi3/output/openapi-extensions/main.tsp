@@ -5,33 +5,14 @@ import "@typespec/openapi3";
 using Http;
 using OpenAPI;
 
-@service({
-  title: "(title)",
-})
-@info({
-  version: "0.0.0",
-})
+@service(#{ title: "(title)" })
+@info(#{ version: "0.0.0" })
 namespace title;
 
 model Foo {
-  @extension(
-    "x-model",
-    {
-      name: "Foo",
-      age: 12,
-      other: {
-        id: "some",
-      },
-    }
-  )
-  @extension(
-    "x-obj",
-    {
-      foo: 123,
-      bar: "string",
-    }
-  )
-  @extension("x-array", ["one", 2])
+  @extension("x-model", #{ name: "Foo", age: 12, other: #{ id: "some", `node.js`: true } })
+  @extension("x-obj", #{ foo: 123, bar: "string" })
+  @extension("x-array", #["one", 2])
   @extension("x-bool", true)
   @extension("x-number", 123)
   @extension("x-string", "string")
@@ -48,12 +29,4 @@ model NestedConfig {
   id: "some";
 }
 
-/**
- * The request has succeeded.
- */
-model foo200ApplicationJsonResponse {
-  @statusCode statusCode: 200;
-  @bodyRoot body: Foo;
-}
-
-@route("/") @get op foo(): foo200ApplicationJsonResponse;
+@route("/") @get op foo(): Foo;

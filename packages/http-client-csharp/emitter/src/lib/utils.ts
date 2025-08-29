@@ -1,74 +1,188 @@
 import {
-  SdkContext,
-  getLibraryName,
-  getSdkModel,
+  listAllServiceNamespaces,
+  SdkHttpParameter,
+  SdkMethodParameter,
+  SdkModelPropertyType,
+  isReadOnly as tcgcIsReadOnly,
 } from "@azure-tools/typespec-client-generator-core";
-import { Enum, EnumMember, Model, ModelProperty, Operation, Scalar } from "@typespec/compiler";
-import { InputConstant } from "../type/input-constant.js";
-import { InputOperationParameterKind } from "../type/input-operation-parameter-kind.js";
-import { InputParameter } from "../type/input-parameter.js";
-import { InputPrimitiveType } from "../type/input-type.js";
-import { RequestLocation } from "../type/request-location.js";
+import { getNamespaceFullName, Namespace, NoTarget, Type } from "@typespec/compiler";
+import { Visibility } from "@typespec/http";
+import { spawn, SpawnOptions } from "child_process";
+import { CSharpEmitterContext } from "../sdk-context.js";
 
-export function capitalize(str: string): string {
+export async function execCSharpGenerator(
+  context: CSharpEmitterContext,
+  options: {
+    generatorPath: string;
+    outputFolder: string;
+    generatorName: string;
+    newProject: boolean;
+    debug: boolean;
+  },
+): Promise<{ exitCode: number; stderr: string; proc: any }> {
+  const command = "dotnet";
+  const args = [
+    "--roll-forward",
+    "Major",
+    options.generatorPath,
+    options.outputFolder,
+    "-g",
+    options.generatorName,
+  ];
+  if (options.newProject) {
+    args.push("--new-project");
+  }
+  if (options.debug) {
+    args.push("--debug");
+  }
+  context.logger.info(`${command} ${args.join(" ")}`);
+
+  const child = spawn(command, args, { stdio: "pipe" });
+
+  const stderr: Buffer[] = [];
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+
+    child.stdout?.on("data", (data) => {
+      buffer += data.toString();
+      let index;
+      while ((index = buffer.indexOf("\n")) !== -1) {
+        const message = buffer.slice(0, index);
+        buffer = buffer.slice(index + 1);
+        processJsonRpc(context, message);
+      }
+    });
+
+    child.stderr?.on("data", (data) => {
+      stderr.push(data);
+    });
+
+    child.on("error", (error) => {
+      reject(error);
+    });
+
+    child.on("exit", (exitCode) => {
+      resolve({
+        exitCode: exitCode ?? -1,
+        stderr: Buffer.concat(stderr).toString(),
+        proc: child,
+      });
+    });
+  });
+}
+
+function processJsonRpc(context: CSharpEmitterContext, message: string) {
+  const response = JSON.parse(message);
+  const method = response.method;
+  const params = response.params;
+  switch (method) {
+    case "trace":
+      context.logger.trace(params.level, params.message);
+      break;
+    case "diagnostic":
+      let crossLanguageDefinitionId: string | undefined;
+      if ("crossLanguageDefinitionId" in params) {
+        crossLanguageDefinitionId = params.crossLanguageDefinitionId;
+      }
+      // Use program.reportDiagnostic for diagnostics from C# so that we don't
+      // have to duplicate the codes in the emitter.
+      context.program.reportDiagnostic({
+        code: params.code,
+        message: params.message,
+        severity: params.severity,
+        target: findTarget(crossLanguageDefinitionId) ?? NoTarget,
+      });
+      break;
+  }
+
+  function findTarget(crossLanguageDefinitionId: string | undefined): Type | undefined {
+    if (crossLanguageDefinitionId === undefined) {
+      return undefined;
+    }
+    return context.__typeCache.crossLanguageDefinitionIds.get(crossLanguageDefinitionId);
+  }
+}
+
+export async function execAsync(
+  command: string,
+  args: string[] = [],
+  options: SpawnOptions = {},
+): Promise<{ exitCode: number; stdio: string; stdout: string; stderr: string; proc: any }> {
+  const child = spawn(command, args, options);
+
+  return new Promise((resolve, reject) => {
+    child.on("error", (error) => {
+      reject(error);
+    });
+    const stdio: Buffer[] = [];
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    child.stdout?.on("data", (data) => {
+      stdout.push(data);
+      stdio.push(data);
+    });
+    child.stderr?.on("data", (data) => {
+      stderr.push(data);
+      stdio.push(data);
+    });
+
+    child.on("exit", (exitCode) => {
+      resolve({
+        exitCode: exitCode ?? -1,
+        stdio: Buffer.concat(stdio).toString(),
+        stdout: Buffer.concat(stdout).toString(),
+        stderr: Buffer.concat(stderr).toString(),
+        proc: child,
+      });
+    });
+  });
+}
+
+export function getClientNamespaceString(context: CSharpEmitterContext): string | undefined {
+  return getClientNamespaceStringHelper(
+    context.emitContext.options["package-name"],
+    listAllServiceNamespaces(context)[0],
+  );
+}
+
+export function getClientNamespaceStringHelper(
+  packageName?: string,
+  namespace?: Namespace,
+): string | undefined {
+  if (packageName) {
+    packageName = packageName
+      .replace(/-/g, ".")
+      .replace(/\.([a-z])?/g, (match: string) => match.toUpperCase());
+    return packageName.charAt(0).toUpperCase() + packageName.slice(1);
+  }
+  if (namespace) {
+    return getNamespaceFullName(namespace);
+  }
+  return undefined;
+}
+
+export function firstLetterToUpperCase(str: string): string {
+  if (str.length === 0) {
+    return str;
+  }
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-export function getNameForTemplate(model: Model): string {
-  if (model.name !== "" && model.templateMapper && model.templateMapper.args) {
-    return model.name + model.templateMapper.args.map((it) => (it as Model).name).join("");
+/**
+ * Checks if the property or parameter is read-only.
+ * @param prop - The property to check.
+ * @beta
+ */
+export function isReadOnly(
+  p: SdkModelPropertyType | SdkMethodParameter | SdkHttpParameter,
+): boolean {
+  if (p.kind === "property") {
+    return tcgcIsReadOnly(p);
   }
 
-  return model.name;
-}
-
-export function getTypeName(
-  context: SdkContext,
-  type: Model | Enum | EnumMember | ModelProperty | Scalar | Operation
-): string {
-  const name = getLibraryName(context, type);
-  if (type.kind !== "Model") return name;
-  if (type.name === name) {
-    const templateName = getNameForTemplate(type);
-    if (templateName === "") {
-      const sdkModel = getSdkModel(context, type as Model);
-      return sdkModel.name;
-    }
-    return templateName;
+  if (p.visibility?.includes(Visibility.Read) && p.visibility.length === 1) {
+    return true;
+  } else {
+    return false;
   }
-  return name;
-}
-
-export function createContentTypeOrAcceptParameter(
-  mediaTypes: string[],
-  name: string,
-  nameInRequest: string
-): InputParameter {
-  const isContentType: boolean = nameInRequest.toLowerCase() === "content-type";
-  const inputType: InputPrimitiveType = {
-    Kind: "string",
-    Name: "string",
-    CrossLanguageDefinitionId: "TypeSpec.string",
-  };
-  return {
-    Name: name,
-    NameInRequest: nameInRequest,
-    Type: inputType,
-    Location: RequestLocation.Header,
-    IsApiVersion: false,
-    IsResourceParameter: false,
-    IsContentType: isContentType,
-    IsRequired: true,
-    IsEndpoint: false,
-    SkipUrlEncoding: false,
-    Explode: false,
-    Kind: InputOperationParameterKind.Constant,
-    DefaultValue:
-      mediaTypes.length === 1
-        ? ({
-            Type: inputType,
-            Value: mediaTypes[0],
-          } as InputConstant)
-        : undefined,
-  };
 }

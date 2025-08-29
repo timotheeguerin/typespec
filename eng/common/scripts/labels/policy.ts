@@ -22,6 +22,13 @@ export type PayloadType = {
     | "Pull_Request_Review_Comment";
 };
 
+export type IsActivitySender = {
+  isActivitySender: {
+    user?: string;
+    issueAuthor?: boolean;
+  };
+};
+
 export type IsAction = {
   isAction: {
     action: // Issues
@@ -67,11 +74,12 @@ export type IncludesModifiedFiles = {
   includesModifiedFiles: { files: string[] };
 };
 export type FilesMatchPattern = {
-  filesMatchPattern: { pattern: string };
+  filesMatchPattern: { pattern: string; matchAny: boolean };
 };
 
 export type Condition =
   | PayloadType
+  | IsActivitySender
   | IsAction
   | LabelAdded
   | HasLabel
@@ -86,6 +94,12 @@ export type Condition =
 export function payloadType(payloadType: PayloadType["payloadType"]): PayloadType {
   return {
     payloadType,
+  };
+}
+
+export function isActivitySender(data: IsActivitySender["isActivitySender"]): IsActivitySender {
+  return {
+    isActivitySender: data,
   };
 }
 
@@ -124,7 +138,7 @@ export function includesModifiedFiles(files: string[]): IncludesModifiedFiles {
  */
 export function filesMatchPattern(pattern: string): FilesMatchPattern {
   return {
-    filesMatchPattern: { pattern },
+    filesMatchPattern: { pattern, matchAny: true },
   };
 }
 

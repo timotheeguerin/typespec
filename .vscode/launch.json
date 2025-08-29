@@ -94,6 +94,24 @@
       }
     },
     {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug tsp-pack",
+      "program": "${workspaceFolder}/packages/pack/dist/cli.js",
+      "args": ["main.tsp"],
+      "smartStep": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**/*.js"],
+      "outFiles": [
+        "${workspaceFolder}/packages/*/dist/**/*.js",
+        "${workspaceFolder}/packages/*/dist-dev/**/*.js"
+      ],
+      "cwd": "${workspaceFolder}/packages/samples/scratch",
+      "presentation": {
+        "order": 2
+      }
+    },
+    {
       "name": "Regenerate .tmlanguage",
       "type": "node",
       "program": "${workspaceFolder}/packages/typespec-vscode/scripts/generate-tmlanguage.js",
@@ -120,6 +138,9 @@
         // Use empty node options and don't debug while profiling to get the most accurate timing
         //"TYPESPEC_SERVER_NODE_OPTIONS": "",
 
+        // Set the telemetry key environment variable to use if you dont want to set it in package.json
+        //"TYPESPEC_VSCODE_TELEMETRY_KEY": "{The instrumentation key of your Application Insights}",
+
         "TYPESPEC_SERVER_NODE_OPTIONS": "--nolazy --inspect-brk=4242",
         "TYPESPEC_DEVELOPMENT_MODE": "true"
       },
@@ -140,10 +161,23 @@
       "type": "node",
       "request": "launch",
       "name": "Debug Docs Generation",
-      "program": "${workspaceFolder}/packages/website/.scripts/regen-ref-docs.mjs",
+      "program": "${workspaceFolder}/packages/tspd/dist/src/cli.js",
+      "args": ["--enable-experimental", "doc", "--typekits", "."],
+      "cwd": "${workspaceFolder}/packages/http",
       "smartStep": true,
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**/*.js"]
+    },
+    {
+      "name": "Run Web Extension in VS Code",
+      "type": "extensionHost",
+      "debugWebWorkerHost": true,
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/typespec-vscode",
+        "--extensionDevelopmentKind=web"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/src/web/**/*.js"]
     }
   ],
   "compounds": [

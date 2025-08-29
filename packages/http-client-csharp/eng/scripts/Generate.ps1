@@ -1,140 +1,116 @@
 #Requires -Version 7.0
 param(
     $filter,
-    [bool]$Stubbed = $true
+    [bool]$Stubbed = $true,
+    [bool]$LaunchOnly = $false
 )
 
 Import-Module "$PSScriptRoot\Generation.psm1" -DisableNameChecking -Force;
+Import-Module "$PSScriptRoot\Spector-Helper.psm1" -DisableNameChecking -Force;
+
+# Start overall timer
+$totalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 $packageRoot = Resolve-Path (Join-Path $PSScriptRoot '..' '..')
 $solutionDir = Join-Path $packageRoot 'generator'
 
-Refresh-Build
+if (-not $LaunchOnly) {
+    Refresh-Build
 
-if ($null -eq $filter -or $filter -eq "Unbranded-TypeSpec") {
-    Write-Host "Generating UnbrandedTypeSpec" -ForegroundColor Cyan
-    $testProjectsLocalDir = Join-Path $packageRoot 'generator' 'TestProjects' 'Local'
+    if ($null -eq $filter -or $filter -eq "Sample-TypeSpec") {
 
-    $unbrandedTypespecTestProject = Join-Path $testProjectsLocalDir "Unbranded-TypeSpec"
+       Write-Host "Building logging plugin" -ForegroundColor Cyan
+       $pluginDir = Join-Path $packageRoot '..' '..' 'docs' 'samples' 'client' 'csharp' 'plugins' 'logging' 'Logging.Plugin' 'src'
+       Invoke "dotnet build" $pluginDir
 
-    Invoke (Get-TspCommand "$unbrandedTypespecTestProject/Unbranded-TypeSpec.tsp" $unbrandedTypespecTestProject)
+       $sampleDir = Join-Path $packageRoot '..' '..' 'docs' 'samples' 'client' 'csharp' 'SampleService'
 
-    # exit if the generation failed
-    if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
-    }
+       Write-Host "Installing SampleTypeSpec plugins" -ForegroundColor Cyan
 
-    Write-Host "Building UnbrandedTypeSpec" -ForegroundColor Cyan
-    Invoke "dotnet build $packageRoot/generator/TestProjects/Local/Unbranded-TypeSpec/src/UnbrandedTypeSpec.csproj"
+       Invoke "npm install --force" $sampleDir
 
-    # exit if the generation failed
-    if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
+       Write-Host "Generating SampleTypeSpec using plugins" -ForegroundColor Cyan
+
+       Invoke "npx tsp compile . --trace @typespec/http-client-csharp --option @typespec/http-client-csharp.new-project=true" $sampleDir
+
+       # exit if the generation failed
+       if ($LASTEXITCODE -ne 0) {
+         exit $LASTEXITCODE
+       }
+
+       Write-Host "Building SampleTypeSpec plugin library" -ForegroundColor Cyan
+       Invoke "dotnet build $sampleDir/SampleClient/src/SampleTypeSpec.csproj"
+
+       # exit if the generation failed
+       if ($LASTEXITCODE -ne 0) {
+         exit $LASTEXITCODE
+       }
+
+        Write-Host "Generating SampleTypeSpec" -ForegroundColor Cyan
+        $testProjectsLocalDir = Join-Path $packageRoot 'generator' 'TestProjects' 'Local'
+
+        $SampleTypeSpecTestProject = Join-Path $testProjectsLocalDir "Sample-TypeSpec"
+        $SampleTypeSpecTestProject = $SampleTypeSpecTestProject
+
+        Invoke (Get-TspCommand "$SampleTypeSpecTestProject/Sample-TypeSpec.tsp" $SampleTypeSpecTestProject)
+
+        # exit if the generation failed
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+
+        Write-Host "Building SampleTypeSpec" -ForegroundColor Cyan
+        Invoke "dotnet build $packageRoot/generator/TestProjects/Local/Sample-TypeSpec/src/SampleTypeSpec.csproj"
+
+        # exit if the generation failed
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
     }
 }
 
-$specsDirectory = "$packageRoot/node_modules/@azure-tools/cadl-ranch-specs"
-$cadlRanchRoot = Join-Path $packageRoot 'generator' 'TestProjects' 'CadlRanch'
+$specsDirectory = "$packageRoot/node_modules/@typespec/http-specs"
+$azureSpecsDirectory = "$packageRoot/node_modules/@azure-tools/azure-http-specs"
+$spectorRoot = Join-Path $packageRoot 'generator' 'TestProjects' 'Spector'
 
-function IsSpecDir {
-    param (
-        [string]$dir
-    )
-    $subdirs = Get-ChildItem -Path $dir -Directory
-    return -not ($subdirs) -and (Test-Path "$dir/main.tsp")
-}
+$spectorLaunchProjects = @{}
 
-$failingSpecs = @(
-    Join-Path 'http' 'special-words'
-    Join-Path 'http' 'client' 'naming'
-    Join-Path 'http' 'client' 'structure' 'default'
-    Join-Path 'http' 'client' 'structure' 'multi-client'
-    Join-Path 'http' 'client' 'structure' 'renamed-operation'
-    Join-Path 'http' 'client' 'structure' 'two-operation-group'
-    Join-Path 'http' 'encode' 'bytes'
-    Join-Path 'http' 'encode' 'datetime'
-    Join-Path 'http' 'encode' 'duration'
-    Join-Path 'http' 'parameters' 'basic'
-    Join-Path 'http' 'parameters' 'body-optionality'
-    Join-Path 'http' 'parameters' 'collection-format'
-    Join-Path 'http' 'parameters' 'spread'
-    Join-Path 'http' 'payload' 'content-negotiation'
-    Join-Path 'http' 'payload' 'json-merge-patch'
-    Join-Path 'http' 'payload' 'media-type'
-    Join-Path 'http' 'payload' 'multipart'
-    Join-Path 'http' 'payload' 'pageable'
-    Join-Path 'http' 'resiliency' 'srv-driven'
-    Join-Path 'http' 'serialization' 'encoded-name' 'json'
-    Join-Path 'http' 'server' 'endpoint' 'not-defined'
-    Join-Path 'http' 'server' 'path' 'multiple'
-    Join-Path 'http' 'server' 'path' 'single'
-    Join-Path 'http' 'server' 'versions' 'not-versioned'
-    Join-Path 'http' 'server' 'versions' 'versioned'
-    Join-Path 'http' 'special-headers' 'conditional-request'
-    Join-Path 'http' 'special-headers' 'repeatability'
-    Join-Path 'http' 'type' 'array'
-    Join-Path 'http' 'type' 'dictionary'
-    Join-Path 'http' 'type' 'scalar'
-    Join-Path 'http' 'type' 'union'
-    Join-Path 'http' 'type' 'enum' 'extensible'
-    Join-Path 'http' 'type' 'enum' 'fixed'
-    Join-Path 'http' 'type' 'model' 'empty'
-    Join-Path 'http' 'type' 'model' 'flatten'
-    Join-Path 'http' 'type' 'model' 'usage'
-    Join-Path 'http' 'type' 'model' 'visibility'
-    Join-Path 'http' 'type' 'model' 'inheritance' 'enum-discriminator'
-    Join-Path 'http' 'type' 'model' 'inheritance' 'nested-discriminator'
-    Join-Path 'http' 'type' 'model' 'inheritance' 'not-discriminated'
-    Join-Path 'http' 'type' 'model' 'inheritance' 'recursive'
-    Join-Path 'http' 'type' 'model' 'inheritance' 'single-discriminator'
-    Join-Path 'http' 'type' 'property' 'additional-properties'
-    Join-Path 'http' 'type' 'property' 'nullable'
-    Join-Path 'http' 'type' 'property' 'optionality'
-    Join-Path 'http' 'type' 'property' 'value-types'
-)
-
-$cadlRanchLaunchProjects = @{}
-
-# Loop through all directories and subdirectories of the cadl ranch specs
-$directories = Get-ChildItem -Path "$specsDirectory/http" -Directory -Recurse
-foreach ($directory in $directories) {
-    if (-not (IsSpecDir $directory.FullName)) {
-        continue
-    }
-
-    $specFile = Join-Path $directory.FullName "main.tsp"
-    $subPath = $directory.FullName.Substring($specsDirectory.Length + 1)
+foreach ($specFile in Get-Sorted-Specs) {
+    $subPath = Get-SubPath $specFile
     $folders = $subPath.Split([System.IO.Path]::DirectorySeparatorChar)
 
     if (-not (Compare-Paths $subPath $filter)) {
         continue
     }
+    $generationDir = Join-Path $spectorRoot $subPath
 
-    if ($folders.Contains("azure")) {
-        continue
-    }
-
-    if ($folders.Contains("versioning")) {
-        continue # TODO: adopt versioning cadl ranch specs https://github.com/microsoft/typespec/issues/3965
-    }
-
-    if ($failingSpecs.Contains($subPath)) {
-        Write-Host "Skipping $subPath" -ForegroundColor Yellow
-        continue
-    }
-
-    $generationDir = $cadlRanchRoot
-    foreach ($folder in $folders) {
-        $generationDir = Join-Path $generationDir $folder
-    }
-
-    #create the directory if it doesn't exist
+    # create the directory if it doesn't exist
     if (-not (Test-Path $generationDir)) {
         New-Item -ItemType Directory -Path $generationDir | Out-Null
     }
 
-    $cadlRanchLaunchProjects.Add(($folders -join "-"), ("TestProjects/CadlRanch/$($subPath.Replace([System.IO.Path]::DirectorySeparatorChar, '/'))"))
     Write-Host "Generating $subPath" -ForegroundColor Cyan
+    
+    if ($folders.Contains("versioning")) {
+        Generate-Versioning (Split-Path $specFile) $generationDir -generateStub $stubbed
+        $spectorLaunchProjects.Add($($folders -join "-") + "-v1", $("TestProjects/Spector/$($subPath.Replace([System.IO.Path]::DirectorySeparatorChar, '/'))") + "/v1")
+        $spectorLaunchProjects.Add($($folders -join "-") + "-v2", $("TestProjects/Spector/$($subPath.Replace([System.IO.Path]::DirectorySeparatorChar, '/'))") + "/v2")
+        continue
+    }
+
+    # srv-driven contains two separate specs, for two separate clients. We need to generate both.
+    if ($folders.Contains("srv-driven")) {
+        Generate-Srv-Driven (Split-Path $specFile) $generationDir -generateStub $stubbed
+        $spectorLaunchProjects.Add($($folders -join "-") + "-v1", $("TestProjects/Spector/$($subPath.Replace([System.IO.Path]::DirectorySeparatorChar, '/'))") + "/v1")
+        $spectorLaunchProjects.Add($($folders -join "-") + "-v2", $("TestProjects/Spector/$($subPath.Replace([System.IO.Path]::DirectorySeparatorChar, '/'))") + "/v2")
+        continue
+    }
+
+    $spectorLaunchProjects.Add(($folders -join "-"), ("TestProjects/Spector/$($subPath.Replace([System.IO.Path]::DirectorySeparatorChar, '/'))"))
+    if ($LaunchOnly) {
+        continue
+    }
+    
     Invoke (Get-TspCommand $specFile $generationDir $stubbed)
 
     # exit if the generation failed
@@ -148,26 +124,25 @@ foreach ($directory in $directories) {
 # only write new launch settings if no filter was passed in
 if ($null -eq $filter) {
     Write-Host "Writing new launch settings" -ForegroundColor Cyan
-    $mgcExe = "`$(SolutionDir)/../dist/generator/Microsoft.Generator.CSharp.exe"
-    $sampleExe = "`$(SolutionDir)/../generator/artifacts/bin/SamplePlugin/Debug/net8.0/Microsoft.Generator.CSharp.exe"
-    $unbrandedSpec = "TestProjects/Local/Unbranded-TypeSpec"
+    $mtgExe = "`$(SolutionDir)/../dist/generator/Microsoft.TypeSpec.Generator.exe"
+    $sampleSpec = "TestProjects/Local/Sample-TypeSpec"
 
     $launchSettings = @{}
     $launchSettings.Add("profiles", @{})
-    $launchSettings["profiles"].Add("Unbranded-TypeSpec", @{})
-    $launchSettings["profiles"]["Unbranded-TypeSpec"].Add("commandLineArgs", "`$(SolutionDir)/$unbrandedSpec -p ClientModelPlugin")
-    $launchSettings["profiles"]["Unbranded-TypeSpec"].Add("commandName", "Executable")
-    $launchSettings["profiles"]["Unbranded-TypeSpec"].Add("executablePath", $mgcExe)
-    $launchSettings["profiles"].Add("Debug-Plugin-Test-TypeSpec", @{})
-    $launchSettings["profiles"]["Debug-Plugin-Test-TypeSpec"].Add("commandLineArgs", "`$(SolutionDir)/$unbrandedSpec -p SampleCodeModelPlugin")
-    $launchSettings["profiles"]["Debug-Plugin-Test-TypeSpec"].Add("commandName", "Executable")
-    $launchSettings["profiles"]["Debug-Plugin-Test-TypeSpec"].Add("executablePath", $sampleExe)
+    $launchSettings["profiles"].Add("Sample-TypeSpec", @{})
+    $launchSettings["profiles"]["Sample-TypeSpec"].Add("commandLineArgs", "`$(SolutionDir)/$sampleSpec -g ScmCodeModelGenerator")
+    $launchSettings["profiles"]["Sample-TypeSpec"].Add("commandName", "Executable")
+    $launchSettings["profiles"]["Sample-TypeSpec"].Add("executablePath", $mtgExe)
+    $launchSettings["profiles"].Add("Sample-Service", @{})
+    $launchSettings["profiles"]["Sample-Service"].Add("commandLineArgs", "`$(SolutionDir)/../../../docs/samples/client/csharp/SampleService/main.tsp -g ScmCodeModelGenerator")
+    $launchSettings["profiles"]["Sample-Service"].Add("commandName", "Executable")
+    $launchSettings["profiles"]["Sample-Service"].Add("executablePath", $mtgExe)
 
-    foreach ($kvp in $cadlRanchLaunchProjects.GetEnumerator()) {
+    foreach ($kvp in $spectorLaunchProjects.GetEnumerator()) {
         $launchSettings["profiles"].Add($kvp.Key, @{})
-        $launchSettings["profiles"][$kvp.Key].Add("commandLineArgs", "`$(SolutionDir)/$($kvp.Value) -p StubLibraryPlugin")
+        $launchSettings["profiles"][$kvp.Key].Add("commandLineArgs", "`$(SolutionDir)/$($kvp.Value) -g StubLibraryGenerator")
         $launchSettings["profiles"][$kvp.Key].Add("commandName", "Executable")
-        $launchSettings["profiles"][$kvp.Key].Add("executablePath", $mgcExe)
+        $launchSettings["profiles"][$kvp.Key].Add("executablePath", $mtgExe)
     }
 
     $sortedLaunchSettings = @{}
@@ -187,6 +162,12 @@ if ($null -eq $filter) {
     }
 
     # Write the launch settings to the launchSettings.json file
-    $launchSettingsPath = Join-Path $solutionDir "Microsoft.Generator.CSharp" "src" "Properties" "launchSettings.json"
-    $sortedLaunchSettings | ConvertTo-Json | Set-Content $launchSettingsPath
+    Set-LaunchSettings $sortedLaunchSettings
 }
+
+# Stop total timer
+$totalStopwatch.Stop()
+
+# Display timing summary
+Write-Host "`n==================== TIMING SUMMARY ====================" -ForegroundColor Cyan
+Write-Host "Total execution time: $($totalStopwatch.Elapsed.ToString('hh\:mm\:ss\.ff'))" -ForegroundColor Yellow

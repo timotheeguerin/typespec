@@ -4,6 +4,7 @@ import { Model, StringTemplate } from "../../src/index.js";
 import {
   BasicTestRunner,
   createTestRunner,
+  expectDiagnosticEmpty,
   expectDiagnostics,
   extractSquiggles,
 } from "../../src/testing/index.js";
@@ -16,7 +17,7 @@ beforeEach(async () => {
 
 async function compileStringTemplate(
   templateString: string,
-  other?: string
+  other?: string,
 ): Promise<StringTemplate> {
   const { Test } = (await runner.compile(
     `
@@ -25,7 +26,7 @@ async function compileStringTemplate(
       }
 
       ${other ?? ""}
-      `
+      `,
   )) as { Test: Model };
 
   const prop = Test.properties.get("test")!.type;
@@ -76,12 +77,24 @@ it("can interpolate a model", async () => {
   strictEqual(template.spans[2].type.value, " end");
 });
 
+// Regression test for https://github.com/microsoft/typespec/issues/7401
+it("can use empty string to interpolate in tempalates", async () => {
+  const diagnostics = await runner.diagnose(
+    `
+    @doc("\${T} strange")
+    model Test<T extends valueof string> {}
+    model B is Test<"">;
+    `,
+  );
+  expectDiagnosticEmpty(diagnostics);
+});
+
 it("emit error if interpolating value and types", async () => {
   const diagnostics = await runner.diagnose(
     `
     const str1 = "hi";
     alias str2 = "\${str1} and \${string}";
-    `
+    `,
   );
   expectDiagnostics(diagnostics, {
     code: "mixed-string-template",

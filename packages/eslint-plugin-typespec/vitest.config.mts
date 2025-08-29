@@ -1,5 +1,5 @@
 import { defineConfig, mergeConfig } from "vitest/config";
-import { defaultTypeSpecVitestConfig } from "../../vitest.workspace.js";
+import { defaultTypeSpecVitestConfig } from "../../vitest.config.js";
 
 export default mergeConfig(
   defaultTypeSpecVitestConfig,
@@ -7,5 +7,5 @@ export default mergeConfig(
     test: {
       setupFiles: ["./test/global-setup.ts"],
     },
-  })
+  }),
 );

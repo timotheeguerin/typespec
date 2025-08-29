@@ -1,5 +1,7 @@
 import { fail, match, strictEqual } from "assert";
-import { Diagnostic, NoTarget, Type, formatDiagnostic, getSourceLocation } from "../core/index.js";
+import { getSourceLocation } from "../core/diagnostics.js";
+import { formatDiagnostic } from "../core/logger/console-sink.js";
+import { NoTarget, type Diagnostic } from "../core/types.js";
 import { isArray } from "../utils/misc.js";
 import { resolveVirtualPath } from "./test-utils.js";
 
@@ -14,7 +16,7 @@ export function expectDiagnosticEmpty(diagnostics: readonly Diagnostic[]) {
 }
 
 function formatDiagnostics(diagnostics: readonly Diagnostic[]) {
-  return diagnostics.map(formatDiagnostic).join("\n");
+  return diagnostics.map((x) => formatDiagnostic(x)).join("\n");
 }
 /**
  * Condition to match
@@ -60,15 +62,15 @@ export function expectDiagnostics(
   match: DiagnosticMatch | DiagnosticMatch[],
   options = {
     strict: true,
-  }
+  },
 ) {
   const array = isArray(match) ? match : [match];
 
   if (options.strict && array.length !== diagnostics.length) {
     fail(
       `Expected ${array.length} diagnostics but found ${diagnostics.length}:\n ${formatDiagnostics(
-        diagnostics
-      )}`
+        diagnostics,
+      )}`,
     );
   }
   for (let i = 0; i < array.length; i++) {
@@ -80,7 +82,7 @@ export function expectDiagnostics(
       strictEqual(
         diagnostic.code,
         expectation.code,
-        `Diagnostic at index ${i} has non matching code.\n${message}`
+        `Diagnostic at index ${i} has non matching code.\n${message}`,
       );
     }
 
@@ -88,14 +90,14 @@ export function expectDiagnostics(
       matchStrOrRegex(
         diagnostic.message,
         expectation.message,
-        `Diagnostic at index ${i} has non matching message.\n${message}`
+        `Diagnostic at index ${i} has non matching message.\n${message}`,
       );
     }
     if (expectation.severity !== undefined) {
       strictEqual(
         diagnostic.severity,
         expectation.severity,
-        `Diagnostic at index ${i} has non matching severity.\n${message}`
+        `Diagnostic at index ${i} has non matching severity.\n${message}`,
       );
     }
     if (
@@ -114,7 +116,7 @@ export function expectDiagnostics(
           typeof expectation.file === "string"
             ? resolveVirtualPath(expectation.file)
             : expectation.file,
-          `Diagnostics at index ${i} has non matching file.\n${message}`
+          `Diagnostics at index ${i} has non matching file.\n${message}`,
         );
       }
 
@@ -122,7 +124,7 @@ export function expectDiagnostics(
         strictEqual(
           source.pos,
           expectation.pos,
-          `Diagnostic at index ${i} has non-matching start position.`
+          `Diagnostic at index ${i} has non-matching start position.`,
         );
       }
 
@@ -130,7 +132,7 @@ export function expectDiagnostics(
         strictEqual(
           source.end,
           expectation.end,
-          `Diagnostic at index ${i} has non-matching end position.`
+          `Diagnostic at index ${i} has non-matching end position.`,
         );
       }
     }
@@ -142,18 +144,5 @@ function matchStrOrRegex(value: string, expectation: string | RegExp, assertMess
     strictEqual(value, expectation, assertMessage);
   } else {
     match(value, expectation, assertMessage);
-  }
-}
-
-/**
- * Replacement for strictEqual for identity check against types. strictEqual
- * does a really slow deep comparison for the error message when it fails in
- * order to show the diff. Just show the type names instead.
- */
-export function expectIdenticalTypes(a: Type, b: Type) {
-  if (a !== b) {
-    // Note: `||` instead of `??` is intentional to allow for anonymous types with name = `""`
-    strictEqual((a as any).name || "(anonymous type 1)", (b as any).name || "(anonymous type 2)");
-    fail(`Types are both named "${(a as any).name}", but they are not identical.`);
   }
 }
