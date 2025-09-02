@@ -2448,7 +2448,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     const target = resolver.getNodeLinks(opReference).resolvedSymbol;
 
     // Did we encounter a circular operation reference?
-    if (pendingResolutions.has(target, ResolutionKind.BaseType)) {
+    if (target && pendingResolutions.has(target, ResolutionKind.BaseType)) {
       if (mapper === undefined) {
         reportCheckerDiagnostic(
           createDiagnostic({
@@ -2464,7 +2464,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     }
 
     // Resolve the base operation type
-    const baseOperation = checkTypeReferenceSymbol(target, opReference, mapper);
+    const baseOperation = checkTypeReferenceSymbol(target as any, opReference, mapper);
     if (sym) {
       pendingResolutions.finish(sym, ResolutionKind.BaseType);
     }
@@ -4581,7 +4581,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     }
     pendingResolutions.start(model.symbol, ResolutionKind.BaseType);
 
-    const target = resolveTypeReferenceSym(heritageRef, mapper);
+    const target = resolveTypeReferenceSym(heritageRef as any, mapper);
     if (target === undefined) {
       return undefined;
     }
@@ -4599,7 +4599,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       pendingResolutions.finish(model.symbol, ResolutionKind.BaseType);
       return undefined;
     }
-    const heritageType = checkTypeReferenceSymbol(target, heritageRef, mapper);
+    const heritageType = checkTypeReferenceSymbol(target, heritageRef as any, mapper);
     pendingResolutions.finish(model.symbol, ResolutionKind.BaseType);
     if (isErrorType(heritageType)) {
       compilerAssert(program.hasError(), "Should already have reported an error.", heritageRef);
@@ -5328,7 +5328,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
 
     const target = resolver.getNodeLinks(extendsRef).resolvedSymbol;
 
-    if (pendingResolutions.has(target, ResolutionKind.BaseType)) {
+    if (target && pendingResolutions.has(target, ResolutionKind.BaseType)) {
       if (mapper === undefined) {
         reportCheckerDiagnostic(
           createDiagnostic({
@@ -5341,7 +5341,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       pendingResolutions.finish(scalar.symbol, ResolutionKind.BaseType);
       return undefined;
     }
-    const extendsType = checkTypeReferenceSymbol(target, extendsRef, mapper);
+    const extendsType = checkTypeReferenceSymbol(target as any, extendsRef, mapper);
     pendingResolutions.finish(scalar.symbol, ResolutionKind.BaseType);
     if (isErrorType(extendsType)) {
       compilerAssert(program.hasError(), "Should already have reported an error.", extendsRef);
