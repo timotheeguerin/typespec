@@ -12,7 +12,7 @@ import {
 } from "../module-resolver/module-resolver.js";
 import { PackageJson } from "../types/package-json.js";
 import { findProjectRoot } from "../utils/io.js";
-import { deepEquals, isDefined, mapEquals, mutate } from "../utils/misc.js";
+import { deepEquals, isDefined, mutate } from "../utils/misc.js";
 import { createBinder } from "./binder.js";
 import { Checker, createChecker } from "./checker.js";
 import { createSuppressCodeFix } from "./compiler-code-fixes/suppress.codefix.js";
@@ -134,6 +134,9 @@ export interface Program {
    * Project root. If a tsconfig was found/specified this is the directory for the tsconfig.json. Otherwise directory where the entrypoint is located.
    */
   readonly projectRoot: string;
+
+  /** @internal Main type graph. */
+  readonly typeGraph: TypeGraph;
 }
 
 interface EmitterRef {
@@ -202,6 +205,203 @@ export async function compile(
   return program;
 }
 
+interface TypeGraph {
+  readonly globalNamespace: Namespace;
+  /** Complexity statistics  */
+  readonly complexityStats: ComplexityStats;
+  /** Runtime statistics  */
+  readonly runtimeStats: RuntimeStats;
+
+  /**
+   * Checker used
+   * @internal
+   */
+  readonly checker: Checker;
+
+  /** @internal */
+  sourceResolution: SourceResolution;
+
+  /** @internal */
+  resolveTypeReference(reference: string): [Type | undefined, readonly Diagnostic[]];
+  /** @internal */
+  resolveTypeOrValueReference(reference: string): [Entity | undefined, readonly Diagnostic[]];
+}
+
+async function createTypeGraph(
+  program: Program,
+  resolvedMain: string,
+  options: CompilerOptions,
+  sourceFileCache: Map<string, TypeSpecScriptNode> | undefined,
+): Promise<TypeGraph> {
+  const host = program.host;
+  const binder = createBinder(program);
+  const runtimeStats: Partial<RuntimeStats> = {};
+  const complexityStats: ComplexityStats = {} as any;
+
+  const sourceLoader = await createSourceLoader(host, {
+    parseOptions: options.parseOptions,
+    tracer: program.tracer,
+    getCachedScript: (file) => sourceFileCache?.get(file.path) ?? host.parseCache?.get(file),
+  });
+
+  const typeGraph: TypeGraph = {
+    globalNamespace: undefined!,
+    checker: undefined!,
+    complexityStats,
+    runtimeStats: runtimeStats as any,
+    sourceResolution: sourceLoader.resolution,
+    resolveTypeReference,
+    resolveTypeOrValueReference,
+  };
+  mutate(program).typeGraph = typeGraph;
+
+  runtimeStats.loader = await timeAsync(() => loadSources(sourceLoader, resolvedMain));
+
+  const resolver = createResolver(program);
+
+  program.resolver = resolver; // Update the current resolver for back compat
+  runtimeStats.resolver = time(() => resolver.resolveProgram());
+  const checker = createChecker(program, resolver);
+  mutate(typeGraph).checker = checker;
+  mutate(typeGraph).globalNamespace = checker.getGlobalNamespaceType();
+  program.checker = checker; // Update current checker for back compat
+
+  runtimeStats.checker = time(() => checker.checkProgram());
+
+  complexityStats.createdTypes = checker.stats.createdTypes;
+  complexityStats.finishedTypes = checker.stats.finishedTypes;
+  await validateLoadedLibraries(sourceLoader);
+
+  return typeGraph;
+  /**
+   * Validate the libraries loaded during the compilation process are compatible.
+   */
+  async function validateLoadedLibraries(sourceLoader: SourceLoader) {
+    const loadedRoots = new Set<string>();
+    // Check all the files that were loaded
+    for (const fileUrl of getLibraryUrlsLoaded()) {
+      if (fileUrl.startsWith("file:")) {
+        const root = await findProjectRoot(host.stat, host.fileURLToPath(fileUrl));
+        if (root) {
+          loadedRoots.add(root);
+        }
+      }
+    }
+
+    const libraries = new Map([...sourceLoader.resolution.loadedLibraries.entries()]);
+    const incompatibleLibraries = new Map<string, TypeSpecLibraryReference[]>();
+    for (const root of loadedRoots) {
+      const packageJsonPath = joinPaths(root, "package.json");
+      try {
+        const packageJson: PackageJson = JSON.parse((await host.readFile(packageJsonPath)).text);
+        if (packageJson.name) {
+          const found = libraries.get(packageJson.name);
+          if (found && found.path !== root && found.manifest.version !== packageJson.version) {
+            let incompatibleIndex: TypeSpecLibraryReference[] | undefined =
+              incompatibleLibraries.get(packageJson.name);
+            if (incompatibleIndex === undefined) {
+              incompatibleIndex = [found];
+              incompatibleLibraries.set(packageJson.name, incompatibleIndex);
+            }
+            incompatibleIndex.push({ path: root, manifest: packageJson });
+          }
+        }
+      } catch {}
+    }
+
+    for (const [name, incompatibleLibs] of incompatibleLibraries) {
+      program.reportDiagnostic(
+        createDiagnostic({
+          code: "incompatible-library",
+          format: {
+            name: name,
+            versionMap: incompatibleLibs
+              .map((x) => `  - Version: "${x.manifest.version}" installed at "${x.path}"`)
+              .join("\n"),
+          },
+          target: NoTarget,
+        }),
+      );
+    }
+  }
+
+  async function loadSources(sourceLoader: SourceLoader, entrypoint: string) {
+    // intrinsic.tsp
+    await loadIntrinsicTypes(sourceLoader);
+
+    // standard library
+    if (!options?.nostdlib) {
+      await loadStandardLibrary(sourceLoader);
+    }
+
+    // main entrypoint
+    await sourceLoader.importFile(entrypoint, NoTarget, { type: "project" }, "entrypoint");
+
+    // additional imports
+    for (const additionalImport of options?.additionalImports ?? []) {
+      await sourceLoader.importPath(additionalImport, NoTarget, getDirectoryPath(entrypoint), {
+        type: "project",
+      });
+    }
+
+    const sourceResolution = sourceLoader.resolution;
+
+    program.sourceFiles = sourceResolution.sourceFiles;
+    program.jsSourceFiles = sourceResolution.jsSourceFiles;
+
+    // Bind
+    for (const file of sourceResolution.sourceFiles.values()) {
+      binder.bindSourceFile(file);
+    }
+    for (const jsFile of sourceResolution.jsSourceFiles.values()) {
+      binder.bindJsSourceFile(jsFile);
+    }
+    program.reportDiagnostics(sourceResolution.diagnostics);
+  }
+
+  async function loadIntrinsicTypes(loader: SourceLoader) {
+    const locationContext: LocationContext = { type: "compiler" };
+    return loader.importFile(
+      resolvePath(host.getExecutionRoot(), "lib/intrinsics.tsp"),
+      NoTarget,
+      locationContext,
+    );
+  }
+
+  async function loadStandardLibrary(loader: SourceLoader) {
+    const locationContext: LocationContext = { type: "compiler" };
+    for (const dir of host.getLibDirs()) {
+      await loader.importFile(resolvePath(dir, "main.tsp"), NoTarget, locationContext);
+    }
+  }
+
+  function resolveTypeReference(reference: string): [Type | undefined, readonly Diagnostic[]] {
+    const [node, parseDiagnostics] = parseStandaloneTypeReference(reference);
+    if (parseDiagnostics.length > 0) {
+      return [undefined, parseDiagnostics];
+    }
+    const binder = createBinder(program);
+    binder.bindNode(node);
+    mutate(node).parent = resolver.symbols.global.declarations[0];
+    resolver.resolveTypeReference(node);
+    return program.checker.resolveTypeReference(node);
+  }
+
+  function resolveTypeOrValueReference(
+    reference: string,
+  ): [Entity | undefined, readonly Diagnostic[]] {
+    const [node, parseDiagnostics] = parseStandaloneTypeReference(reference);
+    if (parseDiagnostics.length > 0) {
+      return [undefined, parseDiagnostics];
+    }
+    const binder = createBinder(program);
+    binder.bindNode(node);
+    mutate(node).parent = resolver.symbols.global.declarations[0];
+    resolver.resolveTypeReference(node);
+    return program.checker.resolveTypeOrValueReference(node);
+  }
+}
+
 async function createProgram(
   host: CompilerHost,
   mainFile: string,
@@ -217,7 +417,6 @@ async function createProgram(
   const emitters: EmitterRef[] = [];
   const requireImports = new Map<string, string>();
   const complexityStats: ComplexityStats = {} as any;
-  let sourceResolution: SourceResolution;
   let error = false;
   let continueToNextStage = true;
 
@@ -227,6 +426,7 @@ async function createProgram(
   const program: Program = {
     checker: undefined!,
     resolver: undefined!,
+    typeGraph: undefined!,
     compilerOptions: resolveOptions(options),
     sourceFiles: new Map(),
     jsSourceFiles: new Map(),
@@ -268,7 +468,6 @@ async function createProgram(
   function trace(area: string, message: string) {
     tracer.trace(area, message);
   }
-  const binder = createBinder(program);
 
   if (resolvedMain === undefined) {
     return { program, shouldAbort: true };
@@ -276,26 +475,12 @@ async function createProgram(
   const basedir = getDirectoryPath(resolvedMain) || "/";
   await checkForCompilerVersionMismatch(basedir);
 
-  runtimeStats.loader = await timeAsync(() => loadSources(resolvedMain));
+  const binder = createBinder(program);
 
   const emit = options.noEmit ? [] : (options.emit ?? []);
   const emitterOptions = options.options;
 
   await loadEmitters(basedir, emit, emitterOptions ?? {});
-
-  if (
-    oldProgram &&
-    mapEquals(oldProgram.sourceFiles, program.sourceFiles) &&
-    deepEquals(oldProgram.compilerOptions, program.compilerOptions)
-  ) {
-    return { program: oldProgram, shouldAbort: true };
-  }
-
-  // let GC reclaim old program, we do not reuse it beyond this point.
-  oldProgram = undefined;
-
-  const resolver = (program.resolver = createResolver(program));
-  runtimeStats.resolver = time(() => resolver.resolveProgram());
 
   const linter = createLinter(program, (name) => loadLibrary(basedir, name));
   linter.registerLinterLibrary(builtInLinterLibraryName, createBuiltInLinterLibrary());
@@ -303,11 +488,19 @@ async function createProgram(
     program.reportDiagnostics(await linter.extendRuleSet(options.linterRuleSet));
   }
 
-  program.checker = createChecker(program, resolver);
-  runtimeStats.checker = time(() => program.checker.checkProgram());
+  // if (
+  //   oldProgram &&
+  //   mapEquals(oldProgram.sourceFiles, program.sourceFiles) &&
+  //   deepEquals(oldProgram.compilerOptions, program.compilerOptions)
+  // ) {
+  //   return { program: oldProgram, shouldAbort: true };
+  // }
 
-  complexityStats.createdTypes = program.checker.stats.createdTypes;
-  complexityStats.finishedTypes = program.checker.stats.finishedTypes;
+  // let GC reclaim old program, we do not reuse it beyond this point.
+  const typeGraph = await createTypeGraph(program, resolvedMain, options, oldProgram?.sourceFiles);
+  oldProgram = undefined;
+  program.checker = typeGraph.checker;
+  Object.assign(complexityStats, typeGraph.complexityStats);
 
   if (!continueToNextStage) {
     return { program, shouldAbort: true };
@@ -317,8 +510,6 @@ async function createProgram(
   await runValidators();
 
   validateRequiredImports();
-
-  await validateLoadedLibraries();
 
   if (!continueToNextStage) {
     return { program, shouldAbort: true };
@@ -330,115 +521,6 @@ async function createProgram(
   program.reportDiagnostics(lintResult.diagnostics);
 
   return { program, shouldAbort: false };
-
-  /**
-   * Validate the libraries loaded during the compilation process are compatible.
-   */
-  async function validateLoadedLibraries() {
-    const loadedRoots = new Set<string>();
-    // Check all the files that were loaded
-    for (const fileUrl of getLibraryUrlsLoaded()) {
-      if (fileUrl.startsWith("file:")) {
-        const root = await findProjectRoot(host.stat, host.fileURLToPath(fileUrl));
-        if (root) {
-          loadedRoots.add(root);
-        }
-      }
-    }
-
-    const libraries = new Map([...sourceResolution.loadedLibraries.entries()]);
-    const incompatibleLibraries = new Map<string, TypeSpecLibraryReference[]>();
-    for (const root of loadedRoots) {
-      const packageJsonPath = joinPaths(root, "package.json");
-      try {
-        const packageJson: PackageJson = JSON.parse((await host.readFile(packageJsonPath)).text);
-        if (packageJson.name) {
-          const found = libraries.get(packageJson.name);
-          if (found && found.path !== root && found.manifest.version !== packageJson.version) {
-            let incompatibleIndex: TypeSpecLibraryReference[] | undefined =
-              incompatibleLibraries.get(packageJson.name);
-            if (incompatibleIndex === undefined) {
-              incompatibleIndex = [found];
-              incompatibleLibraries.set(packageJson.name, incompatibleIndex);
-            }
-            incompatibleIndex.push({ path: root, manifest: packageJson });
-          }
-        }
-      } catch {}
-    }
-
-    for (const [name, incompatibleLibs] of incompatibleLibraries) {
-      reportDiagnostic(
-        createDiagnostic({
-          code: "incompatible-library",
-          format: {
-            name: name,
-            versionMap: incompatibleLibs
-              .map((x) => `  - Version: "${x.manifest.version}" installed at "${x.path}"`)
-              .join("\n"),
-          },
-          target: NoTarget,
-        }),
-      );
-    }
-  }
-
-  async function loadSources(entrypoint: string) {
-    const sourceLoader = await createSourceLoader(host, {
-      parseOptions: options.parseOptions,
-      tracer,
-      getCachedScript: (file) =>
-        oldProgram?.sourceFiles.get(file.path) ?? host.parseCache?.get(file),
-    });
-
-    // intrinsic.tsp
-    await loadIntrinsicTypes(sourceLoader);
-
-    // standard library
-    if (!options?.nostdlib) {
-      await loadStandardLibrary(sourceLoader);
-    }
-
-    // main entrypoint
-    await sourceLoader.importFile(entrypoint, NoTarget, { type: "project" }, "entrypoint");
-
-    // additional imports
-    for (const additionalImport of options?.additionalImports ?? []) {
-      await sourceLoader.importPath(additionalImport, NoTarget, getDirectoryPath(entrypoint), {
-        type: "project",
-      });
-    }
-
-    sourceResolution = sourceLoader.resolution;
-
-    program.sourceFiles = sourceResolution.sourceFiles;
-    program.jsSourceFiles = sourceResolution.jsSourceFiles;
-
-    // Bind
-    for (const file of sourceResolution.sourceFiles.values()) {
-      binder.bindSourceFile(file);
-    }
-    for (const jsFile of sourceResolution.jsSourceFiles.values()) {
-      binder.bindJsSourceFile(jsFile);
-    }
-    program.reportDiagnostics(sourceResolution.diagnostics);
-  }
-
-  async function loadIntrinsicTypes(loader: SourceLoader) {
-    const locationContext: LocationContext = { type: "compiler" };
-    return loader.importFile(
-      resolvePath(host.getExecutionRoot(), "lib/intrinsics.tsp"),
-      NoTarget,
-      locationContext,
-    );
-  }
-
-  async function loadStandardLibrary(loader: SourceLoader) {
-    const locationContext: LocationContext = { type: "compiler" };
-    for (const dir of host.getLibDirs()) {
-      await loader.importFile(resolvePath(dir, "main.tsp"), NoTarget, locationContext);
-    }
-  }
 
   async function loadTypeSpecScript(file: SourceFile): Promise<TypeSpecScriptNode> {
     // This is not a diagnostic because the compiler should never reuse the same path.
@@ -465,7 +547,7 @@ async function createProgram(
   }
 
   function getSourceFileLocationContext(sourcefile: SourceFile): LocationContext {
-    const locationContext = sourceResolution.locationContexts.get(sourcefile);
+    const locationContext = program.typeGraph.sourceResolution.locationContexts.get(sourcefile);
     compilerAssert(locationContext, "SourceFile should have a declaration locationContext.");
     return locationContext;
   }
@@ -670,7 +752,7 @@ async function createProgram(
 
   function validateRequiredImports() {
     for (const [requiredImport, emitterName] of requireImports) {
-      if (!sourceResolution.loadedLibraries.has(requiredImport)) {
+      if (!typeGraph.sourceResolution.loadedLibraries.has(requiredImport)) {
         program.reportDiagnostic(
           createDiagnostic({
             code: "missing-import",
@@ -934,29 +1016,13 @@ async function createProgram(
   }
 
   function resolveTypeReference(reference: string): [Type | undefined, readonly Diagnostic[]] {
-    const [node, parseDiagnostics] = parseStandaloneTypeReference(reference);
-    if (parseDiagnostics.length > 0) {
-      return [undefined, parseDiagnostics];
-    }
-    const binder = createBinder(program);
-    binder.bindNode(node);
-    mutate(node).parent = resolver.symbols.global.declarations[0];
-    resolver.resolveTypeReference(node);
-    return program.checker.resolveTypeReference(node);
+    return program.typeGraph.resolveTypeReference(reference);
   }
 
   function resolveTypeOrValueReference(
     reference: string,
   ): [Entity | undefined, readonly Diagnostic[]] {
-    const [node, parseDiagnostics] = parseStandaloneTypeReference(reference);
-    if (parseDiagnostics.length > 0) {
-      return [undefined, parseDiagnostics];
-    }
-    const binder = createBinder(program);
-    binder.bindNode(node);
-    mutate(node).parent = resolver.symbols.global.declarations[0];
-    resolver.resolveTypeReference(node);
-    return program.checker.resolveTypeOrValueReference(node);
+    return program.typeGraph.resolveTypeOrValueReference(reference);
   }
 }
 

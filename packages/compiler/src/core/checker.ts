@@ -356,9 +356,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
   const pendingResolutions = new PendingResolutions();
 
   const typespecNamespaceBinding = resolver.symbols.global.exports!.get("TypeSpec");
-  if (typespecNamespaceBinding) {
-    initializeTypeSpecIntrinsics();
-  }
+  initializeTypeSpecIntrinsics();
 
   /**
    * Tracking the template parameters used or not.
