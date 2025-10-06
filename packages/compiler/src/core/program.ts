@@ -638,6 +638,15 @@ async function createProgram(
       }
     }
     if (emitFunction !== undefined) {
+      // TODO-TIM reuse the module resolution logic for m more robust resolution.
+      const optionsEntrypoint =
+        library.module.type === "module" &&
+        (library.module.manifest.exports as any)?.["./options"]?.["typespec"];
+      if (optionsEntrypoint) {
+        const fullPath = resolvePath(library.module.path, optionsEntrypoint);
+        const typeGraph = await createTypeGraph(program, fullPath, options, program.sourceFiles);
+      }
+
       if (libDefinition?.emitter?.options) {
         const diagnostics = libDefinition?.emitterOptionValidator?.validate(
           emitterOptions,
