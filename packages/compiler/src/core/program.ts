@@ -16,6 +16,7 @@ import { createBinder } from "./binder.js";
 import { Checker, createChecker } from "./checker.js";
 import { createSuppressCodeFix } from "./compiler-code-fixes/suppress.codefix.js";
 import { compilerAssert } from "./diagnostics.js";
+import { resolveEmitterOptions } from "./emitter-options.js";
 import { flushEmittedFilesPaths } from "./emitter-utils.js";
 import { resolveTypeSpecEntrypoint } from "./entrypoint-resolution.js";
 import { ExternalError } from "./external-error.js";
@@ -204,7 +205,7 @@ export async function compile(
   return program;
 }
 
-interface TypeGraph {
+export interface TypeGraph {
   readonly globalNamespace: Namespace;
   /** Complexity statistics  */
   readonly complexityStats: ComplexityStats;
@@ -216,6 +217,11 @@ interface TypeGraph {
    * @internal
    */
   readonly checker: Checker;
+
+  /**
+   * Entry point of that type graph
+   */
+  readonly entrypoint: string;
 
   /** @internal */
   sourceResolution: SourceResolution;
@@ -244,6 +250,7 @@ async function createTypeGraph(
   });
 
   const typeGraph: TypeGraph = {
+    entrypoint: resolvedMain,
     globalNamespace: undefined!,
     checker: undefined!,
     complexityStats,
@@ -644,6 +651,8 @@ async function createProgram(
       if (optionsEntrypoint) {
         const fullPath = resolvePath(library.module.path, optionsEntrypoint);
         const typeGraph = await createTypeGraph(program, fullPath, options, program.sourceFiles);
+        const [model, diagnostics] = resolveEmitterOptions(typeGraph);
+        program.reportDiagnostics(diagnostics);
       }
 
       if (libDefinition?.emitter?.options) {

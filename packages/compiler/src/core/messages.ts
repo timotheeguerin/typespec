@@ -688,6 +688,18 @@ const diagnostics = {
         "Value interpolated in this string template cannot be converted to a string. Only literal types can be automatically interpolated.",
     },
   },
+  "missing-emitter-options": {
+    severity: "error",
+    messages: {
+      default: "Emitter options should export an `EmitterOptions` model at the top level.",
+    },
+  },
+  "emitter-options-not-model": {
+    severity: "error",
+    messages: {
+      default: "Emitter options should be a model type.",
+    },
+  },
 
   /**
    * Binder
