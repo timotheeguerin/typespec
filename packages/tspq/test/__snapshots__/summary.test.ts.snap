@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renders summary output 1`] = `
+Services (1)
+- Widget Service (Widget) [1 ops]
+Operations (2)
+- globalOp
+- listWidgets
+Models (1)
+- Widget
+Enums (1)
+- Kind
+Unions (1)
+- Choice
+Scalars (1)
+- WidgetId
+Interfaces (1)
+- WidgetOps
+Namespaces (1)
+- Widget
+`;
+
+exports[`renders type view output 1`] = `
+Type: Widget
+Kind: Model
+Namespace: Widget
+Description: Widget model
+Location: <path>:<line>:<col> (project)
+
+Details
+Base model: (none)
+Derived models: (none)
+Properties:
+- id: string
+- name?: string
+
+Decorator State
+(none)
+`;
