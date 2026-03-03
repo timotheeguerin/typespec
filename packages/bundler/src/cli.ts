@@ -39,6 +39,18 @@ async function main() {
           })
           .option("output-dir", {
             type: "string",
+          })
+          .option("contained-dependencies", {
+            type: "array",
+            string: true,
+            description:
+              "Dependency prefixes to bundle in even if they are peer dependencies (e.g. @alloy-js/).",
+          })
+          .option("platform", {
+            type: "string",
+            choices: ["browser", "node"] as const,
+            default: "browser",
+            description: "Target platform for the bundle.",
           });
       },
       async (args) => {
@@ -46,6 +58,10 @@ async function main() {
         await bundleTypeSpecLibrary(
           resolvedRoot,
           args["output-dir"] ?? resolvePath(resolvedRoot, "out/browser"),
+          {
+            containedDependencies: args["contained-dependencies"],
+            platform: args.platform as "browser" | "node",
+          },
         );
       },
     )

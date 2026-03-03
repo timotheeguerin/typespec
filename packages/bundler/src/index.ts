@@ -4,5 +4,6 @@ export {
   TypeSpecBundle,
   TypeSpecBundleDefinition,
   TypeSpecBundleFile,
+  bundleTypeSpecLibrary,
   createTypeSpecBundle,
 } from "./bundler.js";

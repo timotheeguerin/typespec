@@ -62,6 +62,7 @@
     "@microsoft/api-extractor-model": "^7.33.2",
     "@microsoft/tsdoc": "^0.16.0",
     "@microsoft/tsdoc-config": "^0.18.0",
+    "@typespec/bundler": "workspace:^",
     "@typespec/compiler": "workspace:^",
     "picocolors": "~1.1.1",
     "prettier": "~3.8.0",

@@ -6,7 +6,8 @@
   "readme": "https://github.com/microsoft/typespec/blob/main/packages/http-client-js/README.md",
   "main": "dist/src/index.js",
   "scripts": {
-    "build": "alloy build",
+    "build": "alloy build && npm run build:contained",
+    "build:contained": "tspd bundle-contained . --enable-experimental",
     "clean": "rimraf ./dist",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
@@ -27,6 +28,7 @@
   },
   "exports": {
     ".": {
+      "typespec-contained": "./dist/contained/index.js",
       "import": "./dist/src/index.js"
     },
     "./testing": {

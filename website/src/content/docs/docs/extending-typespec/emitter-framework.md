@@ -218,3 +218,67 @@ It also adds the following typekits:
 - **httpPart**: reflect on HTTP parts
 - **httpRequest**: reflect on the request of HTTP operations
 - **httpResponse**: reflect on the response of HTTP operations
+
+## Contained emitter bundles
+
+Because the emitter framework is based on [alloy](https://alloy-framework.github.io/alloy), which maintains global state (similar to React), only one version of `@alloy-js/core` can be active in a given process. This creates conflicts when multiple emitter-framework-based emitters are loaded simultaneously — for example, in the playground or when a user compiles with two different alloy-based emitters at the CLI.
+
+To solve this, emitters can produce a **contained bundle** that internalizes singleton dependencies like `@alloy-js/core`. Each emitter gets its own copy of alloy within its own module scope, and the bundler automatically namespaces alloy's `globalThis.__ALLOY__` singleton guard so that multiple contained bundles can coexist without triggering alloy's duplicate detection.
+
+### Creating a contained bundle
+
+Use the `tspd bundle-contained` command to produce a self-contained emitter bundle:
+
+```bash
+tspd bundle-contained . --enable-experimental
+```
+
+This will:
+
+1. Auto-detect singleton dependencies (e.g. `@alloy-js/*`) from your `package.json`
+2. Bundle them into a single output under `dist/contained/`
+3. Keep true peer dependencies (like `@typespec/compiler`) external
+
+You can also specify dependencies explicitly:
+
+```bash
+tspd bundle-contained . --enable-experimental --contained-dependencies @alloy-js/ @typespec/emitter-framework
+```
+
+### Configuring your package.json
+
+Add the `"typespec-contained"` export condition so the compiler can discover the contained bundle:
+
+```json
+{
+  "exports": {
+    ".": {
+      "typespec-contained": "./dist/contained/index.js",
+      "import": "./dist/src/index.js"
+    }
+  }
+}
+```
+
+And add a build step to produce the contained bundle alongside the normal output:
+
+```json
+{
+  "scripts": {
+    "build": "alloy build && npm run build:contained",
+    "build:contained": "tspd bundle-contained . --enable-experimental"
+  }
+}
+```
+
+### Loading contained emitters
+
+When the compiler option `useContainedEmitters` is enabled, the compiler will prefer the `"typespec-contained"` export condition when resolving emitters. This causes each emitter to load from its contained bundle, with alloy-js isolated inside.
+
+```yaml
+# tspconfig.yaml
+options:
+  useContainedEmitters: true
+```
+
+Emitters without a contained bundle will fall back to normal resolution.

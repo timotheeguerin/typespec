@@ -16,6 +16,12 @@ export interface TypeSpecBundlePluginOptions {
    * Name of libraries to bundle.
    */
   readonly libraries: readonly string[];
+
+  /**
+   * Bundle options passed through to the underlying bundler.
+   * The `minify` property is automatically set based on the Vite mode.
+   */
+  readonly bundleOptions?: Omit<CreateTypeSpecBundleOptions, "minify">;
 }
 
 export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plugin {
@@ -33,7 +39,10 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
       // Minify only in production mode
       const minify = config.command === "build";
       for (const name of options.libraries) {
-        const bundle = await bundleLibrary(config.root, name, { minify });
+        const bundle = await bundleLibrary(config.root, name, {
+          ...options.bundleOptions,
+          minify,
+        });
         bundles[name] = bundle;
         definitions[name] = bundle.definition;
       }
@@ -91,7 +100,7 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
             definitions[library] = bundle.definition;
             server.ws.send({ type: "full-reload" });
           },
-          { minify: false },
+          { ...options.bundleOptions, minify: false },
         );
       }
     },

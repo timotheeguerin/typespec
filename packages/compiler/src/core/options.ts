@@ -68,6 +68,14 @@ export interface CompilerOptions {
   /** Ruleset to enable for linting. */
   linterRuleSet?: LinterRuleSet;
 
+  /**
+   * Use contained emitter bundles when available.
+   * When enabled, emitters that provide a `"typespec-contained"` export condition
+   * will be loaded from their self-contained bundle, which internalizes singleton
+   * dependencies like `@alloy-js/core` to avoid conflicts between emitters.
+   */
+  useContainedEmitters?: boolean;
+
   /** @internal */
   readonly configFile?: TypeSpecConfig;
 }

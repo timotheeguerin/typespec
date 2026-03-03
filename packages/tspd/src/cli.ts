@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+import { bundleTypeSpecLibrary } from "@typespec/bundler";
 import { NodeHost, logDiagnostics, resolvePath } from "@typespec/compiler";
 import pc from "picocolors";
 import yargs from "yargs";
@@ -130,7 +131,100 @@ async function main() {
         }
       },
     )
+    .command(
+      "bundle-contained <entrypoint>",
+      "Create a self-contained emitter bundle with singleton dependencies internalized.",
+      (cmd) => {
+        return cmd
+          .positional("entrypoint", {
+            description: "Path to the emitter package root.",
+            type: "string",
+            demandOption: true,
+          })
+          .option("output-dir", {
+            type: "string",
+            description:
+              "Output directory for the contained bundle. Defaults to dist/contained under the entrypoint.",
+          })
+          .option("contained-dependencies", {
+            type: "array",
+            string: true,
+            description:
+              "Dependency prefixes to bundle in (e.g. @alloy-js/). Auto-detected from package.json if not specified.",
+          })
+          .option("platform", {
+            type: "string",
+            choices: ["browser", "node"] as const,
+            default: "node",
+            description: "Target platform for the bundle.",
+          });
+      },
+      async (args) => {
+        const resolvedRoot = resolvePath(process.cwd(), args.entrypoint);
+        const outputDir = args["output-dir"] ?? resolvePath(resolvedRoot, "dist/contained");
+
+        // Auto-detect contained dependencies if not specified
+        let containedDependencies = args["contained-dependencies"];
+        if (!containedDependencies || containedDependencies.length === 0) {
+          containedDependencies = await detectContainedDependencies(resolvedRoot);
+          if (containedDependencies.length > 0) {
+            console.log(
+              `Auto-detected contained dependencies: ${containedDependencies.join(", ")}`,
+            );
+          }
+        }
+
+        console.log(`Bundling ${resolvedRoot} → ${outputDir}`);
+        console.log(`Platform: ${args.platform}`);
+        console.log(`Contained dependencies: ${containedDependencies.join(", ") || "(none)"}`);
+
+        await bundleTypeSpecLibrary(resolvedRoot, outputDir, {
+          containedDependencies,
+          platform: args.platform as "browser" | "node",
+          minify: true,
+        });
+        console.log(`Bundle created at ${outputDir}`);
+      },
+    )
     .demandCommand(1, "You must use one of the supported commands.").argv;
+}
+
+/** Well-known singleton dependency prefixes that should be contained. */
+const wellKnownSingletonPrefixes = ["@alloy-js/"];
+
+/**
+ * Auto-detect dependencies that should be contained by looking at the
+ * package.json's dependencies for well-known singleton packages.
+ */
+async function detectContainedDependencies(packageRoot: string): Promise<string[]> {
+  try {
+    const { readFile } = await import("fs/promises");
+    const { join } = await import("path");
+    const pkg = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf-8"));
+    const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const contained: string[] = [];
+
+    for (const prefix of wellKnownSingletonPrefixes) {
+      if (Object.keys(allDeps).some((dep) => dep.startsWith(prefix))) {
+        contained.push(prefix);
+      }
+    }
+
+    // If we found singleton deps, also contain emitter-framework and http-client
+    // since they re-export alloy-js types
+    if (contained.length > 0) {
+      if (allDeps["@typespec/emitter-framework"]) {
+        contained.push("@typespec/emitter-framework");
+      }
+      if (allDeps["@typespec/http-client"]) {
+        contained.push("@typespec/http-client");
+      }
+    }
+
+    return contained;
+  } catch {
+    return [];
+  }
 }
 
 function internalError(error: unknown): never {

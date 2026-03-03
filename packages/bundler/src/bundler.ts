@@ -76,6 +76,29 @@ export interface CreateTypeSpecBundleOptions {
    * @default false
    */
   gzip?: boolean;
+
+  /**
+   * List of dependency name prefixes that should be bundled INTO the output
+   * even if they appear as peer dependencies.
+   *
+   * This is used to create "contained" emitter bundles where singleton
+   * dependencies like `@alloy-js/core` are internalized so that multiple
+   * emitters using different versions can coexist in the same process.
+   *
+   * @example ["@alloy-js/", "@typespec/emitter-framework", "@typespec/http-client"]
+   * @default ["@alloy-js/", "@typespec/emitter-framework", "@typespec/http-client"]
+   */
+  containedDependencies?: string[];
+
+  /**
+   * Target platform for the bundle.
+   *
+   * - `"browser"`: Includes Node.js polyfills for browser compatibility (default).
+   * - `"node"`: Targets Node.js directly, skips polyfills.
+   *
+   * @default "browser"
+   */
+  platform?: "browser" | "node";
 }
 
 export async function createTypeSpecBundle(
@@ -159,12 +182,26 @@ async function resolveTypeSpecBundleDefinition(
   };
 }
 
+/**
+ * Default dependency prefixes that are always bundled in rather than externalized.
+ * These packages use singleton global state and must be contained to avoid
+ * conflicts when multiple emitters coexist in the same process.
+ */
+const defaultContainedDependencies = [
+  "@alloy-js/",
+  "@typespec/emitter-framework",
+  "@typespec/http-client",
+];
+
 async function createEsBuildContext(
   definition: TypeSpecBundleDefinition,
   plugins: Plugin[] = [],
   options?: CreateTypeSpecBundleOptions,
 ) {
   const minify = options?.minify ?? true;
+  const containedDependencies =
+    options?.containedDependencies ?? defaultContainedDependencies;
+  const targetPlatform = options?.platform ?? "browser";
   const libraryPath = definition.path;
   const program = await compile(NodeHost, libraryPath, {
     noEmit: true,
@@ -209,7 +246,9 @@ async function createEsBuildContext(
         };
       });
       build.onResolve({ filter: /.*/ }, (args) => {
+        const isContained = containedDependencies.some((x) => args.path.startsWith(x));
         if (
+          !isContained &&
           definition.packageJson.peerDependencies &&
           Object.keys(definition.packageJson.peerDependencies).some((x) => args.path.startsWith(x))
         ) {
@@ -226,6 +265,34 @@ async function createEsBuildContext(
       });
     },
   };
+
+  // When containing alloy-js, namespace its globalThis.__ALLOY__ singleton
+  // guard so that multiple contained bundles can coexist in the same process.
+  const alloySingletonPlugin: Plugin = {
+    name: "alloy-singleton-namespace",
+    setup(build) {
+      build.onLoad({ filter: /reactivity\.[jt]s$/ }, async (args) => {
+        if (!args.path.includes("@alloy-js/core")) return undefined;
+        const source = await readFile(args.path, "utf-8");
+        const namespaceKey = `__ALLOY_${definition.packageJson.name.replace(/[^a-zA-Z0-9]/g, "_")}__`;
+        const patched = source.replaceAll("__ALLOY__", namespaceKey);
+        return {
+          contents: patched,
+          loader: args.path.endsWith(".ts") ? "ts" : "js",
+        };
+      });
+    },
+  };
+
+  const esbuildPlugins = [virtualPlugin];
+  if (containedDependencies.some((x) => "@alloy-js/".startsWith(x) || x.startsWith("@alloy-js/"))) {
+    esbuildPlugins.push(alloySingletonPlugin);
+  }
+  if (targetPlatform === "browser") {
+    esbuildPlugins.push(nodeModulesPolyfillPlugin({}));
+  }
+  esbuildPlugins.push(...plugins);
+
   return await context({
     write: false,
     entryPoints: {
@@ -235,11 +302,11 @@ async function createEsBuildContext(
     bundle: true,
     splitting: true,
     outdir: "out",
-    platform: "browser",
+    platform: targetPlatform === "browser" ? "browser" : "node",
     format: "esm",
     target: "es2024",
     minify,
-    plugins: [virtualPlugin, nodeModulesPolyfillPlugin({}), ...plugins],
+    plugins: esbuildPlugins,
   });
 }
 

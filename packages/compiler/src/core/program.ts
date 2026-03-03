@@ -696,10 +696,13 @@ async function createProgram(
     locationContext: LocationContext,
   ): Promise<[ModuleResolutionResult | undefined, readonly Diagnostic[]]> {
     try {
+      const conditions = options.useContainedEmitters
+        ? ["typespec-contained", "import"]
+        : ["import"];
       return [
         await resolveModule(createResolveModuleHost(host), specifier, {
           baseDir,
-          conditions: ["import"],
+          conditions,
         }),
         [],
       ];
