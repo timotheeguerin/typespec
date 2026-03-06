@@ -1970,6 +1970,9 @@ importers:
       '@fluentui/react-icons':
         specifier: ^2.0.292
         version: 2.0.319(react@19.2.4)
+      '@typespec/react-components':
+        specifier: workspace:^
+        version: link:../react-components
       '@typespec/spec-coverage-sdk':
         specifier: workspace:^
         version: link:../spec-coverage-sdk
@@ -2579,6 +2582,9 @@ importers:
       '@typespec/playground':
         specifier: workspace:^
         version: link:../packages/playground
+      '@typespec/react-components':
+        specifier: workspace:^
+        version: link:../packages/react-components
       astro:
         specifier: ^5.16.5
         version: 5.18.0(@azure/identity@4.13.0)(@azure/storage-blob@12.31.0)(@types/node@25.3.0)(rollup@4.49.0)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)

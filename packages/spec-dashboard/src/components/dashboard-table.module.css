@@ -1,29 +1,34 @@
-.table {
-  border-collapse: collapse;
+.dashboard-tree {
+  border: 1px solid var(--colorNeutralStroke3);
 }
 
-.table tr:nth-of-type(2n) {
+.dashboard-tree > div:nth-child(even) {
   background-color: var(--colorNeutralBackground3);
 }
 
-.table td,
-.table th {
-  border: 1px solid var(--colorNeutralStroke3);
-  height: 32px;
-}
-
-.table th {
-  padding: 6px 13px;
-  background-color: var(--colorNeutralBackground1);
+.dashboard-tree > div {
+  border-bottom: 1px solid var(--colorNeutralStroke3);
+  min-height: 32px;
+  line-height: 32px;
+  font-size: 13px;
 }
 
 .scenario-status-cell {
   padding: 0;
   width: 120px;
+  height: 100%;
+}
+
+.header-label {
+  padding: 6px 13px;
+  background-color: var(--colorNeutralBackground1);
+  font-weight: bold;
+  border-bottom: 1px solid var(--colorNeutralStroke3);
 }
 
 .header-cell {
-  padding: 0 !important;
+  background-color: var(--colorNeutralBackground1);
+  border-bottom: 1px solid var(--colorNeutralStroke3);
 }
 
 .header-grid {

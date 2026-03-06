@@ -1,3 +1,4 @@
+import { mergeClasses } from "@fluentui/react-components";
 import {
   useCallback,
   useEffect,
@@ -6,12 +7,13 @@ import {
   useState,
   type FC,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import { useControllableValue } from "../hooks.js";
 import { useTreeControls } from "./tree-control.js";
 import { TreeViewRow } from "./tree-row.js";
 import style from "./tree.module.css";
-import type { TreeNode, TreeRow } from "./types.js";
+import type { TreeNode, TreeRow, TreeRowColumn } from "./types.js";
 
 export interface TreeProps<T extends TreeNode> {
   /**
@@ -25,6 +27,12 @@ export interface TreeProps<T extends TreeNode> {
   readonly onSelect?: (id: string) => void;
   readonly expanded?: Set<string>;
   readonly onSetExpanded?: (id: Set<string>) => void;
+  /** Additional columns to render alongside each tree row. */
+  readonly columns?: Array<TreeRowColumn<T>>;
+  /** Optional header content rendered above the tree rows. */
+  readonly header?: ReactNode;
+  /** Optional CSS class name for the tree container. */
+  readonly className?: string;
 }
 
 export function Tree<T extends TreeNode>({
@@ -34,6 +42,9 @@ export function Tree<T extends TreeNode>({
   onSetExpanded,
   nodeIcon,
   selectionMode = "none",
+  columns,
+  header,
+  className,
 }: TreeProps<T>) {
   const id = useId();
   const { expanded, toggleExpand, expand, collapse } = useTreeControls({
@@ -103,10 +114,16 @@ export function Tree<T extends TreeNode>({
     [setFocusedIndex, focusedIndex, rows, activateRow, expand, collapse],
   );
 
+  const hasColumns = columns && columns.length > 0;
+  const gridStyle = hasColumns
+    ? { gridTemplateColumns: `1fr ${columns.map(() => "auto").join(" ")}` }
+    : undefined;
+
   return (
     <div
       id={id}
-      className={style["tree"]}
+      className={mergeClasses(style["tree"], hasColumns && style["tree-grid"], className)}
+      style={gridStyle}
       tabIndex={0}
       role="tree"
       onKeyDown={handleKeyDown}
@@ -117,6 +134,7 @@ export function Tree<T extends TreeNode>({
       onBlur={() => setFocusedIndex(-1)}
       aria-activedescendant={`${id}-${focusedIndex}`}
     >
+      {header}
       {rows.map((row) => {
         return (
           <TreeViewRow
@@ -127,6 +145,7 @@ export function Tree<T extends TreeNode>({
             row={row}
             active={selectionMode === "single" && row.id === selectedKey}
             activate={activateRow}
+            columns={columns as Array<TreeRowColumn<any>>}
           />
         );
       })}

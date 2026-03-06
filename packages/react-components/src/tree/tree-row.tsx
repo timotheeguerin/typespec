@@ -17,38 +17,56 @@ export interface TreeViewRowProps {
   readonly activate: (row: TreeRow<any>) => void;
 }
 
-export function TreeViewRow({ id, row, active, focussed, activate, icon: Icon }: TreeViewRowProps) {
+export function TreeViewRow({
+  id,
+  row,
+  active,
+  focussed,
+  activate,
+  icon: Icon,
+  columns,
+}: TreeViewRowProps) {
   const paddingLeft = row.depth * INDENT_SIZE;
 
   const onClick = useCallback(() => activate(row), [activate, row]);
   return (
-    <div
-      id={id}
-      role="treeitem"
-      style={{ paddingLeft }}
-      className={mergeClasses(
-        style["tree-row"],
-        active && style["active"],
-        focussed && style["focus"],
-      )}
-      aria-selected={active}
-      aria-expanded={row.expanded}
-      aria-posinset={row.localIndex}
-      aria-level={row.depth}
-      onClick={onClick}
-    >
-      <span className={style["caret"]}>
-        <Caret row={row} />
-      </span>
-      {Icon && (
-        <span className={style["icon"]}>
-          <Icon node={row.item} />
+    <>
+      <div
+        id={id}
+        role="treeitem"
+        style={{ paddingLeft }}
+        className={mergeClasses(
+          style["tree-row"],
+          active && style["active"],
+          focussed && style["focus"],
+        )}
+        aria-selected={active}
+        aria-expanded={row.expanded}
+        aria-posinset={row.localIndex}
+        aria-level={row.depth}
+        onClick={onClick}
+      >
+        <span className={style["caret"]}>
+          <Caret row={row} />
         </span>
-      )}
-      <span className="label" title={row.item.name}>
-        {row.item.name}
-      </span>
-    </div>
+        {Icon && (
+          <span className={style["icon"]}>
+            <Icon node={row.item} />
+          </span>
+        )}
+        <span
+          className="label"
+          title={typeof row.item.name === "string" ? row.item.name : undefined}
+        >
+          {row.item.name}
+        </span>
+      </div>
+      {columns?.map((col, i) => (
+        <div key={i} className={style["tree-column"]}>
+          {col.render(row)}
+        </div>
+      ))}
+    </>
   );
 }
 

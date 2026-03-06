@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { Tree } from "./tree.js";
-import type { TreeNode } from "./types.js";
+import type { TreeNode, TreeRowColumn } from "./types.js";
 
 const simpleTree: TreeNode = {
   id: "$",
@@ -109,4 +109,41 @@ it("use up down arrow to navigate", async () => {
   fireEvent.keyDown(treeNode, { key: "ArrowDown", code: "ArrowDown" });
   fireEvent.keyDown(treeNode, { key: "ArrowDown", code: "ArrowDown" });
   expect(treeNode).toHaveAttribute("aria-activedescendant", nodes[0].id);
+});
+
+it("renders columns alongside tree rows", async () => {
+  const columns: TreeRowColumn<TreeNode>[] = [
+    { render: (row) => <span data-testid={`col-${row.id}`}>Status: {row.id}</span> },
+  ];
+  render(<Tree tree={simpleTree} columns={columns} />);
+  const nodes = await screen.findAllByRole("treeitem");
+  expect(nodes).toHaveLength(2);
+  // Column cells should render for each visible row
+  expect(screen.getByTestId("col-$.child1")).toHaveTextContent("Status: $.child1");
+  expect(screen.getByTestId("col-$.child2")).toHaveTextContent("Status: $.child2");
+});
+
+it("columns update when nodes expand", async () => {
+  const columns: TreeRowColumn<TreeNode>[] = [
+    { render: (row) => <span data-testid={`col-${row.id}`}>{row.id}</span> },
+  ];
+  render(<Tree tree={simpleTree} columns={columns} />);
+  fireEvent.click(await screen.findByText("Child 1"));
+  const nodes = await screen.findAllByRole("treeitem");
+  expect(nodes).toHaveLength(5);
+  // All expanded rows should have column cells
+  expect(screen.getByTestId("col-$.child1.1")).toBeInTheDocument();
+  expect(screen.getByTestId("col-$.child1.2")).toBeInTheDocument();
+  expect(screen.getByTestId("col-$.child1.3")).toBeInTheDocument();
+});
+
+it("renders header when provided", async () => {
+  render(<Tree tree={simpleTree} header={<div data-testid="tree-header">Header Content</div>} />);
+  expect(screen.getByTestId("tree-header")).toHaveTextContent("Header Content");
+});
+
+it("applies className to the tree container", async () => {
+  render(<Tree tree={simpleTree} className="custom-class" />);
+  const tree = await screen.findByRole("tree");
+  expect(tree.className).toContain("custom-class");
 });

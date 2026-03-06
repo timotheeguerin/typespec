@@ -38,6 +38,7 @@
   "dependencies": {
     "@fluentui/react-components": "~9.73.1",
     "@fluentui/react-icons": "^2.0.292",
+    "@typespec/react-components": "workspace:^",
     "@typespec/spec-coverage-sdk": "workspace:^",
     "react": "~19.2.3",
     "react-dom": "~19.2.3",

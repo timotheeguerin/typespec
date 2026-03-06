@@ -1,56 +1,25 @@
 import { mergeClasses, Popover, PopoverSurface, PopoverTrigger } from "@fluentui/react-components";
 import { CodeBlock16Filled, Print16Filled } from "@fluentui/react-icons";
-import { ScenarioManifest } from "@typespec/spec-coverage-sdk";
-import { FunctionComponent, useCallback, useMemo, useState } from "react";
+import { Tree, type TreeNode, type TreeRowColumn } from "@typespec/react-components";
+import { ScenarioData, ScenarioManifest } from "@typespec/spec-coverage-sdk";
+import { FunctionComponent, useMemo } from "react";
 import { CoverageSummary, GeneratorCoverageSuiteReport } from "../apis.js";
 import { getCompletedRatio } from "../utils/coverage-utils.js";
 import style from "./dashboard-table.module.css";
 import { GeneratorInformation } from "./generator-information.js";
 import { ScenarioGroupRatioStatusBox } from "./scenario-group-status.js";
+import { ScenarioLabel } from "./scenario-label.js";
 import { ScenarioStatusBox } from "./scenario-status.js";
-import { RowLabelCell } from "./tree-table/row-label-cell.js";
-import { ManifestTreeNode, TreeTableRow } from "./tree-table/types.js";
 
 export interface DashboardTableProps {
   coverageSummary: CoverageSummary;
   emitterDisplayNames?: Record<string, string>;
 }
 
-function buildTreeRows(
-  node: ManifestTreeNode,
-  expandedRows: Record<string, boolean>,
-  toggleExpand: (key: string) => void,
-  depth = 0,
-): TreeTableRow[] {
-  const rows: TreeTableRow[] = [];
-  if (!node.children) {
-    return [];
-  }
-  for (const child of Object.values(node.children)) {
-    const hasChildren = Boolean(child.children && Object.keys(child.children).length > 0);
-    const key = child.fullName;
-
-    const expanded = expandedRows[key] ?? false;
-    rows.push({
-      key,
-      item: child,
-      expanded,
-      depth,
-      hasChildren,
-      index: -1,
-      toggleExpand: () => toggleExpand(key),
-    });
-    if (hasChildren && expanded) {
-      for (const row of buildTreeRows(child, expandedRows, toggleExpand, depth + 1)) {
-        rows.push(row);
-      }
-    }
-  }
-  for (const [index, row] of rows.entries()) {
-    row.index = index;
-    row.key = index.toString();
-  }
-  return rows;
+interface DashboardTreeNode extends TreeNode {
+  readonly fullName: string;
+  readonly scenario?: ScenarioData;
+  readonly children?: DashboardTreeNode[];
 }
 
 export const DashboardTable: FunctionComponent<DashboardTableProps> = ({
@@ -60,78 +29,57 @@ export const DashboardTable: FunctionComponent<DashboardTableProps> = ({
   const languages: string[] = Object.keys(coverageSummary.generatorReports) as any;
   const tree = useMemo(() => createTree(coverageSummary.manifest), [coverageSummary.manifest]);
 
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  const toggleExpand = useCallback(
-    (key: string) => {
-      setExpandedRows((state) => {
-        return { ...state, [key]: !state[key] };
-      });
-    },
-    [setExpandedRows],
+  const columns: TreeRowColumn<DashboardTreeNode>[] = useMemo(
+    () =>
+      languages.map((lang) => ({
+        render: (row) => {
+          const scenarioData = row.item.scenario;
+          return (
+            <div className={style["scenario-status-cell"]}>
+              {scenarioData ? (
+                <ScenarioStatusBox
+                  status={coverageSummary.generatorReports[lang]?.results[scenarioData.name]}
+                />
+              ) : (
+                <ScenarioGroupStatusCell
+                  coverageSummary={coverageSummary}
+                  group={row.item.fullName}
+                  lang={lang}
+                />
+              )}
+            </div>
+          );
+        },
+      })),
+    [languages, coverageSummary],
   );
-  const treeRows = useMemo(() => {
-    return buildTreeRows(tree, expandedRows, toggleExpand);
-  }, [tree, expandedRows, toggleExpand]);
 
-  const rows = treeRows.map((x) => {
-    return (
-      <DashboardRow key={x.key} coverageSummary={coverageSummary} languages={languages} row={x} />
-    );
-  });
+  const header = useMemo(
+    () => (
+      <DashboardHeaderRow
+        coverageSummary={coverageSummary}
+        emitterDisplayNames={emitterDisplayNames}
+      />
+    ),
+    [coverageSummary, emitterDisplayNames],
+  );
 
   return (
-    <table className={style["table"]}>
-      <thead>
-        <DashboardHeaderRow
-          coverageSummary={coverageSummary}
-          emitterDisplayNames={emitterDisplayNames}
-        />
-      </thead>
-      <tbody>{rows}</tbody>
-    </table>
+    <Tree<DashboardTreeNode>
+      tree={tree}
+      columns={columns}
+      header={header}
+      className={style["dashboard-tree"]}
+    />
   );
 };
 
-export interface DashboardRowProps {
-  row: TreeTableRow;
-  languages: string[];
-  coverageSummary: CoverageSummary;
-}
-
-const DashboardRow: FunctionComponent<DashboardRowProps> = ({
-  row,
-  languages,
-  coverageSummary,
-}) => {
-  const scenarioData = row.item.scenario;
-  return (
-    <tr>
-      <RowLabelCell manifest={coverageSummary.manifest} row={row} />
-      {languages.map((lang) => (
-        <td key={lang} className={style["scenario-status-cell"]}>
-          {scenarioData ? (
-            <ScenarioStatusBox
-              status={coverageSummary.generatorReports[lang]?.results[scenarioData.name]}
-            />
-          ) : (
-            <ScenarioGroupStatusBox
-              coverageSummary={coverageSummary}
-              group={row.item.fullName}
-              lang={lang}
-            />
-          )}
-        </td>
-      ))}
-    </tr>
-  );
-};
-
-interface ScenarioGroupStatusBoxProps {
+interface ScenarioGroupStatusCellProps {
   coverageSummary: CoverageSummary;
   lang: string;
   group: string;
 }
-const ScenarioGroupStatusBox: FunctionComponent<ScenarioGroupStatusBoxProps> = ({
+const ScenarioGroupStatusCell: FunctionComponent<ScenarioGroupStatusCellProps> = ({
   lang,
   coverageSummary,
   group,
@@ -158,12 +106,12 @@ const DashboardHeaderRow: FunctionComponent<DashboardHeaderRowProps> = ({
     }
     return [language, getCompletedRatio(coverageSummary.manifest.scenarios, report), report];
   });
-  const tableHeader = (
-    <th>{coverageSummary.tableName || coverageSummary.manifest.displayName || "Specs"} </th>
-  );
+
   return (
-    <tr>
-      {tableHeader}
+    <>
+      <div className={style["header-label"]}>
+        {coverageSummary.tableName || coverageSummary.manifest.displayName || "Specs"}
+      </div>
       {data.map(([lang, status, report]) => (
         <GeneratorHeaderCell
           key={lang}
@@ -173,7 +121,7 @@ const DashboardHeaderRow: FunctionComponent<DashboardHeaderRowProps> = ({
           displayName={emitterDisplayNames?.[lang as string]}
         />
       ))}
-    </tr>
+    </>
   );
 };
 
@@ -191,7 +139,7 @@ export const GeneratorHeaderCell: FunctionComponent<GeneratorHeaderCellProps> = 
   displayName,
 }) => {
   return (
-    <th className={style["header-cell"]}>
+    <div className={style["header-cell"]}>
       <div className={style["header-grid"]}>
         <div title="Generator name" className={style["header-name"]}>
           <Popover withArrow>
@@ -208,7 +156,6 @@ export const GeneratorHeaderCell: FunctionComponent<GeneratorHeaderCellProps> = 
           className={mergeClasses(style["version"], style["gen-version"])}
         >
           <Print16Filled className={style["version-icon"]} />
-
           {report?.generatorMetadata?.version ?? "?"}
         </div>
         <div
@@ -222,17 +169,24 @@ export const GeneratorHeaderCell: FunctionComponent<GeneratorHeaderCellProps> = 
           <ScenarioGroupRatioStatusBox ratio={status} />
         </div>
       </div>
-    </th>
+    </div>
   );
 };
 
-function createTree(manifest: ScenarioManifest): ManifestTreeNode {
-  const root: ManifestTreeNode = { name: "", fullName: "", children: {} };
+function createTree(manifest: ScenarioManifest): DashboardTreeNode {
+  interface BuildNode {
+    name: string;
+    fullName: string;
+    scenario?: ScenarioData;
+    children: Record<string, BuildNode>;
+  }
+
+  const root: BuildNode = { name: "", fullName: "", children: {} };
 
   const sortedScenarios = [...manifest.scenarios].sort((a, b) => a.name.localeCompare(b.name));
   for (const scenario of sortedScenarios) {
     const segments = scenario.name.split("_");
-    let current: ManifestTreeNode = root;
+    let current: BuildNode = root;
 
     for (const [index, segment] of segments.entries()) {
       if (!(segment in current.children)) {
@@ -248,5 +202,44 @@ function createTree(manifest: ScenarioManifest): ManifestTreeNode {
     current.scenario = scenario;
   }
 
-  return root;
+  return convertToTreeNode(root, manifest);
+}
+
+function convertToTreeNode(
+  node: { name: string; fullName: string; scenario?: ScenarioData; children: Record<string, any> },
+  manifest: ScenarioManifest,
+): DashboardTreeNode {
+  const childEntries = Object.values(node.children);
+  const children =
+    childEntries.length > 0
+      ? childEntries.map((child) => convertToTreeNode(child, manifest))
+      : undefined;
+
+  const hasChildren = children && children.length > 0;
+  const label = hasChildren ? (
+    <ScenarioLabel
+      name={node.name}
+      manifest={manifest}
+      scenario={node.scenario}
+      childCount={countLeafChildren(node)}
+    />
+  ) : (
+    <ScenarioLabel name={node.name} manifest={manifest} scenario={node.scenario} />
+  );
+
+  return {
+    id: node.fullName || "$root",
+    name: label,
+    fullName: node.fullName,
+    scenario: node.scenario,
+    children,
+  };
+}
+
+function countLeafChildren(node: { children: Record<string, any> }): number {
+  const entries = Object.values(node.children);
+  if (entries.length === 0) {
+    return 1;
+  }
+  return entries.reduce((acc: number, child: any) => acc + countLeafChildren(child), 0);
 }

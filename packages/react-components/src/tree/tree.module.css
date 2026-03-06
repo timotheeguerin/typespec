@@ -1,9 +1,14 @@
 .tree {
   outline: none;
 }
+
+.tree-grid {
+  display: grid;
+}
+
 .tree-row {
   cursor: pointer;
-  display: block;
+  display: flex;
   height: 22px;
   line-height: 22px;
   user-select: none;
@@ -11,7 +16,6 @@
   overflow: hidden;
   white-space: nowrap;
   font-size: 12px;
-  display: flex;
 }
 
 .tree-row:hover,
@@ -43,4 +47,9 @@
 
 .tree-row .column:last-child {
   margin-right: 5px;
+}
+
+.tree-column {
+  display: flex;
+  align-items: center;
 }
