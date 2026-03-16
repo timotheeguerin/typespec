@@ -43,7 +43,7 @@ describe("http: routes", () => {
           }
         `);
 
-        expectRouteIncluded(routes, ["/"]);
+        expectRouteIncluded(routes, [""]);
       });
 
       it("generic operation at the document root are NOT included", async () => {
@@ -89,7 +89,7 @@ describe("http: routes", () => {
           `,
         );
 
-        expectRouteIncluded(routes, ["/"]);
+        expectRouteIncluded(routes, [""]);
       });
 
       it("operation at the root of the document are NOT included", async () => {
@@ -118,7 +118,7 @@ describe("http: routes", () => {
           }`,
         );
 
-        expectRouteIncluded(routes, ["/"]);
+        expectRouteIncluded(routes, [""]);
       });
 
       it("operation in namespace in the service namespace are be included", async () => {
@@ -133,7 +133,7 @@ describe("http: routes", () => {
           `,
         );
 
-        expectRouteIncluded(routes, ["/"]);
+        expectRouteIncluded(routes, [""]);
       });
 
       it("operation in a different namespace are not included", async () => {
@@ -282,7 +282,7 @@ describe("http: routes", () => {
       `,
     );
 
-    deepStrictEqual(routes, [{ verb: "get", path: "/", params: [] }]);
+    deepStrictEqual(routes, [{ verb: "get", path: "", params: [] }]);
   });
 
   it("keeps trailing / at the end of the route", async () => {

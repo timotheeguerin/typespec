@@ -251,7 +251,7 @@ describe("rest: routes", () => {
       `,
       );
       strictEqual(ops[0].verb, "get");
-      strictEqual(ops[0].path, "/");
+      strictEqual(ops[0].path, "");
       strictEqual(ops[1].verb, "get");
       strictEqual(ops[1].path, "/my");
     });
@@ -278,7 +278,7 @@ describe("rest: routes", () => {
       strictEqual(ops[1].path, "/my");
       strictEqual(ops[1].container.kind, "Interface");
       strictEqual(ops[0].verb, "get");
-      strictEqual(ops[0].path, "/");
+      strictEqual(ops[0].path, "");
       strictEqual(ops[0].container.kind, "Namespace");
     });
 

@@ -19,14 +19,14 @@ it("allows a deeply nested @body", async () => {
       op get(data: {nested: { @body param2: string }}): string;
     `);
 
-  deepStrictEqual(routes, [{ verb: "post", params: [], path: "/" }]);
+  deepStrictEqual(routes, [{ verb: "post", params: [], path: "" }]);
 });
 it("allows a deeply nested @bodyRoot", async () => {
   const routes = await getRoutesFor(`
       op get(data: {nested: { @bodyRoot param2: string }}): string;
     `);
 
-  deepStrictEqual(routes, [{ verb: "post", params: [], path: "/" }]);
+  deepStrictEqual(routes, [{ verb: "post", params: [], path: "" }]);
 });
 
 // Test for https://github.com/microsoft/typespec/issues/8667

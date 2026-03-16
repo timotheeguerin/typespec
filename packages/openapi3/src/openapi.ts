@@ -755,7 +755,9 @@ function createOAPIEmitter(
       for (const op of resolveOperations(httpService.operations)) {
         const result = getOperationOrSharedOperation(op);
         if (result) {
-          const { operation, path, verb } = result;
+          const { operation, path: rawPath, verb } = result;
+          // OpenAPI3 paths must start with '/', so default empty path to '/'
+          const path = rawPath === "" ? "/" : rawPath;
           currentPath[path] ??= {};
           currentPath[path][verb] = operation;
         }

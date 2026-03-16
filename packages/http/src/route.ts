@@ -58,7 +58,11 @@ export function joinPathSegments(rest: string[]) {
 
 function buildPath(pathFragments: string[]) {
   // Join all fragments with leading and trailing slashes trimmed
-  const path = pathFragments.length === 0 ? "/" : joinPathSegments(pathFragments);
+  const path = pathFragments.length === 0 ? "" : joinPathSegments(pathFragments);
+
+  if (path === "") {
+    return path;
+  }
 
   // The final path must start with a '/', {/ (path expansion), or an allowed segment separator
   return AllowedSegmentSeparators.includes(path[0]) || (path[0] === "{" && path[1] === "/")
