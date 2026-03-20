@@ -22,7 +22,7 @@ import { PlaygroundContextProvider } from "./context/playground-context.js";
 import { debugGlobals, printDebugInfo } from "./debug.js";
 import { DefaultFooter } from "./default-footer.js";
 import { EditorPanel } from "./editor-panel/editor-panel.js";
-import { useMonacoModel, type OnMountData } from "./editor.js";
+import { type OnMountData } from "./editor.js";
 import { OutputView } from "./output-view/output-view.js";
 import style from "./playground.module.css";
 import { ProblemPane } from "./problem-pane/index.js";
@@ -86,11 +86,17 @@ export interface PlaygroundEditorsOptions {
 }
 
 export interface PlaygroundSaveData extends PlaygroundState {
-  /** Current content of the playground.   */
+  /** Current content of the playground (active file content for backward compat). */
   content: string;
 
   /** Emitter name. */
   emitter: string;
+
+  /** All files in the playground. */
+  files?: Record<string, string>;
+
+  /** Currently active file. */
+  activeFile?: string;
 }
 
 /**
@@ -152,7 +158,6 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
     debugGlobals().host = host;
   }, [host]);
 
-  const typespecModel = useMonacoModel("inmemory://test/main.tsp", "typespec");
   const [compilationState, setCompilationState] = useState<CompilationState | undefined>(undefined);
 
   // Use the playground state hook
@@ -175,72 +180,125 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
     selectedViewer,
     viewerState,
     content,
+    files,
+    activeFile,
     onSelectedEmitterChange,
     onCompilerOptionsChange,
     onSelectedSampleNameChange,
     onSelectedViewerChange,
     onViewerStateChange,
     onContentChange,
+    addFile,
+    removeFile,
+    renameFile,
+    updateFileContent,
+    onActiveFileChange,
   } = state;
 
-  // Sync Monaco model with state content
-  useEffect(() => {
-    if (typespecModel.getValue() !== (content ?? "")) {
-      typespecModel.setValue(content ?? "");
-    }
-  }, [content, typespecModel]);
+  // Dynamic Monaco model management
+  const modelsRef = useRef<Map<string, editor.IModel>>(new Map());
+  const updateFileContentRef = useRef(updateFileContent);
+  updateFileContentRef.current = updateFileContent;
 
-  // Update state when Monaco model changes
+  const getOrCreateModel = useCallback((filePath: string, fileContent: string): editor.IModel => {
+    const existing = modelsRef.current.get(filePath);
+    if (existing && !existing.isDisposed()) {
+      return existing;
+    }
+    const uri = Uri.parse(`inmemory://test/${filePath}`);
+    const existingByUri = editor.getModel(uri);
+    if (existingByUri) {
+      modelsRef.current.set(filePath, existingByUri);
+      return existingByUri;
+    }
+    const model = editor.createModel(fileContent, "typespec", uri);
+    modelsRef.current.set(filePath, model);
+    return model;
+  }, []);
+
+  // Sync Monaco models with files state
   useEffect(() => {
-    const disposable = typespecModel.onDidChangeContent(() => {
-      const newContent = typespecModel.getValue();
-      if (newContent !== content) {
-        onContentChange(newContent);
+    for (const [filePath, fileContent] of Object.entries(files)) {
+      const model = getOrCreateModel(filePath, fileContent);
+      if (model.getValue() !== fileContent) {
+        model.setValue(fileContent);
       }
-    });
-    return () => disposable.dispose();
-  }, [typespecModel, content, onContentChange]);
+    }
+    // Dispose models that no longer exist
+    for (const [filePath, model] of modelsRef.current.entries()) {
+      if (!(filePath in files)) {
+        model.dispose();
+        modelsRef.current.delete(filePath);
+      }
+    }
+  }, [files, getOrCreateModel]);
+
+  // Get current active model
+  const activeModel = useMemo(() => {
+    return getOrCreateModel(activeFile, files[activeFile] ?? "");
+  }, [activeFile, files, getOrCreateModel]);
 
   const isSampleUntouched = useMemo(() => {
     return Boolean(selectedSampleName && content === props.samples?.[selectedSampleName]?.content);
   }, [content, selectedSampleName, props.samples]);
 
   const doCompile = useCallback(async () => {
-    const currentContent = typespecModel.getValue();
     const typespecCompiler = host.compiler;
 
-    const state = await compile(host, currentContent, selectedEmitter, compilerOptions);
-    setCompilationState(state);
-    if ("program" in state) {
-      const markers: editor.IMarkerData[] = state.program.diagnostics.map((diag) => ({
-        ...getMonacoRange(typespecCompiler, diag.target),
-        message: diag.message,
-        severity: diag.severity === "error" ? MarkerSeverity.Error : MarkerSeverity.Warning,
-        tags: diag.code === "deprecated" ? [CompletionItemTag.Deprecated] : undefined,
-      }));
-
+    const compilationResult = await compile(host, files, selectedEmitter, compilerOptions);
+    setCompilationState(compilationResult);
+    if ("program" in compilationResult) {
       // Update code action provider with current diagnostics (for codefix support).
-      updateDiagnosticsForCodeFixes(typespecCompiler, state.program.diagnostics);
+      updateDiagnosticsForCodeFixes(typespecCompiler, compilationResult.program.diagnostics);
 
       // Set the program on the window.
-      debugGlobals().program = state.program;
-      debugGlobals().$$ = $(state.program);
+      debugGlobals().program = compilationResult.program;
+      debugGlobals().$$ = $(compilationResult.program);
 
-      editor.setModelMarkers(typespecModel, "owner", markers ?? []);
+      // Set markers for each file model
+      for (const [filePath, model] of modelsRef.current.entries()) {
+        const fileDiags = compilationResult.program.diagnostics.filter((diag) => {
+          if (!diag.target || typeof diag.target === "symbol" || !("file" in diag.target)) {
+            return filePath === "main.tsp";
+          }
+          const diagPath = diag.target.file.path;
+          return diagPath === resolveVirtualPath(filePath);
+        });
+        const markers: editor.IMarkerData[] = fileDiags.map((diag) => ({
+          ...getMonacoRange(typespecCompiler, diag.target),
+          message: diag.message,
+          severity: diag.severity === "error" ? MarkerSeverity.Error : MarkerSeverity.Warning,
+          tags: diag.code === "deprecated" ? [CompletionItemTag.Deprecated] : undefined,
+        }));
+        editor.setModelMarkers(model, "owner", markers);
+      }
     } else {
       updateDiagnosticsForCodeFixes(typespecCompiler, []);
-      editor.setModelMarkers(typespecModel, "owner", []);
+      for (const model of modelsRef.current.values()) {
+        editor.setModelMarkers(model, "owner", []);
+      }
     }
-  }, [host, selectedEmitter, compilerOptions, typespecModel]);
+  }, [host, selectedEmitter, compilerOptions, files]);
 
+  // Debounced recompile and state sync on model content changes
   useEffect(() => {
     const debouncer = debounce(() => doCompile(), 200);
-    const disposable = typespecModel.onDidChangeContent(debouncer);
+
+    const disposables: { dispose: () => void }[] = [];
+    for (const [filePath, model] of modelsRef.current.entries()) {
+      disposables.push(
+        model.onDidChangeContent(() => {
+          updateFileContentRef.current(filePath, model.getValue());
+          void debouncer();
+        }),
+      );
+    }
+
     return () => {
       debouncer.clear();
-      disposable.dispose();
+      for (const d of disposables) d.dispose();
     };
-  }, [typespecModel, doCompile]);
+  }, [doCompile, files]);
 
   useEffect(() => {
     void doCompile();
@@ -252,6 +310,8 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
         content: content ?? "",
         emitter: selectedEmitter,
         compilerOptions,
+        files,
+        activeFile,
         sampleName: isSampleUntouched ? selectedSampleName : undefined,
         selectedViewer,
         viewerState,
@@ -259,6 +319,8 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
     }
   }, [
     content,
+    files,
+    activeFile,
     onSave,
     selectedEmitter,
     compilerOptions,
@@ -319,11 +381,27 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
     return {
       host,
       setContent: (val: string) => {
-        typespecModel.setValue(val);
         onContentChange(val);
       },
+      files,
+      activeFile,
+      setActiveFile: onActiveFileChange,
+      setFileContent: updateFileContent,
+      addFile,
+      removeFile,
+      renameFile,
     };
-  }, [host, typespecModel, onContentChange]);
+  }, [
+    host,
+    onContentChange,
+    files,
+    activeFile,
+    onActiveFileChange,
+    updateFileContent,
+    addFile,
+    removeFile,
+    renameFile,
+  ]);
 
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<ViewMode>("editor");
@@ -355,7 +433,7 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
   const editorPanel = (
     <EditorPanel
       host={host}
-      model={typespecModel}
+      model={activeModel}
       actions={typespecEditorActions}
       editorOptions={props.editorOptions}
       onMount={onTypeSpecEditorMount}
@@ -364,6 +442,12 @@ export const Playground: FunctionComponent<PlaygroundProps> = (props) => {
       onCompilerOptionsChange={onCompilerOptionsChange}
       onSelectedEmitterChange={onSelectedEmitterChange}
       commandBar={isMobile ? undefined : commandBar}
+      files={Object.keys(files)}
+      activeFile={activeFile}
+      onFileSelect={onActiveFileChange}
+      onFileAdd={addFile}
+      onFileRemove={removeFile}
+      onFileRename={renameFile}
     />
   );
 
@@ -423,11 +507,14 @@ const outputDir = resolveVirtualPath("tsp-output");
 
 async function compile(
   host: BrowserHost,
-  content: string,
+  files: Record<string, string>,
   selectedEmitter: string,
   options: CompilerOptions,
 ): Promise<CompilationState> {
-  await host.writeFile("main.tsp", content);
+  // Write all source files to virtual FS
+  for (const [filePath, fileContent] of Object.entries(files)) {
+    await host.writeFile(filePath, fileContent);
+  }
   await emptyOutputDir(host);
   try {
     const typespecCompiler = host.compiler;

@@ -20,6 +20,12 @@ export interface PlaygroundSample {
    * Compiler options for the sample.
    */
   compilerOptions?: CompilerOptions;
+
+  /**
+   * Multiple files for a multi-file sample. Maps relative path to content.
+   * When provided, `content` is ignored and files are used instead.
+   */
+  files?: Record<string, string>;
 }
 
 export interface PlaygroundTspLibrary {

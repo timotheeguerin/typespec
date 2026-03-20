@@ -10,11 +10,11 @@ export interface FileTreeExplorerProps {
   readonly onSelect: (file: string) => void;
 }
 
-interface FileTreeNode extends TreeNode {
+export interface FileTreeNode extends TreeNode {
   readonly isDirectory: boolean;
 }
 
-const FileNodeIcon: FC<{ node: FileTreeNode }> = ({ node }) => {
+export const FileNodeIcon: FC<{ node: FileTreeNode }> = ({ node }) => {
   if (node.isDirectory) {
     return <FolderRegular />;
   }
@@ -24,7 +24,7 @@ const FileNodeIcon: FC<{ node: FileTreeNode }> = ({ node }) => {
 /**
  * Builds a tree structure from a flat list of file paths.
  */
-function buildTree(files: string[]): FileTreeNode {
+export function buildFileTree(files: string[]): FileTreeNode {
   const root: FileTreeNode = { id: "__root__", name: "root", isDirectory: true, children: [] };
   const dirMap = new Map<string, FileTreeNode>();
   dirMap.set("", root);
@@ -91,7 +91,7 @@ export const FileTreeExplorer: FunctionComponent<FileTreeExplorerProps> = ({
   selected,
   onSelect,
 }) => {
-  const tree = useMemo(() => buildTree(files), [files]);
+  const tree = useMemo(() => buildFileTree(files), [files]);
 
   return (
     <div className={style["file-tree"]}>

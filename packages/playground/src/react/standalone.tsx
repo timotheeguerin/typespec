@@ -102,12 +102,14 @@ export const StandalonePlayground: FunctionComponent<ReactPlaygroundConfig> = (c
       // Auto-save state changes to storage without showing toast
       // Preserve the last known content or use empty string if none
       const saveData: PlaygroundSaveData = {
-        content: lastSavedData?.content || "",
+        content: newState.content || lastSavedData?.content || "",
         emitter: newState.emitter || "",
         compilerOptions: newState.compilerOptions,
         sampleName: newState.sampleName,
         selectedViewer: newState.selectedViewer,
         viewerState: newState.viewerState,
+        files: newState.files,
+        activeFile: newState.activeFile,
       };
       saveToStorage(saveData);
     },
@@ -129,6 +131,8 @@ export const StandalonePlayground: FunctionComponent<ReactPlaygroundConfig> = (c
             context.initialState.selectedViewer ?? config.defaultPlaygroundState?.selectedViewer,
           viewerState:
             context.initialState.viewerState ?? config.defaultPlaygroundState?.viewerState,
+          files: context.initialState.files ?? config.defaultPlaygroundState?.files,
+          activeFile: context.initialState.activeFile ?? config.defaultPlaygroundState?.activeFile,
         },
       },
     [config.defaultPlaygroundState, config.libraries, context],
@@ -190,17 +194,50 @@ export function createStandalonePlaygroundStateStorage(): UrlStateStorage<Playgr
       type: "object",
       queryParam: "vs",
     },
+    files: {
+      type: "object",
+      queryParam: "f",
+      compress: "lz-base64",
+    },
+    activeFile: {
+      queryParam: "af",
+    },
   });
 
   return {
-    load: stateStorage.load,
+    load(this: void) {
+      const loaded = stateStorage.load();
+      // Backward compat: if we have `content` but no `files`, create files from content
+      if (loaded.content && !loaded.files) {
+        loaded.files = { "main.tsp": loaded.content };
+        loaded.activeFile = "main.tsp";
+      }
+      return loaded;
+    },
     resolveSearchParams: stateStorage.resolveSearchParams,
     save(data: PlaygroundSaveData) {
-      stateStorage.save(
-        data.sampleName
-          ? { ...data, content: undefined, emitter: undefined, sampleName: data.sampleName }
-          : data,
-      );
+      if (data.sampleName) {
+        stateStorage.save({
+          ...data,
+          content: undefined,
+          files: undefined,
+          emitter: undefined,
+          sampleName: data.sampleName,
+        });
+      } else {
+        // For multi-file, save files and omit single content
+        const hasMultipleFiles = data.files && Object.keys(data.files).length > 1;
+        const saveData = { ...data } as Partial<PlaygroundSaveData>;
+        if (hasMultipleFiles) {
+          // Save as files map, clear single content to keep URL shorter
+          saveData.content = undefined;
+        } else {
+          // Single file: save as content for backward-compatible shorter URLs
+          saveData.files = undefined;
+          saveData.activeFile = undefined;
+        }
+        stateStorage.save(saveData as PlaygroundSaveData);
+      }
     },
   };
 }

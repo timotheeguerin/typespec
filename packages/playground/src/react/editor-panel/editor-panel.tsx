@@ -1,16 +1,18 @@
 import { Tab, TabList, type SelectTabEventHandler } from "@fluentui/react-components";
-import { SettingsRegular } from "@fluentui/react-icons";
+import { ChevronRightRegular, DocumentRegular, SettingsRegular } from "@fluentui/react-icons";
 import type { CompilerOptions } from "@typespec/compiler";
 import { editor } from "monaco-editor";
-import { useCallback, useState, type FunctionComponent, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type FunctionComponent, type ReactNode } from "react";
 import type { BrowserHost } from "../../types.js";
 import type { OnMountData } from "../editor.js";
+import { InputFileTree } from "../input-file-tree/index.js";
 import type { PlaygroundEditorsOptions } from "../playground.js";
 import { TypeSpecEditor } from "../typespec-editor.js";
 import { ConfigPanel } from "./config-panel.js";
 import style from "./editor-panel.module.css";
 
-export type EditorPanelTab = "tsp" | "cfg";
+/** Special tab ID for the tspconfig file */
+const CONFIG_TAB = "$$config$$";
 
 const TypeSpecIcon = () => (
   // icons/raw/tsp-logo-inverted.svg
@@ -28,6 +30,13 @@ const TypeSpecIcon = () => (
   </svg>
 );
 
+function getFileIcon(filePath: string) {
+  if (filePath === "main.tsp") {
+    return <TypeSpecIcon />;
+  }
+  return <DocumentRegular />;
+}
+
 export interface EditorPanelProps {
   host: BrowserHost;
   model: editor.IModel;
@@ -42,6 +51,19 @@ export interface EditorPanelProps {
 
   /** Toolbar content rendered above the editor area */
   commandBar?: ReactNode;
+
+  /** Input file paths for file tree */
+  files?: string[];
+  /** Currently active file */
+  activeFile?: string;
+  /** Callback when a file is selected in the tree */
+  onFileSelect?: (file: string) => void;
+  /** Callback to add a new file */
+  onFileAdd?: (path: string, content?: string) => void;
+  /** Callback to remove a file */
+  onFileRemove?: (path: string) => void;
+  /** Callback to rename a file */
+  onFileRename?: (oldPath: string, newPath: string) => void;
 }
 
 export const EditorPanel: FunctionComponent<EditorPanelProps> = ({
@@ -55,48 +77,130 @@ export const EditorPanel: FunctionComponent<EditorPanelProps> = ({
   onCompilerOptionsChange,
   onSelectedEmitterChange,
   commandBar,
+  files,
+  activeFile,
+  onFileSelect,
+  onFileAdd,
+  onFileRemove,
+  onFileRename,
 }) => {
-  const [selectedTab, setSelectedTab] = useState<EditorPanelTab>("tsp");
+  const [fileTreeExpanded, setFileTreeExpanded] = useState(false);
 
-  const onTabSelect = useCallback<SelectTabEventHandler>((_, data) => {
-    setSelectedTab(data.value as EditorPanelTab);
+  const [showConfig, setShowConfig] = useState(false);
+
+  // The selected tab in the sidebar: either a file path or CONFIG_TAB
+  const selectedTab = showConfig ? CONFIG_TAB : (activeFile ?? "main.tsp");
+
+  const onTabSelect = useCallback<SelectTabEventHandler>(
+    (_, data) => {
+      const value = data.value as string;
+      if (value === CONFIG_TAB) {
+        setShowConfig(true);
+      } else {
+        setShowConfig(false);
+        onFileSelect?.(value);
+      }
+    },
+    [onFileSelect],
+  );
+
+  const handleFileTreeSelect = useCallback(
+    (file: string) => {
+      setShowConfig(false);
+      onFileSelect?.(file);
+    },
+    [onFileSelect],
+  );
+
+  const toggleFileTree = useCallback(() => {
+    setFileTreeExpanded((v) => !v);
   }, []);
+
+  // Files list including tspconfig for the tree view
+  const allFiles = useMemo(() => {
+    const tspFiles = files ?? ["main.tsp"];
+    return [...tspFiles, "tspconfig.yaml"];
+  }, [files]);
+
+  // Build the tab icons for the sidebar
+  const fileTabs = useMemo(() => {
+    const tabs: { id: string; icon: ReactNode; title: string }[] = [];
+    if (files) {
+      for (const f of files) {
+        tabs.push({ id: f, icon: getFileIcon(f), title: f });
+      }
+    } else {
+      tabs.push({ id: "main.tsp", icon: <TypeSpecIcon />, title: "main.tsp" });
+    }
+    // Always add config tab at the end
+    tabs.push({ id: CONFIG_TAB, icon: <SettingsRegular />, title: "tspconfig.yaml" });
+    return tabs;
+  }, [files]);
+
+  const editorContent = (
+    <TypeSpecEditor model={model} actions={actions} options={editorOptions} onMount={onMount} />
+  );
+
+  const mainContent = showConfig ? (
+    <ConfigPanel
+      host={host}
+      selectedEmitter={selectedEmitter}
+      compilerOptions={compilerOptions}
+      onCompilerOptionsChange={onCompilerOptionsChange}
+      onSelectedEmitterChange={onSelectedEmitterChange}
+      editorOptions={editorOptions}
+    />
+  ) : (
+    editorContent
+  );
+
+  const handleTreeFileSelect = useCallback(
+    (file: string) => {
+      if (file === "tspconfig.yaml") {
+        setShowConfig(true);
+      } else {
+        setShowConfig(false);
+        onFileSelect?.(file);
+      }
+    },
+    [onFileSelect],
+  );
 
   return (
     <div className={style["editor-panel"]}>
-      <div className={style["panel-tabs-container"]}>
-        <TabList vertical size="large" selectedValue={selectedTab} onTabSelect={onTabSelect}>
-          <Tab value="tsp">
-            <span title="TypeSpec">
-              <TypeSpecIcon />
-            </span>
-          </Tab>
-          <Tab value="cfg">
-            <span title="Config">
-              <SettingsRegular />
-            </span>
-          </Tab>
-        </TabList>
-      </div>
+      {fileTreeExpanded ? (
+        <div className={style["file-tree-panel"]}>
+          <InputFileTree
+            files={allFiles}
+            activeFile={showConfig ? "tspconfig.yaml" : (activeFile ?? "main.tsp")}
+            onFileSelect={handleTreeFileSelect}
+            onFileAdd={onFileAdd ?? (() => {})}
+            onFileRemove={onFileRemove ?? (() => {})}
+            onFileRename={onFileRename ?? (() => {})}
+            onCollapse={toggleFileTree}
+          />
+        </div>
+      ) : (
+        <div className={style["panel-tabs-container"]}>
+          <button
+            className={style["tree-toggle"]}
+            onClick={toggleFileTree}
+            title="Expand file tree"
+          >
+            <ChevronRightRegular />
+          </button>
+          <TabList vertical size="large" selectedValue={selectedTab} onTabSelect={onTabSelect}>
+            {fileTabs.map((tab) => (
+              <Tab key={tab.id} value={tab.id}>
+                <span title={tab.title}>{tab.icon}</span>
+              </Tab>
+            ))}
+          </TabList>
+        </div>
+      )}
       <div className={style["panel-content"]}>
         {commandBar}
-        {selectedTab === "tsp" ? (
-          <TypeSpecEditor
-            model={model}
-            actions={actions}
-            options={editorOptions}
-            onMount={onMount}
-          />
-        ) : (
-          <ConfigPanel
-            host={host}
-            selectedEmitter={selectedEmitter}
-            compilerOptions={compilerOptions}
-            onCompilerOptionsChange={onCompilerOptionsChange}
-            onSelectedEmitterChange={onSelectedEmitterChange}
-            editorOptions={editorOptions}
-          />
-        )}
+        {mainContent}
       </div>
     </div>
   );

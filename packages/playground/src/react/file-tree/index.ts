@@ -1,1 +1,7 @@
-export { FileTreeExplorer, type FileTreeExplorerProps } from "./file-tree.js";
+export {
+  buildFileTree,
+  FileNodeIcon,
+  FileTreeExplorer,
+  type FileTreeExplorerProps,
+  type FileTreeNode,
+} from "./file-tree.js";

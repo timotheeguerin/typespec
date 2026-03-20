@@ -26,7 +26,19 @@ const meta: Meta<typeof Footer> = {
   component: Footer,
   decorators: [
     (Story) => (
-      <PlaygroundContextProvider value={{ host: storyHost, setContent: () => null }}>
+      <PlaygroundContextProvider
+        value={{
+          host: storyHost,
+          setContent: () => null,
+          files: { "main.tsp": "" },
+          activeFile: "main.tsp",
+          setActiveFile: () => {},
+          setFileContent: () => {},
+          addFile: () => {},
+          removeFile: () => {},
+          renameFile: () => {},
+        }}
+      >
         <Footer>{Story()}</Footer>
       </PlaygroundContextProvider>
     ),

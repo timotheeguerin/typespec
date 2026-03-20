@@ -14,8 +14,15 @@ export interface PlaygroundState {
   selectedViewer?: string;
   /** Internal state of viewers */
   viewerState?: Record<string, any>;
-  /** TypeSpec content */
+  /**
+   * TypeSpec content for single-file mode.
+   * @deprecated Use `files` instead. Kept for backward compatibility.
+   */
   content?: string;
+  /** Map of file paths to their content. */
+  files?: Record<string, string>;
+  /** Currently active file path being edited. */
+  activeFile?: string;
 }
 
 export interface UsePlaygroundStateProps {
@@ -50,6 +57,10 @@ export interface PlaygroundStateResult {
   selectedViewer?: string;
   viewerState: Record<string, any>;
   content: string;
+  /** All files in the playground. Maps relative path to content. */
+  files: Record<string, string>;
+  /** Currently active file path. */
+  activeFile: string;
 
   // State setters
   onSelectedEmitterChange: (emitter: string) => void;
@@ -58,6 +69,14 @@ export interface PlaygroundStateResult {
   onSelectedViewerChange: (selectedViewer: string) => void;
   onViewerStateChange: (viewerState: Record<string, any>) => void;
   onContentChange: (content: string) => void;
+  onFilesChange: (files: Record<string, string>) => void;
+  onActiveFileChange: (activeFile: string) => void;
+
+  // File management
+  addFile: (path: string, content?: string) => void;
+  removeFile: (path: string) => void;
+  renameFile: (oldPath: string, newPath: string) => void;
+  updateFileContent: (path: string, content: string) => void;
 
   // Full state management
   playgroundState: PlaygroundState;
@@ -104,7 +123,19 @@ export function usePlaygroundState({
   );
   const selectedSampleName = playgroundState.sampleName ?? "";
   const selectedViewer = playgroundState.selectedViewer;
-  const content = playgroundState.content ?? "";
+
+  // Resolve files: use `files` if present, otherwise derive from `content`
+  const files = useMemo((): Record<string, string> => {
+    if (playgroundState.files && Object.keys(playgroundState.files).length > 0) {
+      return playgroundState.files;
+    }
+    return { "main.tsp": playgroundState.content ?? "" };
+  }, [playgroundState.files, playgroundState.content]);
+
+  const activeFile = playgroundState.activeFile ?? "main.tsp";
+
+  // `content` reflects the active file's content for backward compat
+  const content = files[activeFile] ?? "";
 
   // Create a generic state updater that can handle any field
   const updateState = useCallback(
@@ -135,7 +166,77 @@ export function usePlaygroundState({
     (viewerState: Record<string, any>) => updateState({ viewerState }),
     [updateState],
   );
-  const onContentChange = useCallback((content: string) => updateState({ content }), [updateState]);
+  const onContentChange = useCallback(
+    (newContent: string) => {
+      const newFiles = { ...files, [activeFile]: newContent };
+      updateState({ files: newFiles, content: newFiles["main.tsp"] ?? "" });
+    },
+    [updateState, files, activeFile],
+  );
+  const onFilesChange = useCallback(
+    (newFiles: Record<string, string>) =>
+      updateState({ files: newFiles, content: newFiles["main.tsp"] ?? "" }),
+    [updateState],
+  );
+  const onActiveFileChange = useCallback(
+    (newActiveFile: string) => updateState({ activeFile: newActiveFile }),
+    [updateState],
+  );
+
+  // File management helpers
+  const addFile = useCallback(
+    (path: string, fileContent: string = "") => {
+      const newFiles = { ...files, [path]: fileContent };
+      updateState({ files: newFiles, activeFile: path, content: newFiles["main.tsp"] ?? "" });
+    },
+    [updateState, files],
+  );
+
+  const removeFile = useCallback(
+    (path: string) => {
+      // Prevent removing main.tsp or the last file
+      if (path === "main.tsp" || Object.keys(files).length <= 1) {
+        return;
+      }
+      const newFiles = { ...files };
+      delete newFiles[path];
+      const newActiveFile = activeFile === path ? "main.tsp" : activeFile;
+      updateState({
+        files: newFiles,
+        activeFile: newActiveFile,
+        content: newFiles["main.tsp"] ?? "",
+      });
+    },
+    [updateState, files, activeFile],
+  );
+
+  const renameFile = useCallback(
+    (oldPath: string, newPath: string) => {
+      // Prevent overwriting an existing file
+      if (newPath in files && newPath !== oldPath) {
+        return;
+      }
+      const newFiles = { ...files };
+      const fileContent = newFiles[oldPath] ?? "";
+      delete newFiles[oldPath];
+      newFiles[newPath] = fileContent;
+      const newActiveFile = activeFile === oldPath ? newPath : activeFile;
+      updateState({
+        files: newFiles,
+        activeFile: newActiveFile,
+        content: newFiles["main.tsp"] ?? "",
+      });
+    },
+    [updateState, files, activeFile],
+  );
+
+  const updateFileContent = useCallback(
+    (path: string, fileContent: string) => {
+      const newFiles = { ...files, [path]: fileContent };
+      updateState({ files: newFiles, content: newFiles["main.tsp"] ?? "" });
+    },
+    [updateState, files],
+  );
 
   // Track last processed sample to avoid re-processing
   const lastProcessedSample = useRef<string>("");
@@ -144,9 +245,18 @@ export function usePlaygroundState({
   useEffect(() => {
     if (selectedSampleName && samples && selectedSampleName !== lastProcessedSample.current) {
       const config = samples[selectedSampleName];
-      if (config?.content) {
+      if (config?.content || config?.files) {
         lastProcessedSample.current = selectedSampleName;
-        const updates: Partial<PlaygroundState> = { content: config.content };
+        const updates: Partial<PlaygroundState> = {};
+        if (config.files) {
+          updates.files = config.files;
+          updates.content = config.files["main.tsp"] ?? "";
+          updates.activeFile = "main.tsp";
+        } else if (config.content) {
+          updates.content = config.content;
+          updates.files = { "main.tsp": config.content };
+          updates.activeFile = "main.tsp";
+        }
         if (config.preferredEmitter) {
           updates.emitter = config.preferredEmitter;
         }
@@ -166,6 +276,8 @@ export function usePlaygroundState({
     selectedViewer,
     viewerState: playgroundState.viewerState ?? {},
     content,
+    files,
+    activeFile,
 
     // State setters
     onSelectedEmitterChange,
@@ -174,6 +286,14 @@ export function usePlaygroundState({
     onSelectedViewerChange,
     onViewerStateChange,
     onContentChange,
+    onFilesChange,
+    onActiveFileChange,
+
+    // File management
+    addFile,
+    removeFile,
+    renameFile,
+    updateFileContent,
 
     // Full state management
     playgroundState,

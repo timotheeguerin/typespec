@@ -5,7 +5,34 @@
 }
 
 .panel-tabs-container {
+  display: flex;
+  flex-direction: column;
   background-color: var(--colorNeutralBackground3);
+}
+
+.tree-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--colorNeutralForeground2);
+  font-size: 16px;
+}
+
+.tree-toggle:hover {
+  color: var(--colorNeutralForeground1);
+  background: var(--colorNeutralBackground4);
+}
+
+.file-tree-panel {
+  width: 200px;
+  min-width: 120px;
+  max-width: 300px;
+  border-right: 1px solid var(--colorNeutralStroke2);
+  overflow: hidden;
 }
 
 .panel-content {
