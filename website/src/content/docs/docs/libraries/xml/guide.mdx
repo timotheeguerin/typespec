@@ -975,9 +975,165 @@ Store:
 </TabItem>
 </Tabs>
 
-## 5. Attributes
+## 5. Array models
 
-### 5.1 — Serializing a property as an XML attribute
+An _array model_ is a named model that _is_ an array rather than a model that _has_ an array property. It is declared with `model X is Type[]`.
+
+### 5.1 — Array model by itself
+
+A standalone array model produces an array schema in OpenAPI. When serialized to XML, the model name becomes the root element and each item uses its type name as the element name.
+
+```tsp
+model Tags is string[];
+```
+
+<Tabs>
+<TabItem label="XML">
+
+```xml
+<Tags>
+  <string>fiction</string>
+  <string>classic</string>
+</Tags>
+```
+
+</TabItem>
+<TabItem label="OpenAPI3">
+
+```yaml
+Tags:
+  type: "array"
+  items:
+    type: "string"
+```
+
+</TabItem>
+</Tabs>
+
+### 5.2 — Array model used as a property (default)
+
+When a property references an array model, it behaves the same as an inline array: the property name becomes the wrapper element and each item uses its type name as the element name.
+
+```tsp
+model BookList is Book[];
+
+model Book {
+  title: string;
+}
+
+model Store {
+  books: BookList;
+}
+```
+
+<Tabs>
+<TabItem label="XML">
+
+```xml
+<Store>
+  <books>
+    <Book>
+      <title>The Great Gatsby</title>
+    </Book>
+    <Book>
+      <title>Les Miserables</title>
+    </Book>
+  </books>
+</Store>
+```
+
+</TabItem>
+<TabItem label="OpenAPI3">
+
+```yaml
+Book:
+  type: "object"
+  properties:
+    title:
+      type: "string"
+BookList:
+  type: "array"
+  items:
+    $ref: "#/components/schemas/Book"
+Store:
+  type: "object"
+  properties:
+    books:
+      type: "array"
+      xml:
+        wrapped: true
+      items:
+        allOf:
+          - $ref: "#/components/schemas/Book"
+        xml:
+          name: "Book"
+```
+
+</TabItem>
+</Tabs>
+
+### 5.3 — Unwrapped array model property
+
+`@Xml.unwrapped` on the property removes the wrapper element, just as with inline arrays.
+
+```tsp
+model BookList is Book[];
+
+model Book {
+  title: string;
+}
+
+model Store {
+  @Xml.unwrapped
+  books: BookList;
+}
+```
+
+<Tabs>
+<TabItem label="XML">
+
+```xml
+<Store>
+  <books>
+    <title>The Great Gatsby</title>
+  </books>
+  <books>
+    <title>Les Miserables</title>
+  </books>
+</Store>
+```
+
+</TabItem>
+<TabItem label="OpenAPI3">
+
+```yaml
+Book:
+  type: "object"
+  properties:
+    title:
+      type: "string"
+BookList:
+  type: "array"
+  items:
+    $ref: "#/components/schemas/Book"
+Store:
+  type: "object"
+  properties:
+    books:
+      type: "array"
+      items:
+        allOf:
+          - $ref: "#/components/schemas/Book"
+        xml:
+          name: "books"
+```
+
+</TabItem>
+</Tabs>
+
+## 6. Attributes
+
+### 6.1 — Serializing a property as an XML attribute
 
 `@Xml.attribute` serializes a property as an XML attribute instead of a child element.
 
@@ -1021,7 +1177,7 @@ Book:
 </TabItem>
 </Tabs>
 
-### 5.2 — Renaming an XML attribute
+### 6.2 — Renaming an XML attribute
 
 `@Xml.name` or `@encodedName` on an `@Xml.attribute` property changes the attribute name in the XML output.
 
@@ -1087,9 +1243,9 @@ Book:
 </TabItem>
 </Tabs>
 
-## 6. Namespace and prefix (inline form)
+## 7. Namespace and prefix (inline form)
 
-### 6.1 — Namespace on the model
+### 7.1 — Namespace on the model
 
 `@Xml.ns` on a model adds a namespace prefix and declaration to the root element.
 
@@ -1134,7 +1290,7 @@ Book:
 </TabItem>
 </Tabs>
 
-### 6.2 — Namespace on individual properties
+### 7.2 — Namespace on individual properties
 
 Properties can declare their own namespace with `@Xml.ns`, which may differ from the model's namespace.
 
@@ -1189,9 +1345,9 @@ Book:
 </TabItem>
 </Tabs>
 
-## 7. Namespace and prefix (normalized form)
+## 8. Namespace and prefix (normalized form)
 
-### 7.1 — Using an `@Xml.nsDeclarations` enum
+### 8.1 — Using an `@Xml.nsDeclarations` enum
 
 Declare namespaces in an enum to avoid repeating URIs. Reference enum members with `@Xml.ns`.
 
@@ -1245,7 +1401,7 @@ Namespaces:
 </TabItem>
 </Tabs>
 
-### 7.2 — Multiple namespaces via enum
+### 8.2 — Multiple namespaces via enum
 
 Multiple namespace declarations can be defined in a single enum and referenced on individual properties.
 
@@ -1311,9 +1467,9 @@ Namespaces:
 </TabItem>
 </Tabs>
 
-## 8. Property setting the text of the node
+## 9. Property setting the text of the node
 
-### 8.1 — Text content with attributes
+### 9.1 — Text content with attributes
 
 `@Xml.unwrapped` on a scalar property makes it the text content of the parent element. Combined with `@Xml.attribute`, you can model elements that have both attributes and inline text.
 
@@ -1346,162 +1502,6 @@ BookTitle:
         attribute: true
     content:
       type: string
-```
-
-</TabItem>
-</Tabs>
-
-## 9. Array models
-
-An _array model_ is a named model that _is_ an array rather than a model that _has_ an array property. It is declared with `model X is Type[]`.
-
-### 9.1 — Array model by itself
-
-A standalone array model produces an array schema in OpenAPI. When serialized to XML, the model name becomes the root element and each item uses its type name as the element name.
-
-```tsp
-model Tags is string[];
-```
-
-<Tabs>
-<TabItem label="XML">
-
-```xml
-<Tags>
-  <string>fiction</string>
-  <string>classic</string>
-</Tags>
-```
-
-</TabItem>
-<TabItem label="OpenAPI3">
-
-```yaml
-Tags:
-  type: "array"
-  items:
-    type: "string"
-```
-
-</TabItem>
-</Tabs>
-
-### 9.2 — Array model used in a property (default)
-
-When a property references an array model, it behaves the same as an inline array: the property name becomes the wrapper element and each item uses its type name as the element name.
-
-```tsp
-model BookList is Book[];
-
-model Book {
-  title: string;
-}
-
-model Store {
-  books: BookList;
-}
-```
-
-<Tabs>
-<TabItem label="XML">
-
-```xml
-<Store>
-  <books>
-    <Book>
-      <title>The Great Gatsby</title>
-    </Book>
-    <Book>
-      <title>Les Miserables</title>
-    </Book>
-  </books>
-</Store>
-```
-
-</TabItem>
-<TabItem label="OpenAPI3">
-
-```yaml
-Book:
-  type: "object"
-  properties:
-    title:
-      type: "string"
-BookList:
-  type: "array"
-  items:
-    $ref: "#/components/schemas/Book"
-Store:
-  type: "object"
-  properties:
-    books:
-      type: "array"
-      xml:
-        wrapped: true
-      items:
-        allOf:
-          - $ref: "#/components/schemas/Book"
-        xml:
-          name: "Book"
-```
-
-</TabItem>
-</Tabs>
-
-### 9.3 — Unwrapped array model property
-
-`@Xml.unwrapped` on the property removes the wrapper element, just as with inline arrays.
-
-```tsp
-model BookList is Book[];
-
-model Book {
-  title: string;
-}
-
-model Store {
-  @Xml.unwrapped
-  books: BookList;
-}
-```
-
-<Tabs>
-<TabItem label="XML">
-
-```xml
-<Store>
-  <books>
-    <title>The Great Gatsby</title>
-  </books>
-  <books>
-    <title>Les Miserables</title>
-  </books>
-</Store>
-```
-
-</TabItem>
-<TabItem label="OpenAPI3">
-
-```yaml
-Book:
-  type: "object"
-  properties:
-    title:
-      type: "string"
-BookList:
-  type: "array"
-  items:
-    $ref: "#/components/schemas/Book"
-Store:
-  type: "object"
-  properties:
-    books:
-      type: "array"
-      items:
-        allOf:
-          - $ref: "#/components/schemas/Book"
-        xml:
-          name: "books"
 ```
 
 </TabItem>
