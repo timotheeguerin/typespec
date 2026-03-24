@@ -37,7 +37,21 @@ namespace Microsoft.TypeSpec.Generator.ClientModel.Providers
 
             var inputEndpointParam = inputClient.Parameters
                 .FirstOrDefault(p => p is InputEndpointParameter ep && ep.IsEndpoint) as InputEndpointParameter;
-            EndpointPropertyName = inputEndpointParam?.Name.ToIdentifierName();
+
+            if (inputEndpointParam != null)
+            {
+                var endpointType = ScmCodeModelGenerator.Instance.TypeFactory.CreateCSharpType(inputEndpointParam.Type);
+                if (endpointType != null)
+                {
+                    EndpointProperty = new PropertyProvider(
+                        null,
+                        MethodSignatureModifiers.Public,
+                        endpointType.WithNullable(true),
+                        inputEndpointParam.Name.ToIdentifierName(),
+                        new AutoPropertyBody(true),
+                        this);
+                }
+            }
 
             // Collect non-endpoint, non-apiVersion required parameters (auth params come separately via InputClient.Auth)
             OtherRequiredParams = inputClient.Parameters
@@ -49,7 +63,8 @@ namespace Microsoft.TypeSpec.Generator.ClientModel.Providers
                 .ToList();
         }
 
-        internal string? EndpointPropertyName { get; }
+        /// <summary>Gets the endpoint property (name and type) when the client has an endpoint parameter.</summary>
+        internal PropertyProvider? EndpointProperty { get; }
 
         /// <summary>Gets non-endpoint, non-auth required parameters that have settings properties.</summary>
         internal IReadOnlyList<ParameterProvider> OtherRequiredParams { get; }
@@ -74,15 +89,9 @@ namespace Microsoft.TypeSpec.Generator.ClientModel.Providers
         {
             var properties = new List<PropertyProvider>();
 
-            if (EndpointPropertyName != null)
+            if (EndpointProperty != null)
             {
-                properties.Add(new PropertyProvider(
-                    null,
-                    MethodSignatureModifiers.Public,
-                    new CSharpType(typeof(Uri), isNullable: true),
-                    EndpointPropertyName,
-                    new AutoPropertyBody(true),
-                    this));
+                properties.Add(EndpointProperty);
             }
 
             foreach (var param in OtherRequiredParams)
@@ -96,12 +105,13 @@ namespace Microsoft.TypeSpec.Generator.ClientModel.Providers
                     this));
             }
 
-            if (_clientProvider.ClientOptions != null)
+            var clientOptions = _clientProvider.EffectiveClientOptions;
+            if (clientOptions != null)
             {
                 properties.Add(new PropertyProvider(
                     null,
                     MethodSignatureModifiers.Public,
-                    _clientProvider.ClientOptions.Type.WithNullable(true),
+                    clientOptions.Type.WithNullable(true),
                     "Options",
                     new AutoPropertyBody(true),
                     this));
@@ -115,9 +125,9 @@ namespace Microsoft.TypeSpec.Generator.ClientModel.Providers
             var sectionParam = new ParameterProvider("section", $"The configuration section.", IConfigurationSectionType);
             var body = new List<MethodBodyStatement>();
 
-            if (EndpointPropertyName != null)
+            if (EndpointProperty != null)
             {
-                AppendUriTryCreateBinding(body, sectionParam, EndpointPropertyName, EndpointPropertyName.ToVariableName());
+                AppendBindingForProperty(body, sectionParam, EndpointProperty.Name, EndpointProperty.Name.ToVariableName(), EndpointProperty.Type);
             }
 
             foreach (var param in OtherRequiredParams)
@@ -126,9 +136,10 @@ namespace Microsoft.TypeSpec.Generator.ClientModel.Providers
                 AppendBindingForProperty(body, sectionParam, propName, param.Name.ToVariableName(), param.Type);
             }
 
-            if (_clientProvider.ClientOptions != null)
+            var clientOptions = _clientProvider.EffectiveClientOptions;
+            if (clientOptions != null)
             {
-                AppendComplexObjectBinding(body, sectionParam, "Options", "options", _clientProvider.ClientOptions.Type);
+                AppendComplexObjectBinding(body, sectionParam, "Options", "options", clientOptions.Type);
             }
 
             var bindCoreMethod = new MethodProvider(
