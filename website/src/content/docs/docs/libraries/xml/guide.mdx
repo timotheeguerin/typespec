@@ -1350,3 +1350,159 @@ BookTitle:
 
 </TabItem>
 </Tabs>
+
+## 9. Array models
+
+An _array model_ is a named model that _is_ an array rather than a model that _has_ an array property. It is declared with `model X is Type[]`.
+
+### 9.1 — Array model by itself
+
+A standalone array model produces an array schema in OpenAPI. When serialized to XML, the model name becomes the root element and each item uses its type name as the element name.
+
+```tsp
+model Tags is string[];
+```
+
+<Tabs>
+<TabItem label="XML">
+
+```xml
+<Tags>
+  <string>fiction</string>
+  <string>classic</string>
+</Tags>
+```
+
+</TabItem>
+<TabItem label="OpenAPI3">
+
+```yaml
+Tags:
+  type: "array"
+  items:
+    type: "string"
+```
+
+</TabItem>
+</Tabs>
+
+### 9.2 — Array model used in a property (default)
+
+When a property references an array model, it behaves the same as an inline array: the property name becomes the wrapper element and each item uses its type name as the element name.
+
+```tsp
+model BookList is Book[];
+
+model Book {
+  title: string;
+}
+
+model Store {
+  books: BookList;
+}
+```
+
+<Tabs>
+<TabItem label="XML">
+
+```xml
+<Store>
+  <books>
+    <Book>
+      <title>The Great Gatsby</title>
+    </Book>
+    <Book>
+      <title>Les Miserables</title>
+    </Book>
+  </books>
+</Store>
+```
+
+</TabItem>
+<TabItem label="OpenAPI3">
+
+```yaml
+Book:
+  type: "object"
+  properties:
+    title:
+      type: "string"
+BookList:
+  type: "array"
+  items:
+    $ref: "#/components/schemas/Book"
+Store:
+  type: "object"
+  properties:
+    books:
+      type: "array"
+      xml:
+        wrapped: true
+      items:
+        allOf:
+          - $ref: "#/components/schemas/Book"
+        xml:
+          name: "Book"
+```
+
+</TabItem>
+</Tabs>
+
+### 9.3 — Unwrapped array model property
+
+`@Xml.unwrapped` on the property removes the wrapper element, just as with inline arrays.
+
+```tsp
+model BookList is Book[];
+
+model Book {
+  title: string;
+}
+
+model Store {
+  @Xml.unwrapped
+  books: BookList;
+}
+```
+
+<Tabs>
+<TabItem label="XML">
+
+```xml
+<Store>
+  <books>
+    <title>The Great Gatsby</title>
+  </books>
+  <books>
+    <title>Les Miserables</title>
+  </books>
+</Store>
+```
+
+</TabItem>
+<TabItem label="OpenAPI3">
+
+```yaml
+Book:
+  type: "object"
+  properties:
+    title:
+      type: "string"
+BookList:
+  type: "array"
+  items:
+    $ref: "#/components/schemas/Book"
+Store:
+  type: "object"
+  properties:
+    books:
+      type: "array"
+      items:
+        allOf:
+          - $ref: "#/components/schemas/Book"
+        xml:
+          name: "books"
+```
+
+</TabItem>
+</Tabs>
