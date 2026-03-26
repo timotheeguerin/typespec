@@ -171,6 +171,54 @@ worksFor(supportedVersions, ({ openApiFor }) => {
       });
     });
 
+    it("set examples on union response with same status code", async () => {
+      const res: OpenAPI3Document = await openApiFor(
+        `
+        model ModelA { a: string; }
+        model ModelB { b: string; }
+
+        @opExample(#{ returnType: #{ a: "A" } }, #{ title: "ExampleA" })
+        @opExample(#{ returnType: #{ b: "B" } }, #{ title: "ExampleB" })
+        op getUnion(): ModelA | ModelB;
+        `,
+      );
+      ok(res.paths["/"].get);
+      ok(res.paths["/"].get.responses);
+      ok("200" in res.paths["/"].get.responses);
+      const resp200 = res.paths["/"].get.responses["200"];
+      ok(typeof resp200 === "object" && "content" in resp200);
+      expect(resp200.content?.["application/json"].examples).toEqual({
+        ExampleA: {
+          summary: "ExampleA",
+          value: { a: "A" },
+        },
+        ExampleB: {
+          summary: "ExampleB",
+          value: { b: "B" },
+        },
+      });
+    });
+
+    it("set single example on union response with same status code", async () => {
+      const res: OpenAPI3Document = await openApiFor(
+        `
+        model ModelA { a: string; }
+        model ModelB { b: string; }
+
+        @opExample(#{ returnType: #{ a: "A" } })
+        op getUnion(): ModelA | ModelB;
+        `,
+      );
+      ok(res.paths["/"].get);
+      ok(res.paths["/"].get.responses);
+      ok("200" in res.paths["/"].get.responses);
+      const resp200 = res.paths["/"].get.responses["200"];
+      ok(typeof resp200 === "object" && "content" in resp200);
+      expect(resp200.content?.["application/json"].example).toEqual({
+        a: "A",
+      });
+    });
+
     it("apply to status code ranges", async () => {
       const res: OpenAPI3Document = await openApiFor(
         `
