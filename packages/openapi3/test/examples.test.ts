@@ -219,6 +219,26 @@ worksFor(supportedVersions, ({ openApiFor }) => {
       });
     });
 
+    it("set example on union of response envelopes with same status code", async () => {
+      const res: OpenAPI3Document = await openApiFor(
+        `
+        @error model Error { @statusCode _: 400; }
+        model Error1 is Error { @body body: { error1: string } }
+        model Error2 is Error { @body body: { error2: string } }
+
+        @opExample(#{ returnType: #{ _: 400, body: #{ error1: "abc" } } })
+        op bad(): Error1 | Error2;
+        `,
+      );
+      ok(res.paths["/"].get);
+      ok(res.paths["/"].get.responses);
+      const resp400 = (res.paths["/"].get.responses as Record<string, any>)["400"];
+      ok(typeof resp400 === "object" && "content" in resp400);
+      expect(resp400.content?.["application/json"].example).toEqual({
+        error1: "abc",
+      });
+    });
+
     it("apply to status code ranges", async () => {
       const res: OpenAPI3Document = await openApiFor(
         `
