@@ -116,7 +116,11 @@ export function resolveValues<T extends Record<string, unknown>>(
     }
     const replaced = value.replace(VariableInterpolationRegex, (match, expression) => {
       const resolved = resolveExpression(expression);
-      return typeof resolved === "string" || typeof resolved === "number" || typeof resolved === "boolean" ? String(resolved) : match;
+      return typeof resolved === "string" ||
+        typeof resolved === "number" ||
+        typeof resolved === "boolean"
+        ? String(resolved)
+        : match;
     });
     resolvingValues.delete(keyPath);
     return replaced;
