@@ -1,4 +1,5 @@
 import { Realm } from "../experimental/realm.js";
+import { getDataDecoratorStateKey } from "../lib/data-decorator.js";
 import { docFromCommentDecorator, getIndexer } from "../lib/intrinsic/decorators.js";
 import { $ } from "../typekit/index.js";
 import { DuplicateTracker } from "../utils/duplicate-tracker.js";
@@ -107,6 +108,7 @@ import {
   ModelProperty,
   ModelPropertyNode,
   ModelStatementNode,
+  ModifierFlags,
   Namespace,
   NamespaceStatementNode,
   NeverType,
@@ -2099,8 +2101,11 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     );
     const name = node.id.sv;
 
-    const implementation = symbol.value;
-    if (implementation === undefined) {
+    const isData = (node.modifierFlags & ModifierFlags.Data) !== 0;
+    let implementation = symbol.value;
+    if (isData) {
+      implementation = createDataDecoratorImplementation(symbol, node);
+    } else if (implementation === undefined) {
       reportCheckerDiagnostic(createDiagnostic({ code: "missing-implementation", target: node }));
     }
     const decoratorType: Decorator = createType({
@@ -2111,6 +2116,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       target: checkFunctionParameter(ctx, node.target, true),
       parameters: node.parameters.map((param) => checkFunctionParameter(ctx, param, true)),
       implementation: implementation ?? (() => {}),
+      ...(isData ? { isData: true } : {}),
     });
 
     namespace.decoratorDeclarations.set(name, decoratorType);
@@ -2118,6 +2124,36 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     linkType(ctx, links, decoratorType);
 
     return decoratorType;
+  }
+
+  function createDataDecoratorImplementation(
+    symbol: Sym,
+    node: DecoratorDeclarationStatementNode,
+  ): (ctx: DecoratorContext, target: Type, ...args: unknown[]) => void {
+    const fqn = getFullyQualifiedSymbolName(symbol);
+    const stateKey = getDataDecoratorStateKey(fqn);
+    const paramNames = node.parameters.map((p) => p.id.sv);
+
+    if (paramNames.length === 0) {
+      // No args beyond target — boolean flag via stateSet
+      return (context: DecoratorContext, target: Type) => {
+        context.program.stateSet(stateKey).add(target);
+      };
+    } else if (paramNames.length === 1) {
+      // Single arg — store value directly
+      return (context: DecoratorContext, target: Type, value: unknown) => {
+        context.program.stateMap(stateKey).set(target, value);
+      };
+    } else {
+      // Multiple args — store as named record
+      return (context: DecoratorContext, target: Type, ...args: unknown[]) => {
+        const data: Record<string, unknown> = {};
+        for (let i = 0; i < paramNames.length; i++) {
+          data[paramNames[i]] = args[i];
+        }
+        context.program.stateMap(stateKey).set(target, data);
+      };
+    }
   }
 
   function checkFunctionDeclaration(
@@ -5746,9 +5782,10 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       return undefined;
     }
 
+    const impl = sym.value ?? symbolLinks.declaredType?.implementation;
     return {
       definition: symbolLinks.declaredType,
-      decorator: sym.value ?? ((...args: any[]) => {}),
+      decorator: impl ?? ((...args: any[]) => {}),
       node: decNode,
       args,
     };

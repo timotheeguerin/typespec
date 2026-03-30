@@ -2975,6 +2975,28 @@ internal extern dec foo(target: Type, arg1: StringLiteral);
       });
     });
 
+    it("format data dec", async () => {
+      await assertFormat({
+        code: `
+data    dec   foo(target: Type,    arg1: StringLiteral);
+`,
+        expected: `
+data dec foo(target: Type, arg1: StringLiteral);
+`,
+      });
+    });
+
+    it("format internal data dec", async () => {
+      await assertFormat({
+        code: `
+internal   data    dec   foo(target: Type,    arg1: StringLiteral);
+`,
+        expected: `
+internal data dec foo(target: Type, arg1: StringLiteral);
+`,
+      });
+    });
+
     it("format internal extern fn", async () => {
       await assertFormat({
         code: `

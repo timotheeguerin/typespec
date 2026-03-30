@@ -139,6 +139,7 @@ export enum Token {
 
   ExternKeyword = __StartModifierKeyword,
   InternalKeyword,
+  DataKeyword,
 
   /** @internal */ __EndModifierKeyword,
   ///////////////////////////////////////////////////////////////
@@ -310,6 +311,7 @@ export const TokenDisplay = getTokenDisplayTable([
   [Token.NeverKeyword, "'never'"],
   [Token.UnknownKeyword, "'unknown'"],
   [Token.ExternKeyword, "'extern'"],
+  [Token.DataKeyword, "'data'"],
 
   // Reserved keywords
   [Token.StatemachineKeyword, "'statemachine'"],
@@ -383,6 +385,7 @@ export const Keywords: ReadonlyMap<string, Token> = new Map([
   ["never", Token.NeverKeyword],
   ["unknown", Token.UnknownKeyword],
   ["extern", Token.ExternKeyword],
+  ["data", Token.DataKeyword],
   ["internal", Token.InternalKeyword],
 
   // Reserved keywords

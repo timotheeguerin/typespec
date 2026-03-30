@@ -721,6 +721,8 @@ export interface Decorator extends BaseType {
   target: MixedFunctionParameter;
   parameters: MixedFunctionParameter[];
   implementation: (ctx: DecoratorContext, target: Type, ...args: unknown[]) => void;
+  /** Whether this is a data decorator (declared with `data dec`). */
+  isData?: boolean;
 }
 
 /**
@@ -1175,6 +1177,7 @@ export enum SyntaxKind {
   CallExpression,
   ScalarConstructor,
   InternalKeyword,
+  DataKeyword,
   FunctionTypeExpression,
 }
 
@@ -1741,6 +1744,10 @@ export interface InternalKeywordNode extends BaseNode {
   readonly kind: SyntaxKind.InternalKeyword;
 }
 
+export interface DataKeywordNode extends BaseNode {
+  readonly kind: SyntaxKind.DataKeyword;
+}
+
 export interface VoidKeywordNode extends BaseNode {
   readonly kind: SyntaxKind.VoidKeyword;
 }
@@ -1797,11 +1804,12 @@ export const enum ModifierFlags {
   None,
   Extern = 1 << 1,
   Internal = 1 << 2,
+  Data = 1 << 3,
 
-  All = Extern | Internal,
+  All = Extern | Internal | Data,
 }
 
-export type Modifier = ExternKeywordNode | InternalKeywordNode;
+export type Modifier = ExternKeywordNode | InternalKeywordNode | DataKeywordNode;
 
 /**
  * Represent a decorator declaration

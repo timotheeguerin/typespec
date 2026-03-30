@@ -29,6 +29,7 @@ import {
   CallExpressionNode,
   Comment,
   ConstStatementNode,
+  DataKeywordNode,
   Declaration,
   DeclarationNode,
   DecoratorDeclarationStatementNode,
@@ -461,6 +462,7 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
         case Token.ConstKeyword:
         case Token.ExternKeyword:
         case Token.InternalKeyword:
+        case Token.DataKeyword:
         case Token.FnKeyword:
         case Token.DecKeyword:
           item = parseDeclaration(pos, decorators, docs, directives);
@@ -532,6 +534,7 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
         case Token.ConstKeyword:
         case Token.ExternKeyword:
         case Token.InternalKeyword:
+        case Token.DataKeyword:
         case Token.FnKeyword:
         case Token.DecKeyword:
           item = parseDeclaration(pos, decorators, docs, directives);
@@ -1770,6 +1773,15 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
     };
   }
 
+  function parseDataKeyword(): DataKeywordNode {
+    const pos = tokenPos();
+    parseExpected(Token.DataKeyword);
+    return {
+      kind: SyntaxKind.DataKeyword,
+      ...finishNode(pos),
+    };
+  }
+
   function parseVoidKeyword(): VoidKeywordNode {
     const pos = tokenPos();
     parseExpected(Token.VoidKeyword);
@@ -2090,6 +2102,8 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
         return parseExternKeyword();
       case Token.InternalKeyword:
         return parseInternalKeyword();
+      case Token.DataKeyword:
+        return parseDataKeyword();
       default:
         return undefined;
     }
@@ -3167,6 +3181,7 @@ export function visitChildren<T>(node: Node, cb: NodeCallback<T>): T | undefined
     case SyntaxKind.NeverKeyword:
     case SyntaxKind.ExternKeyword:
     case SyntaxKind.InternalKeyword:
+    case SyntaxKind.DataKeyword:
     case SyntaxKind.UnknownKeyword:
     case SyntaxKind.JsSourceFile:
     case SyntaxKind.JsNamespaceDeclaration:
