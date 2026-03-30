@@ -721,8 +721,8 @@ export interface Decorator extends BaseType {
   target: MixedFunctionParameter;
   parameters: MixedFunctionParameter[];
   implementation: (ctx: DecoratorContext, target: Type, ...args: unknown[]) => void;
-  /** Whether this is a data decorator (declared with `data dec`). */
-  isData?: boolean;
+  /** How this decorator was declared. */
+  declarationKind: "extern" | "data";
 }
 
 /**

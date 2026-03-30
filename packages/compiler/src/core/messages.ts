@@ -552,6 +552,8 @@ const diagnostics = {
     messages: {
       default: paramMessage`Modifier '${"modifier"}' is invalid.`,
       "missing-required": paramMessage`Declaration of type '${"nodeKind"}' is missing required modifier '${"modifier"}'.`,
+      "missing-required-one-of": paramMessage`Declaration of type '${"nodeKind"}' is missing one of the required modifiers: ${"modifiers"}.`,
+      "mutually-exclusive": paramMessage`Modifiers '${"modifierA"}' and '${"modifierB"}' cannot be used together.`,
       "not-allowed": paramMessage`Modifier '${"modifier"}' cannot be used on declarations of type '${"nodeKind"}'.`,
     },
   },

@@ -15,6 +15,9 @@ export interface DecoratorSignature {
   typeName: string;
 
   decorator: Decorator;
+
+  /** Whether this is a data decorator (declared with `data dec`). */
+  isData: boolean;
 }
 
 export interface FunctionSignature {

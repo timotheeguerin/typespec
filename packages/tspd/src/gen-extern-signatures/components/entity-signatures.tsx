@@ -12,6 +12,7 @@ import * as ts from "@alloy-js/typescript";
 import { Program } from "@typespec/compiler";
 import { typespecCompiler } from "../external-packages/compiler.js";
 import { DecoratorSignature, EntitySignature, FunctionSignature } from "../types.js";
+import { DataDecoratorAccessors } from "./data-decorator-accessors.js";
 import { DecoratorSignatureType, ValueOfModelTsInterfaceBody } from "./decorator-signature-type.js";
 import { DollarDecoratorsType } from "./dollar-decorators-type.js";
 import { DollarFunctionsType } from "./dollar-functions-type.jsx";
@@ -33,41 +34,50 @@ export function EntitySignatures({
   dollarFunctionsRefKey: dollarFunctionsRefkey,
 }: EntitySignaturesProps) {
   const decorators = entities.filter((e): e is DecoratorSignature => e.kind === "Decorator");
+  const externDecorators = decorators.filter((d) => !d.isData);
+  const dataDecorators = decorators.filter((d) => d.isData);
 
   const functions = entities.filter((e): e is FunctionSignature => e.kind === "Function");
 
   return (
-    <ts.TypeRefContext>
-      <LocalTypes />
-      <Show when={decorators.length > 0}>
+    <>
+      <ts.TypeRefContext>
+        <LocalTypes />
+        <Show when={externDecorators.length > 0}>
+          <hbr />
+          <hbr />
+          <For each={externDecorators} doubleHardline semicolon>
+            {(signature) => <DecoratorSignatureType signature={signature} />}
+          </For>
+          <hbr />
+          <hbr />
+          <DollarDecoratorsType
+            namespaceName={namespaceName}
+            decorators={externDecorators}
+            refkey={dollarDecoratorsRefkey}
+          />
+        </Show>
+        <Show when={functions.length > 0}>
+          <hbr />
+          <hbr />
+          <For each={functions} doubleHardline semicolon>
+            {(signature) => <FunctionSignatureType signature={signature} />}
+          </For>
+          <hbr />
+          <hbr />
+          <DollarFunctionsType
+            namespaceName={namespaceName}
+            functions={functions}
+            refkey={dollarFunctionsRefkey}
+          />
+        </Show>
+      </ts.TypeRefContext>
+      <Show when={dataDecorators.length > 0}>
         <hbr />
         <hbr />
-        <For each={decorators} doubleHardline semicolon>
-          {(signature) => <DecoratorSignatureType signature={signature} />}
-        </For>
-        <hbr />
-        <hbr />
-        <DollarDecoratorsType
-          namespaceName={namespaceName}
-          decorators={decorators}
-          refkey={dollarDecoratorsRefkey}
-        />
+        <DataDecoratorAccessors decorators={dataDecorators} namespaceName={namespaceName} />
       </Show>
-      <Show when={functions.length > 0}>
-        <hbr />
-        <hbr />
-        <For each={functions} doubleHardline semicolon>
-          {(signature) => <FunctionSignatureType signature={signature} />}
-        </For>
-        <hbr />
-        <hbr />
-        <DollarFunctionsType
-          namespaceName={namespaceName}
-          functions={functions}
-          refkey={dollarFunctionsRefkey}
-        />
-      </Show>
-    </ts.TypeRefContext>
+    </>
   );
 }
 

@@ -423,3 +423,76 @@ function importLine(imports: string[]) {
   const all = new Set(["DecoratorContext", "DecoratorValidatorCallbacks", ...imports]);
   return `import type { ${[...all].sort().join(", ")} } from "@typespec/compiler";`;
 }
+
+function dataImportLine(typeImports: string[], valueImports: string[]) {
+  const parts: string[] = [];
+  const all = [...valueImports, ...typeImports.map((t) => `type ${t}`)];
+  all.sort((a, b) => {
+    const nameA = a.replace("type ", "");
+    const nameB = b.replace("type ", "");
+    return nameA.localeCompare(nameB);
+  });
+  return `import { ${all.join(", ")} } from "@typespec/compiler";`;
+}
+
+describe("data decorator accessors", () => {
+  it("generate accessor for no-arg data decorator (boolean flag)", async () => {
+    await expectSignatures({
+      code: `data dec myFlag(target: Model);`,
+      expected: `
+${dataImportLine(["Model", "Program"], ["hasDataDecorator"])}
+
+export function isMyFlag(program: Program, target: Model): boolean {
+  return hasDataDecorator(program, "myFlag", target);
+}
+  `,
+    });
+  });
+
+  it("generate accessor for single-arg data decorator", async () => {
+    await expectSignatures({
+      code: `data dec myLabel(target: Model, label: valueof string);`,
+      expected: `
+${dataImportLine(["Model", "Program"], ["getDataDecoratorValue"])}
+
+export function getMyLabel(program: Program, target: Model): string | undefined {
+  return getDataDecoratorValue(program, "myLabel", target) as any;
+}
+  `,
+    });
+  });
+
+  it("generate accessor for multi-arg data decorator", async () => {
+    await expectSignatures({
+      code: `data dec myMeta(target: Model, name: valueof string, version: valueof int32);`,
+      expected: `
+${dataImportLine(["Model", "Program"], ["getDataDecoratorValue"])}
+
+export function getMyMeta(program: Program, target: Model): { name: string; version: number } | undefined {
+  return getDataDecoratorValue(program, "myMeta", target) as any;
+}
+  `,
+    });
+  });
+
+  it("does not generate $decorators type for data decorators", async () => {
+    const result = await generateDecoratorSignatures(`data dec myFlag(target: Model);`);
+    expect(result).not.toContain("Decorators");
+    expect(result).not.toContain("$myFlag");
+  });
+
+  it("generates both extern and data decorator outputs when mixed", async () => {
+    const result = await generateDecoratorSignatures(`
+      extern dec externDec(target: Model);
+      data dec dataFlag(target: Model);
+    `);
+    // Verify extern decorator parts
+    expect(result).toContain("ExternDecDecorator");
+    expect(result).toContain("externDec: ExternDecDecorator");
+    // Verify data decorator parts
+    expect(result).toContain("isDataFlag");
+    expect(result).toContain("hasDataDecorator");
+    // Verify no $decorators type for data decorators
+    expect(result).not.toContain("dataFlag: ");
+  });
+});

@@ -24,6 +24,8 @@ export const typespecCompiler = createPackage({
         "Numeric",
         "ScalarValue",
         "DecoratorValidatorCallbacks",
+        "getDataDecoratorValue",
+        "hasDataDecorator",
       ],
     },
   },

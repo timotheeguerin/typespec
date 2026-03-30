@@ -111,13 +111,24 @@ describe("compiler: checker: decorators", () => {
       });
     });
 
-    it("errors if decorator is missing extern modifier", async () => {
+    it("errors if decorator is missing extern or data modifier", async () => {
       const diagnostics = await DecTester.diagnose(`
         dec testDec(target: unknown);
       `);
       expectDiagnostics(diagnostics, {
         code: "invalid-modifier",
-        message: "Declaration of type 'dec' is missing required modifier 'extern'.",
+        message:
+          "Declaration of type 'dec' is missing one of the required modifiers: 'extern' or 'data'.",
+      });
+    });
+
+    it("errors if both extern and data modifiers are used", async () => {
+      const diagnostics = await DecTester.diagnose(`
+        data extern dec testDec(target: unknown);
+      `);
+      expectDiagnostics(diagnostics, {
+        code: "invalid-modifier",
+        message: "Modifiers 'extern' and 'data' cannot be used together.",
       });
     });
 
@@ -139,6 +150,83 @@ describe("compiler: checker: decorators", () => {
         code: "missing-implementation",
         message: "Extern declaration must have an implementation in JS file.",
       });
+    });
+  });
+
+  describe("data decorators", () => {
+    it("data decorator does not require an implementation", async () => {
+      const { program } = await Tester.using("TypeSpec.Reflection").compile(`
+        data dec myFlag(target: Model);
+      `);
+
+      const dec = program.getGlobalNamespaceType().decoratorDeclarations.get("myFlag");
+      ok(dec);
+      strictEqual(dec.declarationKind, "data");
+      ok(dec.implementation, "should have auto-generated implementation");
+    });
+
+    it("data decorator with no args stores in stateMap", async () => {
+      const { program } = await Tester.using("TypeSpec.Reflection").compile(`
+        data dec myFlag(target: Model);
+
+        @myFlag
+        model Foo {}
+      `);
+
+      const Foo = program.getGlobalNamespaceType().models.get("Foo")!;
+      ok(Foo, "Foo should exist");
+      const { getDataDecoratorValue } = await import("../../src/lib/data-decorator.js");
+      strictEqual(getDataDecoratorValue(program, "myFlag", Foo), true);
+    });
+
+    it("data decorator with single arg stores value in stateMap", async () => {
+      const { program } = await Tester.using("TypeSpec.Reflection").compile(`
+        data dec myLabel(target: Model, label: valueof string);
+
+        @myLabel("hello")
+        model Foo {}
+      `);
+
+      const Foo = program.getGlobalNamespaceType().models.get("Foo")!;
+      const { getDataDecoratorValue } = await import("../../src/lib/data-decorator.js");
+      strictEqual(getDataDecoratorValue(program, "myLabel", Foo), "hello");
+    });
+
+    it("data decorator with multiple args stores named record in stateMap", async () => {
+      const { program } = await Tester.using("TypeSpec.Reflection").compile(`
+        data dec myMeta(target: Model, name: valueof string, version: valueof int32);
+
+        @myMeta("test", 42)
+        model Foo {}
+      `);
+
+      const Foo = program.getGlobalNamespaceType().models.get("Foo")!;
+      const { getDataDecoratorValue } = await import("../../src/lib/data-decorator.js");
+      const value = getDataDecoratorValue(program, "myMeta", Foo) as any;
+      deepStrictEqual(value, { name: "test", version: 42 });
+    });
+
+    it("data decorator in namespace uses FQN for state key", async () => {
+      const { program } = await Tester.using("TypeSpec.Reflection").compile(`
+        namespace MyLib {
+          data dec myLabel(target: Model, label: valueof string);
+        }
+
+        @MyLib.myLabel("world")
+        model Foo {}
+      `);
+
+      const Foo = program.getGlobalNamespaceType().models.get("Foo")!;
+      const { getDataDecoratorValue } = await import("../../src/lib/data-decorator.js");
+      strictEqual(getDataDecoratorValue(program, "MyLib.myLabel", Foo), "world");
+    });
+
+    it("internal data dec is valid", async () => {
+      const diagnostics = await Tester.using("TypeSpec.Reflection").diagnose(`
+        #suppress "experimental-feature"
+        internal data dec myDec(target: unknown);
+      `);
+      strictEqual(diagnostics.length, 0);
     });
   });
 

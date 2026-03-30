@@ -2116,7 +2116,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       target: checkFunctionParameter(ctx, node.target, true),
       parameters: node.parameters.map((param) => checkFunctionParameter(ctx, param, true)),
       implementation: implementation ?? (() => {}),
-      ...(isData ? { isData: true } : {}),
+      declarationKind: isData ? "data" : "extern",
     });
 
     namespace.decoratorDeclarations.set(name, decoratorType);
@@ -2135,9 +2135,9 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     const paramNames = node.parameters.map((p) => p.id.sv);
 
     if (paramNames.length === 0) {
-      // No args beyond target — boolean flag via stateSet
+      // No args beyond target — store `true` as a boolean flag in stateMap
       return (context: DecoratorContext, target: Type) => {
-        context.program.stateSet(stateKey).add(target);
+        context.program.stateMap(stateKey).set(target, true);
       };
     } else if (paramNames.length === 1) {
       // Single arg — store value directly
