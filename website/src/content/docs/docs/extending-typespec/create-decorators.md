@@ -8,6 +8,77 @@ TypeSpec decorators are implemented as JavaScript functions. The process of crea
 1. [Declare the decorator signature in TypeSpec](#declare-the-decorator-signature) (optional but recommended)
 2. [Implement the decorator in JavaScript](#javascript-decorator-implementation)
 
+Alternatively, for decorators that simply store metadata, you can use [data decorators](#data-decorators) which require no JavaScript implementation at all.
+
+## Data decorators
+
+Data decorators are a simplified way to declare decorators that only store metadata. They are declared with the `data` modifier and require no JavaScript implementation — the compiler auto-generates the storage logic.
+
+```typespec
+// A boolean flag (no parameters beyond the target)
+data dec deprecated(target: unknown);
+
+// A single value
+data dec label(target: Model, value: valueof string);
+
+// Multiple values (stored as a named record)
+data dec metadata(target: Model, name: valueof string, version: valueof int32);
+```
+
+### How data is stored
+
+Data decorator arguments are stored automatically in the program's state map, keyed by the decorator's fully-qualified name:
+
+- **No parameters** (flag): stores `true`
+- **Single parameter**: stores the value directly
+- **Multiple parameters**: stores a record with parameter names as keys, e.g. `{ name: "hello", version: 1 }`
+
+### Reading data decorator values
+
+The compiler provides a generic API to read data decorator values without any generated code:
+
+```ts
+import { hasDataDecorator, getDataDecoratorValue } from "@typespec/compiler";
+
+// Check if a flag decorator was applied
+if (hasDataDecorator(program, "MyLib.deprecated", type)) {
+  // ...
+}
+
+// Get the stored value
+const label = getDataDecoratorValue(program, "MyLib.label", type) as string;
+
+// Get a multi-arg record
+const meta = getDataDecoratorValue(program, "MyLib.metadata", type) as {
+  name: string;
+  version: number;
+};
+```
+
+### Generated typed accessors
+
+When using `tspd gen-extern-signature`, typed accessor functions are generated for data decorators:
+
+```ts
+// Generated for: data dec deprecated(target: Model);
+export function isDeprecated(program: Program, target: Model): boolean;
+
+// Generated for: data dec label(target: Model, value: valueof string);
+export function getLabel(program: Program, target: Model): string | undefined;
+```
+
+### Combining with `internal`
+
+Data decorators can be combined with the `internal` modifier:
+
+```typespec
+internal data dec myInternalFlag(target: Model);
+```
+
+:::note
+`data` and `extern` are mutually exclusive — a decorator is either auto-implemented (data) or externally implemented (extern).
+:::
+
 ## Declare the decorator signature
 
 While this step is optional, it offers significant benefits:

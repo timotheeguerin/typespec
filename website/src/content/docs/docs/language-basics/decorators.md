@@ -62,3 +62,9 @@ model Dog {
 ## Creating decorators
 
 For more information on creating decorators, see [Creating Decorators](../extending-typespec/create-decorators.md).
+
+For decorators that simply attach metadata without custom logic, TypeSpec provides [data decorators](../extending-typespec/create-decorators.md#data-decorators) which require no JavaScript implementation:
+
+```typespec
+data dec label(target: Model, value: valueof string);
+```
