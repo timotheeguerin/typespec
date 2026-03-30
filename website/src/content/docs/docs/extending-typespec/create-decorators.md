@@ -16,13 +16,13 @@ Data decorators are a simplified way to declare decorators that only store metad
 
 ```typespec
 // A boolean flag (no parameters beyond the target)
-data dec deprecated(target: unknown);
+data dec tracked(target: unknown);
 
 // A single value
 data dec label(target: Model, value: valueof string);
 
 // Multiple values (stored as a named record)
-data dec metadata(target: Model, name: valueof string, version: valueof int32);
+data dec serviceInfo(target: Model, name: valueof string, version: valueof int32);
 ```
 
 ### How data is stored
@@ -41,7 +41,7 @@ The compiler provides a generic API to read data decorator values without any ge
 import { hasDataDecorator, getDataDecoratorValue } from "@typespec/compiler";
 
 // Check if a flag decorator was applied
-if (hasDataDecorator(program, "MyLib.deprecated", type)) {
+if (hasDataDecorator(program, "MyLib.tracked", type)) {
   // ...
 }
 
@@ -49,7 +49,7 @@ if (hasDataDecorator(program, "MyLib.deprecated", type)) {
 const label = getDataDecoratorValue(program, "MyLib.label", type) as string;
 
 // Get a multi-arg record
-const meta = getDataDecoratorValue(program, "MyLib.metadata", type) as {
+const info = getDataDecoratorValue(program, "MyLib.serviceInfo", type) as {
   name: string;
   version: number;
 };
@@ -60,8 +60,8 @@ const meta = getDataDecoratorValue(program, "MyLib.metadata", type) as {
 When using `tspd gen-extern-signature`, typed accessor functions are generated for data decorators:
 
 ```ts
-// Generated for: data dec deprecated(target: Model);
-export function isDeprecated(program: Program, target: Model): boolean;
+// Generated for: data dec tracked(target: Model);
+export function isTracked(program: Program, target: Model): boolean;
 
 // Generated for: data dec label(target: Model, value: valueof string);
 export function getLabel(program: Program, target: Model): string | undefined;

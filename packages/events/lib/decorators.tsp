@@ -56,4 +56,4 @@ extern dec contentType(target: UnionVariant | ModelProperty, contentType: valueo
  * }
  * ```
  */
-extern dec `data`(target: ModelProperty);
+extern dec data(target: ModelProperty);

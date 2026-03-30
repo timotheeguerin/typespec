@@ -425,7 +425,6 @@ function importLine(imports: string[]) {
 }
 
 function dataImportLine(typeImports: string[], valueImports: string[]) {
-  const parts: string[] = [];
   const all = [...valueImports, ...typeImports.map((t) => `type ${t}`)];
   all.sort((a, b) => {
     const nameA = a.replace("type ", "");
