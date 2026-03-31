@@ -34,6 +34,7 @@
   "dependencies": {
     "@azure/identity": "catalog:",
     "@azure/storage-blob": "catalog:",
+    "jose": "^6.0.11",
     "tar": "catalog:"
   },
   "devDependencies": {

@@ -1,9 +1,0 @@
-node_modules
-dist
-temp
-tsp-output
-*.tsp
-tspconfig.yaml
-tsconfig*.json
-.gitignore
-README.md

@@ -1,0 +1,9 @@
+{
+  "$schema": "./auth-config.schema.json",
+  "tenantId": "your-azure-ad-tenant-id",
+  "audience": "api://playground-registry",
+  "allowedUploaders": [
+    "user-object-id-1",
+    "user-object-id-2"
+  ]
+}

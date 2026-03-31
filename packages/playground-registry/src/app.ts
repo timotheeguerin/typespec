@@ -11,13 +11,15 @@ import { BlobStorageClient } from "./storage/blob-client.js";
 import { handleUpload } from "./handlers/upload.js";
 import { handleGetImportMap } from "./handlers/import-map.js";
 import { handleListVersions, handleListPackageVersions } from "./handlers/versions.js";
-import { createAuthPolicy } from "./auth.js";
+import { createAuthPolicy, loadAuthConfig } from "./auth.js";
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 const STORAGE_ACCOUNT = process.env.STORAGE_ACCOUNT ?? "typespec";
 const CONTAINER_NAME = process.env.CONTAINER_NAME ?? "pkgs";
 const INDEX_NAME = process.env.INDEX_NAME ?? "typespec";
+const AUTH_CONFIG_PATH = process.env.AUTH_CONFIG_PATH;
 
+const authConfig = loadAuthConfig(AUTH_CONFIG_PATH);
 const credential = new DefaultAzureCredential();
 const storage = new BlobStorageClient({
   storageAccountName: STORAGE_ACCOUNT,
@@ -55,7 +57,7 @@ const router = createPlaygroundRegistryRouter(packages, importMaps, versions, {
   routePolicies: {
     packages: {
       methodPolicies: {
-        upload: [createAuthPolicy()],
+        upload: [createAuthPolicy(authConfig)],
       },
     },
   },
