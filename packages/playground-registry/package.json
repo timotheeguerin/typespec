@@ -1,0 +1,47 @@
+{
+  "name": "@typespec/playground-registry",
+  "version": "0.1.0",
+  "private": true,
+  "author": "Microsoft Corporation",
+  "description": "Service for managing TypeSpec playground packages.",
+  "homepage": "https://typespec.io",
+  "readme": "https://github.com/microsoft/typespec/blob/main/README.md",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/microsoft/typespec.git"
+  },
+  "bugs": {
+    "url": "https://github.com/microsoft/typespec/issues"
+  },
+  "keywords": ["typespec"],
+  "type": "module",
+  "main": "dist/src/app.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "clean": "rimraf ./dist ./temp",
+    "build": "tsc -p tsconfig.build.json",
+    "watch": "tsc -p tsconfig.build.json --watch",
+    "start": "node dist/src/app.js",
+    "test": "echo 'no test'",
+    "test:ci": "echo 'no test'",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "generate": "tsp compile main.tsp --config tspconfig.yaml"
+  },
+  "dependencies": {
+    "@azure/identity": "catalog:",
+    "@azure/storage-blob": "catalog:",
+    "tar": "catalog:"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "workspace:^",
+    "@typespec/http": "workspace:^",
+    "@typespec/http-server-js": "workspace:^",
+    "@types/node": "catalog:",
+    "rimraf": "catalog:",
+    "typescript": "catalog:"
+  }
+}
