@@ -87,6 +87,12 @@ parameters:
     type: boolean
     default: false
 
+  # The npm script to run to build the emitter for playground bundling.
+  # Default is "build". C# uses "build:emitter" to skip the .NET generator build.
+  - name: PlaygroundBundleBuildScript
+    type: string
+    default: "build"
+
 stages:
   # Build stage
   # Responsible for building the autorest generator and typespec emitter packages
@@ -344,7 +350,7 @@ stages:
                   - script: npm ci
                     displayName: Install emitter dependencies for playground bundle
                     workingDirectory: $(Build.SourcesDirectory)/${{ parameters.PackagePath }}
-                  - script: npm run build:emitter
+                  - script: npm run ${{ parameters.PlaygroundBundleBuildScript }}
                     displayName: Build emitter for playground bundle
                     workingDirectory: $(Build.SourcesDirectory)/${{ parameters.PackagePath }}
                   - script: pnpm install --filter "@typespec/bundle-uploader..."
