@@ -13,6 +13,7 @@ export interface CSharpEmitterOptions {
   "unreferenced-types-handling"?: "removeOrInternalize" | "internalize" | "keepAll";
   "new-project"?: boolean;
   "save-inputs"?: boolean;
+  "skip-generator"?: boolean;
   debug?: boolean;
   logLevel?: LoggerLevel;
   "disable-xml-docs"?: boolean;
@@ -76,6 +77,13 @@ export const CSharpEmitterOptionsSchema: JSONSchemaType<CSharpEmitterOptions> = 
       nullable: true,
       description:
         "Set to `true` to save the `tspCodeModel.json` and `Configuration.json` files that are emitted and used as inputs to the generator. The default value is `false`.",
+    },
+    "skip-generator": {
+      type: "boolean",
+      nullable: true,
+      description:
+        "Set to `true` to skip running the C# generator (dotnet) and only emit the code model JSON files. " +
+        "This is useful for browser environments where dotnet is not available. The default value is `false`.",
     },
     "package-name": {
       type: "string",
@@ -145,6 +153,7 @@ export const defaultOptions = {
   "api-version": "latest",
   "new-project": false,
   "save-inputs": false,
+  "skip-generator": undefined,
   "generate-protocol-methods": true,
   "generate-convenience-methods": true,
   "package-name": undefined,

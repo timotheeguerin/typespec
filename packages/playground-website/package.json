@@ -53,12 +53,15 @@
     "!dist/test/**"
   ],
   "dependencies": {
+    "@azure-tools/typespec-azure-core": "0.66.0",
+    "@azure-tools/typespec-client-generator-core": "0.66.3",
     "@fluentui/react-components": "catalog:",
     "@fluentui/react-icons": "catalog:",
     "@typespec/compiler": "workspace:^",
     "@typespec/events": "workspace:^",
     "@typespec/html-program-viewer": "workspace:^",
     "@typespec/http": "workspace:^",
+    "@typespec/http-client-csharp": "file:../http-client-csharp",
     "@typespec/json-schema": "workspace:^",
     "@typespec/openapi": "workspace:^",
     "@typespec/openapi3": "workspace:^",

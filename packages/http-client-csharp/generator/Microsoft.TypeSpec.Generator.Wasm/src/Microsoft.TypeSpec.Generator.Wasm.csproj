@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Trim unused code to reduce bundle size (disabled for now - enable later) -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <!-- Suppress analyzer/trimming warnings for WASM project -->
+    <NoWarn>$(NoWarn);SA1402;CA1416;IL2026;IL2075;IL2070;IL2104</NoWarn>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Required for browser WASM -->
+    <WasmMainJSPath>main.js</WasmMainJSPath>
+    <!-- Disable features we don't need -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Override shared settings from Directory.Build.props -->
+    <IsGeneratedTestProject>false</IsGeneratedTestProject>
+    <ImportDefaultReferences>true</ImportDefaultReferences>
+    <DisableImplicitFrameworkReferences>false</DisableImplicitFrameworkReferences>
+    <!-- Suppress analyzer warnings for WASM project -->
+    <NoWarn>$(NoWarn);SA1402;CA1416;IL2026</NoWarn>
+    <!-- Allow referencing Exe projects -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Microsoft.TypeSpec.Generator.ClientModel\src\Microsoft.TypeSpec.Generator.ClientModel.csproj" />
+  </ItemGroup>
+</Project>
