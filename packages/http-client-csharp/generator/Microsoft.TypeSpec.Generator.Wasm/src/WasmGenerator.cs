@@ -32,9 +32,16 @@ public partial class WasmGenerator
     [JSExport]
     public static string Generate(string codeModelJson, string configurationJson)
     {
+        return Generate(codeModelJson, configurationJson, false);
+    }
+
+    /// <param name="enablePostProcessing">Enable Roslyn simplification/formatting (slower but prettier output)</param>
+    [JSExport]
+    public static string Generate(string codeModelJson, string configurationJson, bool enablePostProcessing)
+    {
         try
         {
-            return GenerateCore(codeModelJson, configurationJson);
+            return GenerateCore(codeModelJson, configurationJson, enablePostProcessing);
         }
         catch (Exception ex)
         {
@@ -147,7 +154,7 @@ public partial class WasmGenerator
         return processed;
     }
 
-    private static string GenerateCore(string codeModelJson, string configurationJson)
+    private static string GenerateCore(string codeModelJson, string configurationJson, bool enablePostProcessing)
     {
         // 1. Write the code model to a temp path on the WASM virtual filesystem
         //    so that InputLibrary can load it normally
@@ -216,14 +223,17 @@ public partial class WasmGenerator
             }
         }
 
-        // 9. Run Roslyn post-processing (simplification + formatting)
-        try
+        // 9. Optionally run Roslyn post-processing (simplification + formatting)
+        if (enablePostProcessing)
         {
-            generatedFiles = PostProcessFilesAsync(generatedFiles).GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[WASM] Roslyn post-processing failed, using raw output: {ex.Message}");
+            try
+            {
+                generatedFiles = PostProcessFilesAsync(generatedFiles).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WASM] Roslyn post-processing failed, using raw output: {ex.Message}");
+            }
         }
 
         return JsonSerializer.Serialize(generatedFiles);

@@ -1,6 +1,6 @@
 import { definePlaygroundViteConfig } from "@typespec/playground/vite";
 import { execSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { resolve } from "path";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig, loadEnv } from "vite";
@@ -37,31 +37,30 @@ export default defineConfig(({ mode }) => {
     }) as any,
   );
 
-  // Serve WASM generator bundle as static files
+  // Serve WASM generator bundle as static files (bypassing Vite transforms)
   if (existsSync(wasmBundlePath)) {
-    config.server = {
-      ...config.server,
-      fs: {
-        ...((config.server as any)?.fs ?? {}),
-        allow: [...((config.server as any)?.fs?.allow ?? []), wasmBundlePath],
-      },
-    };
-
-    // Add middleware to serve WASM bundle at /wasm/csharp/
     config.plugins!.push({
       name: "serve-csharp-wasm",
       configureServer(server) {
-        server.middlewares.use("/wasm/csharp/", (req, res, next) => {
-          // Rewrite to serve from the AppBundle directory
-          const filePath = resolve(wasmBundlePath, req.url!.slice(1));
-          if (existsSync(filePath)) {
-            return server.middlewares.handle(
-              Object.assign(req, {
-                url: `/@fs/${filePath}`,
-              }),
-              res,
-              next,
-            );
+        // Serve WASM bundle files raw — must bypass Vite's transform pipeline
+        // because dotnet.js/dotnet.runtime.js break when Vite injects its client code
+        server.middlewares.use("/wasm/csharp", (req, res, next) => {
+          const urlPath = req.url?.split("?")[0] ?? "";
+          const filePath = resolve(wasmBundlePath, urlPath.startsWith("/") ? urlPath.slice(1) : urlPath);
+          if (existsSync(filePath) && !statSync(filePath).isDirectory()) {
+            const content = readFileSync(filePath);
+            const ext = filePath.split(".").pop();
+            const mimeTypes: Record<string, string> = {
+              js: "application/javascript",
+              mjs: "application/javascript",
+              wasm: "application/wasm",
+              json: "application/json",
+              dat: "application/octet-stream",
+            };
+            res.setHeader("Content-Type", mimeTypes[ext ?? ""] ?? "application/octet-stream");
+            res.setHeader("Access-Control-Allow-Origin", "*");
+            res.end(content);
+            return;
           }
           next();
         });

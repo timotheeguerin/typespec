@@ -27,4 +27,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Microsoft.TypeSpec.Generator.ClientModel\src\Microsoft.TypeSpec.Generator.ClientModel.csproj" />
   </ItemGroup>
+
+  <!-- Copy worker.js to AppBundle output -->
+  <ItemGroup>
+    <Content Include="worker.js" CopyToPublishDirectory="PreserveNewest" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
