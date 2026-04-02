@@ -4,8 +4,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.TypeSpec.Generator;
 using Microsoft.TypeSpec.Generator.ClientModel;
 using Microsoft.TypeSpec.Generator.Input;
@@ -40,6 +46,107 @@ public partial class WasmGenerator
         }
     }
 
+    /// <summary>
+    /// Creates a MetadataReference from a loaded assembly using in-memory metadata,
+    /// avoiding file system access which isn't available in WASM.
+    /// </summary>
+    private static unsafe MetadataReference? CreateMetadataReferenceFromAssembly(Assembly assembly)
+    {
+        if (assembly.TryGetRawMetadata(out byte* blob, out int length))
+        {
+            var moduleMetadata = ModuleMetadata.CreateFromMetadata((IntPtr)blob, length);
+            var assemblyMetadata = AssemblyMetadata.Create(moduleMetadata);
+            return assemblyMetadata.GetReference();
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Collects metadata references from all loaded assemblies for Roslyn compilation.
+    /// </summary>
+    private static List<MetadataReference> CollectMetadataReferences()
+    {
+        var references = new List<MetadataReference>();
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.IsDynamic)
+                continue;
+            try
+            {
+                var reference = CreateMetadataReferenceFromAssembly(assembly);
+                if (reference != null)
+                    references.Add(reference);
+            }
+            catch
+            {
+                // Skip assemblies that can't provide metadata
+            }
+        }
+        return references;
+    }
+
+    /// <summary>
+    /// Runs Roslyn simplification and formatting on generated C# code.
+    /// </summary>
+    private static async System.Threading.Tasks.Task<Dictionary<string, string>> PostProcessFilesAsync(
+        Dictionary<string, string> generatedFiles)
+    {
+        var metadataReferences = CollectMetadataReferences();
+
+        using var workspace = new AdhocWorkspace();
+        var projectId = ProjectId.CreateNewId();
+        var projectInfo = ProjectInfo.Create(
+            projectId,
+            VersionStamp.Create(),
+            "GeneratedCode",
+            "GeneratedCode",
+            LanguageNames.CSharp,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+            metadataReferences: metadataReferences);
+
+        var project = workspace.AddProject(projectInfo);
+
+        // Add all generated files as documents
+        var documentMap = new Dictionary<DocumentId, string>();
+        foreach (var (filePath, content) in generatedFiles)
+        {
+            var document = project.AddDocument(filePath, Microsoft.CodeAnalysis.Text.SourceText.From(content));
+            documentMap[document.Id] = filePath;
+            project = document.Project;
+        }
+
+        // Apply the updated project to the workspace
+        workspace.TryApplyChanges(project.Solution);
+        project = workspace.CurrentSolution.GetProject(projectId)!;
+
+        // Process each document: simplify and format
+        var processed = new Dictionary<string, string>();
+
+        foreach (var document in project.Documents)
+        {
+            if (!documentMap.ContainsKey(document.Id))
+                continue;
+
+            try
+            {
+                // Run Roslyn simplification (reduces qualified names like System.String → string)
+                var simplified = await Simplifier.ReduceAsync(document);
+                // Run Roslyn formatting
+                var formatted = await Formatter.FormatAsync(simplified);
+                var text = await formatted.GetTextAsync();
+                processed[documentMap[document.Id]] = text.ToString();
+            }
+            catch
+            {
+                // If post-processing fails for a file, use the raw output
+                var text = await document.GetTextAsync();
+                processed[documentMap[document.Id]] = text.ToString();
+            }
+        }
+
+        return processed;
+    }
+
     private static string GenerateCore(string codeModelJson, string configurationJson)
     {
         // 1. Write the code model to a temp path on the WASM virtual filesystem
@@ -55,19 +162,24 @@ public partial class WasmGenerator
         var context = new GeneratorContext(configuration);
         var generator = new ScmCodeModelGenerator(context);
 
-        // 4. Set up the singleton instance
+        // 4. Set up the singleton instance and configure with in-memory metadata references
         CodeModelGenerator.Instance = generator;
 
-        // Configure() loads Roslyn metadata references from assembly paths,
-        // which aren't available in WASM. This is safe to skip since we don't
-        // run Roslyn post-processing in the playground.
+        // Configure the generator, catching metadata reference errors that occur in WASM
+        // (Assembly.Location is empty in WASM, but we handle references separately)
         try
         {
             generator.Configure();
         }
         catch (Exception)
         {
-            // Expected in WASM - assembly locations are empty strings
+            // Expected - ScmCodeModelGenerator.Configure() tries CreateFromFile with empty paths
+        }
+
+        // Add metadata references from in-memory assemblies (works in WASM)
+        foreach (var reference in CollectMetadataReferences())
+        {
+            generator.AddMetadataReference(reference);
         }
 
         // 5. Set a minimal SourceInputModel (no custom code, no baseline contract)
@@ -86,7 +198,7 @@ public partial class WasmGenerator
             visitor.VisitLibrary(output);
         }
 
-        // 8. Generate code files directly (skip Roslyn post-processing for WASM)
+        // 8. Generate raw code files
         var generatedFiles = new Dictionary<string, string>();
 
         foreach (var outputType in output.TypeProviders)
@@ -102,6 +214,16 @@ public partial class WasmGenerator
                 codeFile = writer.Write();
                 generatedFiles[codeFile.Name] = codeFile.Content;
             }
+        }
+
+        // 9. Run Roslyn post-processing (simplification + formatting)
+        try
+        {
+            generatedFiles = PostProcessFilesAsync(generatedFiles).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[WASM] Roslyn post-processing failed, using raw output: {ex.Message}");
         }
 
         return JsonSerializer.Serialize(generatedFiles);
