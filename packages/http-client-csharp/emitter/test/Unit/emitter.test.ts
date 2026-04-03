@@ -265,7 +265,7 @@ describe("Test _validateDotNetSdk", () => {
 
     // dynamically import the module to get the $onEmit function
     // we avoid importing it at the top to allow mocking of dependencies
-    _validateDotNetSdk = (await import("../../src/emitter.js"))._validateDotNetSdk;
+    _validateDotNetSdk = (await import("../../src/emit-generate.js"))._validateDotNetSdk;
   });
 
   it("should return false and report diagnostic when dotnet SDK is not installed.", async () => {
