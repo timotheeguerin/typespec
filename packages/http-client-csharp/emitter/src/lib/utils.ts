@@ -9,7 +9,7 @@ import {
 } from "@azure-tools/typespec-client-generator-core";
 import { getNamespaceFullName, Namespace, NoTarget, Type } from "@typespec/compiler";
 import { Visibility } from "@typespec/http";
-import type { SpawnOptions } from "child_process";
+import { spawn, SpawnOptions } from "child_process";
 import { CSharpEmitterContext } from "../sdk-context.js";
 
 export async function execCSharpGenerator(
@@ -22,7 +22,6 @@ export async function execCSharpGenerator(
     debug: boolean;
   },
 ): Promise<{ exitCode: number; stderr: string; proc: any }> {
-  const { spawn } = await import("child_process");
   const command = "dotnet";
   const args = [
     "--roll-forward",
@@ -111,7 +110,6 @@ export async function execAsync(
   args: string[] = [],
   options: SpawnOptions = {},
 ): Promise<{ exitCode: number; stdio: string; stdout: string; stderr: string; proc: any }> {
-  const { spawn } = await import("child_process");
   const child = spawn(command, args, options);
 
   return new Promise((resolve, reject) => {

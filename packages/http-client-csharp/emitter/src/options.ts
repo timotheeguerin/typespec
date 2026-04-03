@@ -22,7 +22,6 @@ export interface CSharpEmitterOptions {
   "generate-protocol-methods"?: boolean;
   "generate-convenience-methods"?: boolean;
   "package-name"?: string;
-  "playground-server-url"?: string;
   license?: {
     name: string;
     company?: string;
@@ -133,12 +132,6 @@ export const CSharpEmitterOptionsSchema: JSONSchemaType<CSharpEmitterOptions> = 
       nullable: true,
       description:
         "The SDK context options that implement the `CreateSdkContextOptions` interface from the [`@azure-tools/typespec-client-generator-core`](https://www.npmjs.com/package/@azure-tools/typespec-client-generator-core) package to be used by the CSharp emitter.",
-    },
-    "playground-server-url": {
-      type: "string",
-      nullable: true,
-      description:
-        "URL of a playground server that runs the .NET generator. When set, the emitter sends the code model to this server instead of spawning a local dotnet process. Used for browser-based playground environments.",
     },
   },
   required: [],
