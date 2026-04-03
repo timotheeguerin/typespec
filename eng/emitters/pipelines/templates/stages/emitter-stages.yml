@@ -347,6 +347,15 @@ stages:
               - ${{ if parameters.UploadPlaygroundBundle }}:
                   - script: npm install -g pnpm
                     displayName: Install pnpm for playground bundle upload
+                  - script: |
+                      PUBLISHED_VERSION=$(ls $(buildArtifactsPath)/packages/*.tgz | head -1 | sed 's/.*-\([0-9].*\)\.tgz/\1/')
+                      echo "Published version: $PUBLISHED_VERSION"
+                      if [ -n "$PUBLISHED_VERSION" ]; then
+                        node -e "const p=require('./package.json'); p.version='$PUBLISHED_VERSION'; require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2)+'\n')"
+                        echo "Updated package.json version to $PUBLISHED_VERSION"
+                      fi
+                    displayName: Sync version from published package
+                    workingDirectory: $(Build.SourcesDirectory)/${{ parameters.PackagePath }}
                   - script: npm ci
                     displayName: Install emitter dependencies for playground bundle
                     workingDirectory: $(Build.SourcesDirectory)/${{ parameters.PackagePath }}
