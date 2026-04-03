@@ -93,6 +93,28 @@ parameters:
     type: string
     default: "build"
 
+  # Path to a Dockerfile (relative to PackagePath) for the playground server.
+  # When set alongside UploadPlaygroundBundle, the server container is built and
+  # deployed to Azure Container Apps after publishing.
+  - name: PlaygroundServerDockerfile
+    type: string
+    default: ""
+
+  # Azure Container Registry name for the playground server image.
+  - name: PlaygroundServerRegistry
+    type: string
+    default: ""
+
+  # Azure Container Apps name for the playground server.
+  - name: PlaygroundServerAppName
+    type: string
+    default: ""
+
+  # Azure resource group for the playground server.
+  - name: PlaygroundServerResourceGroup
+    type: string
+    default: ""
+
 stages:
   # Build stage
   # Responsible for building the autorest generator and typespec emitter packages
@@ -374,6 +396,32 @@ stages:
                       azureSubscription: "Azure SDK Engineering System"
                       scriptLocation: inlineScript
                       inlineScript: node ./eng/emitters/scripts/upload-bundled-emitter.js ${{ parameters.PackagePath }}
+                      workingDirectory: $(Build.SourcesDirectory)
+
+              - ${{ if and(parameters.UploadPlaygroundBundle, ne(parameters.PlaygroundServerDockerfile, '')) }}:
+                  - task: AzureCLI@1
+                    displayName: Build and deploy playground server
+                    inputs:
+                      azureSubscription: "Azure SDK Engineering System"
+                      scriptLocation: inlineScript
+                      inlineScript: |
+                        set -e
+                        IMAGE="${{ parameters.PlaygroundServerRegistry }}.azurecr.io/${{ parameters.PlaygroundServerAppName }}:$(Build.BuildId)"
+
+                        echo "Building Docker image: $IMAGE"
+                        az acr build \
+                          --registry ${{ parameters.PlaygroundServerRegistry }} \
+                          --image "${{ parameters.PlaygroundServerAppName }}:$(Build.BuildId)" \
+                          --file ${{ parameters.PlaygroundServerDockerfile }} \
+                          $(Build.SourcesDirectory)/${{ parameters.PackagePath }}
+
+                        echo "Deploying to Container Apps"
+                        az containerapp update \
+                          --name ${{ parameters.PlaygroundServerAppName }} \
+                          --resource-group ${{ parameters.PlaygroundServerResourceGroup }} \
+                          --image "$IMAGE"
+
+                        echo "Deployed successfully"
                       workingDirectory: $(Build.SourcesDirectory)
 
             templateContext:
