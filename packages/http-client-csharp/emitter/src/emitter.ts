@@ -10,8 +10,6 @@ import {
 } from "@typespec/compiler";
 import { serializeCodeModel } from "./code-model-writer.js";
 import { generate } from "./emit-generate.js";
-// Re-export for backwards compatibility with tests
-export { _validateDotNetSdk } from "./emit-generate.js";
 import { createModel } from "./lib/client-model-builder.js";
 import { LoggerLevel } from "./lib/logger-level.js";
 import { Logger } from "./lib/logger.js";
