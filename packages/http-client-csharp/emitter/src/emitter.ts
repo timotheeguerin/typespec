@@ -8,6 +8,7 @@ import {
   EmitContext,
   Program,
 } from "@typespec/compiler";
+import { serializeCodeModel } from "./code-model-writer.js";
 import { generate } from "./emit-generate.js";
 // Re-export for backwards compatibility with tests
 export { _validateDotNetSdk } from "./emit-generate.js";
@@ -79,7 +80,7 @@ export async function emitCodeModel(
       const configurations: Configuration = createConfiguration(options, namespace, sdkContext);
 
       // Serialize code model and configuration
-      const codeModelJson = JSON.stringify(updatedRoot, null, 2);
+      const codeModelJson = serializeCodeModel(sdkContext, updatedRoot);
       const configJson = JSON.stringify(configurations, null, 2) + "\n";
 
       // Generate C# code via platform-specific implementation.
