@@ -100,18 +100,8 @@ parameters:
     type: string
     default: ""
 
-  # Azure Container Registry name for the playground server image.
-  - name: PlaygroundServerRegistry
-    type: string
-    default: ""
-
   # Azure Container Apps name for the playground server.
   - name: PlaygroundServerAppName
-    type: string
-    default: ""
-
-  # Azure resource group for the playground server.
-  - name: PlaygroundServerResourceGroup
     type: string
     default: ""
 
@@ -406,19 +396,22 @@ stages:
                       scriptLocation: inlineScript
                       inlineScript: |
                         set -e
-                        IMAGE="${{ parameters.PlaygroundServerRegistry }}.azurecr.io/${{ parameters.PlaygroundServerAppName }}:$(Build.BuildId)"
+                        REGISTRY="typespec"
+                        RESOURCE_GROUP="typespec"
+                        APP_NAME="${{ parameters.PlaygroundServerAppName }}"
+                        IMAGE="$REGISTRY.azurecr.io/$APP_NAME:$(Build.BuildId)"
 
                         echo "Building Docker image: $IMAGE"
                         az acr build \
-                          --registry ${{ parameters.PlaygroundServerRegistry }} \
-                          --image "${{ parameters.PlaygroundServerAppName }}:$(Build.BuildId)" \
+                          --registry "$REGISTRY" \
+                          --image "$APP_NAME:$(Build.BuildId)" \
                           --file ${{ parameters.PlaygroundServerDockerfile }} \
                           $(Build.SourcesDirectory)/${{ parameters.PackagePath }}
 
                         echo "Deploying to Container Apps"
                         az containerapp update \
-                          --name ${{ parameters.PlaygroundServerAppName }} \
-                          --resource-group ${{ parameters.PlaygroundServerResourceGroup }} \
+                          --name "$APP_NAME" \
+                          --resource-group "$RESOURCE_GROUP" \
                           --image "$IMAGE"
 
                         echo "Deployed successfully"

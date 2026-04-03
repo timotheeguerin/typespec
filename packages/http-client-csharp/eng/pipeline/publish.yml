@@ -67,9 +67,7 @@ extends:
           UploadPlaygroundBundle: true
           PlaygroundBundleBuildScript: "build:emitter"
           PlaygroundServerDockerfile: "playground-server/Dockerfile"
-          PlaygroundServerRegistry: "typespec"
           PlaygroundServerAppName: "csharp-playground-server"
-          PlaygroundServerResourceGroup: "typespec-playground"
           AdditionalInitializeSteps:
             - task: UseDotNet@2
               inputs:
