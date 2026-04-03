@@ -5,6 +5,7 @@ import { TestHost } from "@typespec/compiler/testing";
 import { strictEqual } from "assert";
 import { statSync } from "fs";
 import { beforeEach, describe, expect, it, Mock, vi } from "vitest";
+import { generate } from "../../src/emit-generate.js";
 import { execAsync, execCSharpGenerator } from "../../src/lib/utils.js";
 import { CSharpEmitterOptions } from "../../src/options.js";
 import { CodeModel } from "../../src/type/code-model.js";
@@ -60,6 +61,14 @@ describe("$onEmit tests", () => {
       execCSharpGenerator: vi.fn(),
       execAsync: vi.fn(),
     }));
+
+    vi.mock("../../src/emit-generate.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src/emit-generate.js")>();
+      return {
+        ...actual,
+        generate: vi.fn(),
+      };
+    });
 
     vi.mock("../../src/lib/client-model-builder.js", () => ({
       createModel: vi.fn().mockReturnValue([{ name: "TestNamespace" }, []]),
@@ -119,68 +128,53 @@ describe("$onEmit tests", () => {
     );
   });
 
-  it("should set newProject to TRUE if .csproj file DOES NOT exist", async () => {
-    vi.mocked(statSync).mockImplementation(() => {
-      throw new Error("File not found");
-    });
-
+  it("should pass newProject FALSE by default", async () => {
     const context: EmitContext<CSharpEmitterOptions> = createEmitterContext(program);
     await $onEmit(context);
 
-    expect(execCSharpGenerator).toHaveBeenCalledWith(expect.anything(), {
-      generatorPath: expect.any(String),
-      outputFolder: undefined,
-      generatorName: "ScmCodeModelGenerator",
-      newProject: true, // Ensure this is passed as true
-      debug: false,
-    });
+    expect(generate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({
+        newProject: false,
+        generatorName: "ScmCodeModelGenerator",
+      }),
+    );
   });
 
-  it("should set newProject to FALSE if .csproj file DOES exist", async () => {
-    vi.mocked(statSync).mockReturnValue({ isFile: () => true } as any);
-
-    const context: EmitContext<CSharpEmitterOptions> = createEmitterContext(program);
-    await $onEmit(context);
-
-    expect(execCSharpGenerator).toHaveBeenCalledWith(expect.anything(), {
-      generatorPath: expect.any(String),
-      outputFolder: undefined,
-      generatorName: "ScmCodeModelGenerator",
-      newProject: false, // Ensure this is passed as false
-      debug: false,
-    });
-  });
-
-  it("should set newProject to TRUE if passed in options", async () => {
-    vi.mocked(statSync).mockReturnValue({ isFile: () => true } as any);
-
+  it("should pass newProject TRUE when set in options", async () => {
     const context: EmitContext<CSharpEmitterOptions> = createEmitterContext(program, {
       "new-project": true,
     });
     await $onEmit(context);
-    expect(execCSharpGenerator).toHaveBeenCalledWith(expect.anything(), {
-      generatorPath: expect.any(String),
-      outputFolder: undefined,
-      generatorName: "ScmCodeModelGenerator",
-      newProject: true, // Ensure this is passed as true
-      debug: false,
-    });
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({
+        newProject: true,
+        generatorName: "ScmCodeModelGenerator",
+      }),
+    );
   });
 
-  it("should set newProject to FALSE if passed in options", async () => {
-    vi.mocked(statSync).mockReturnValue({ isFile: () => true } as any);
-
+  it("should pass newProject FALSE when set in options", async () => {
     const context: EmitContext<CSharpEmitterOptions> = createEmitterContext(program, {
       "new-project": false,
     });
     await $onEmit(context);
-    expect(execCSharpGenerator).toHaveBeenCalledWith(expect.anything(), {
-      generatorPath: expect.any(String),
-      outputFolder: undefined,
-      generatorName: "ScmCodeModelGenerator",
-      newProject: false, // Ensure this is passed as true
-      debug: false,
-    });
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({
+        newProject: false,
+        generatorName: "ScmCodeModelGenerator",
+      }),
+    );
   });
 });
 
