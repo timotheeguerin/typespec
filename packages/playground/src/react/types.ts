@@ -1,15 +1,39 @@
 import type { Program } from "@typespec/compiler";
 import type { ReactNode } from "react";
+import type { SerializedDiagnostic } from "../workers/types.js";
 
 export type CompilationCrashed = {
   readonly internalCompilerError: any;
 };
 
+/** Result from main-thread compilation (has live Program). */
 export type CompileResult = {
   readonly program: Program;
   readonly outputFiles: string[];
 };
-export type CompilationState = CompileResult | CompilationCrashed;
+
+/** Result from worker compilation (has serialized data). */
+export type WorkerCompileResult = {
+  readonly outputFiles: Record<string, string>;
+  readonly diagnostics: readonly SerializedDiagnostic[];
+};
+
+export type CompilationState = CompileResult | WorkerCompileResult | CompilationCrashed;
+
+/** Type guard: check if result has a live Program */
+export function hasProgram(state: CompilationState): state is CompileResult {
+  return "program" in state;
+}
+
+/** Type guard: check if result is from worker */
+export function isWorkerResult(state: CompilationState): state is WorkerCompileResult {
+  return "diagnostics" in state && !("program" in state);
+}
+
+/** Type guard: check if result is a crash */
+export function isCrashed(state: CompilationState): state is CompilationCrashed {
+  return "internalCompilerError" in state;
+}
 
 export type EmitterOptions = Record<string, Record<string, unknown>>;
 

@@ -1,6 +1,6 @@
 import { FolderListRegular } from "@fluentui/react-icons";
 import { Pane, SplitPane } from "@typespec/react-components";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { FileBreadcrumb } from "../breadcrumb/index.js";
 import { FileOutput } from "../file-output/file-output.js";
 import { FileTreeExplorer } from "../file-tree/index.js";
@@ -100,6 +100,105 @@ export function createFileViewer(fileViewers: FileOutputViewer[]): ProgramViewer
     icon: <FolderListRegular />,
     render: (props) => {
       return <FileViewerComponent {...props} fileViewers={viewerMap} />;
+    },
+  };
+}
+
+/**
+ * File viewer for worker results that reads from a content map instead of program.host.
+ */
+export interface WorkerFileViewerProps {
+  readonly outputFiles: string[];
+  readonly outputContents: Record<string, string>;
+}
+
+interface WorkerFileViewerDef {
+  readonly key: string;
+  readonly label: string;
+  readonly render: (props: WorkerFileViewerProps) => ReactNode;
+}
+
+const WorkerFileViewerComponent = ({
+  outputFiles,
+  outputContents,
+  fileViewers,
+}: WorkerFileViewerProps & { fileViewers: Record<string, FileOutputViewer> }) => {
+  const [filename, setFilename] = useState<string>("");
+
+  const showFileTree = useMemo(
+    () =>
+      outputFiles.length > 1 &&
+      (outputFiles.some((f) => f.includes("/")) || outputFiles.length >= 3),
+    [outputFiles],
+  );
+
+  const content = useMemo(() => {
+    return outputContents[filename] ?? "";
+  }, [outputContents, filename]);
+
+  useEffect(() => {
+    if (outputFiles.length > 0) {
+      const fileStillThere = outputFiles.find((x) => x === filename);
+      setFilename(fileStillThere ?? outputFiles[0]);
+    } else {
+      setFilename("");
+    }
+  }, [outputFiles, filename]);
+
+  const handleFileSelection = useCallback(
+    (newFilename: string) => {
+      if (outputFiles.includes(newFilename)) {
+        setFilename(newFilename);
+      }
+    },
+    [outputFiles],
+  );
+
+  if (outputFiles.length === 0) {
+    return <>No files emitted.</>;
+  }
+
+  if (showFileTree) {
+    return (
+      <div className={style["file-viewer"]}>
+        <SplitPane initialSizes={["220px", undefined]}>
+          <Pane minSize={120} maxSize={400}>
+            <FileTreeExplorer
+              files={outputFiles}
+              selected={filename}
+              onSelect={handleFileSelection}
+            />
+          </Pane>
+          <Pane>
+            <div className={style["file-viewer-content-with-breadcrumb"]}>
+              <FileBreadcrumb path={filename} />
+              <div className={style["file-viewer-content"]}>
+                <FileOutput filename={filename} content={content} viewers={fileViewers} />
+              </div>
+            </div>
+          </Pane>
+        </SplitPane>
+      </div>
+    );
+  }
+
+  return (
+    <div className={style["file-viewer"]}>
+      <OutputTabs filenames={outputFiles} selected={filename} onSelect={handleFileSelection} />
+      <div className={style["file-viewer-content"]}>
+        <FileOutput filename={filename} content={content} viewers={fileViewers} />
+      </div>
+    </div>
+  );
+};
+
+export function createWorkerFileViewer(fileViewers: FileOutputViewer[]): WorkerFileViewerDef {
+  const viewerMap = Object.fromEntries(fileViewers.map((x) => [x.key, x]));
+  return {
+    key: "worker-file-output",
+    label: "Output explorer",
+    render: (props) => {
+      return <WorkerFileViewerComponent {...props} fileViewers={viewerMap} />;
     },
   };
 }

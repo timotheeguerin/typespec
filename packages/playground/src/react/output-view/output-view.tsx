@@ -2,8 +2,17 @@ import { Button, Tab, TabList, type SelectTabEventHandler } from "@fluentui/reac
 import { useCallback, useMemo, useState, type FunctionComponent } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import type { PlaygroundEditorsOptions } from "../playground.js";
-import type { CompilationState, CompileResult, FileOutputViewer, ProgramViewer } from "../types.js";
-import { createFileViewer } from "./file-viewer.js";
+import {
+  hasProgram,
+  isCrashed,
+  isWorkerResult,
+  type CompilationState,
+  type CompileResult,
+  type FileOutputViewer,
+  type ProgramViewer,
+  type WorkerCompileResult,
+} from "../types.js";
+import { createFileViewer, createWorkerFileViewer } from "./file-viewer.js";
 import { TypeGraphViewer } from "./type-graph-viewer.js";
 
 import style from "./output-view.module.css";
@@ -51,19 +60,35 @@ export const OutputView: FunctionComponent<OutputViewProps> = ({
   if (compilationState === undefined) {
     return <></>;
   }
-  if ("internalCompilerError" in compilationState) {
+  if (isCrashed(compilationState)) {
     return <></>;
   }
-  return (
-    <OutputViewInternal
-      compilationResult={compilationState}
-      viewers={resolvedViewers}
-      selectedViewer={selectedViewer}
-      onViewerChange={onViewerChange}
-      viewerState={viewerState}
-      onViewerStateChange={onViewerStateChange}
-    />
-  );
+
+  if (hasProgram(compilationState)) {
+    return (
+      <OutputViewInternal
+        compilationResult={compilationState}
+        viewers={resolvedViewers}
+        selectedViewer={selectedViewer}
+        onViewerChange={onViewerChange}
+        viewerState={viewerState}
+        onViewerStateChange={onViewerStateChange}
+      />
+    );
+  }
+
+  if (isWorkerResult(compilationState)) {
+    return (
+      <WorkerOutputView
+        compilationResult={compilationState}
+        fileViewers={fileViewers ?? []}
+        selectedViewer={selectedViewer}
+        onViewerChange={onViewerChange}
+      />
+    );
+  }
+
+  return <></>;
 };
 
 function resolveViewers(
@@ -164,3 +189,31 @@ function fallbackRender({ error, resetErrorBoundary }: FallbackProps) {
     </div>
   );
 }
+
+/**
+ * Simple output view for worker results - renders output files directly
+ * from the serialized file content map (no Program object needed).
+ */
+const WorkerOutputView: FunctionComponent<{
+  compilationResult: WorkerCompileResult;
+  fileViewers: FileOutputViewer[];
+  selectedViewer?: string;
+  onViewerChange?: (viewerKey: string) => void;
+}> = ({ compilationResult, fileViewers }) => {
+  const workerFileViewer = useMemo(
+    () => createWorkerFileViewer(fileViewers),
+    [fileViewers],
+  );
+  const outputFiles = Object.keys(compilationResult.outputFiles);
+  const outputContents = compilationResult.outputFiles;
+
+  return (
+    <div className={style["output-view"]}>
+      <div className={style["output-content"]}>
+        <ErrorBoundary fallbackRender={fallbackRender}>
+          <workerFileViewer.render outputFiles={outputFiles} outputContents={outputContents} />
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};

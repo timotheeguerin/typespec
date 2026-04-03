@@ -7,6 +7,12 @@ export interface PlaygroundUserConfig extends Omit<PlaygroundConfig, "samples"> 
    */
   readonly skipBundleLibraries?: boolean;
   readonly samples?: Record<string, PlaygroundSampleConfig>;
+
+  /**
+   * Whether to generate a compile worker for off-main-thread compilation.
+   * @default true
+   */
+  readonly enableCompileWorker?: boolean;
 }
 
 export interface PlaygroundConfig {

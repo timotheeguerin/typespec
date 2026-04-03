@@ -8,6 +8,7 @@ import {
   createTypeSpecBundle,
   watchTypeSpecBundle,
 } from "../bundler.js";
+import { createWorkerBundle } from "../worker-bundler.js";
 
 export interface TypeSpecBundlePluginOptions {
   readonly folderName: string;
@@ -16,12 +17,37 @@ export interface TypeSpecBundlePluginOptions {
    * Name of libraries to bundle.
    */
   readonly libraries: readonly string[];
+
+  /**
+   * Whether to generate a self-contained compile worker bundle.
+   * When enabled, a `compile-worker.js` file is generated that includes
+   * all libraries with peer deps inlined, suitable for use in a Web Worker.
+   * @default false
+   */
+  readonly generateCompileWorker?: boolean;
+
+  /**
+   * Custom handler code to include in the compile worker.
+   * This code runs inside the worker after all libraries are loaded.
+   * The variable `self.__typespec_libraries` is available with all library modules.
+   */
+  readonly compileWorkerHandlerCode?: string;
 }
 
 export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plugin {
   let config: ResolvedConfig;
   const definitions: Record<string, TypeSpecBundleDefinition> = {};
   const bundles: Record<string, TypeSpecBundle> = {};
+  let workerBundleContent: string | undefined;
+
+  async function buildWorkerBundleIfNeeded(minify: boolean) {
+    if (!options.generateCompileWorker) return;
+    workerBundleContent = await createWorkerBundle({
+      bundles,
+      workerHandlerCode: options.compileWorkerHandlerCode,
+      minify,
+    });
+  }
 
   return {
     name: "typespec-bundle",
@@ -37,6 +63,7 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
         bundles[name] = bundle;
         definitions[name] = bundle.definition;
       }
+      await buildWorkerBundleIfNeeded(minify);
     },
     async configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -46,6 +73,16 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
           return;
         }
         const start = `/${options.folderName}/`;
+
+        // Serve the compile worker bundle
+        if (options.generateCompileWorker && id === `${start}compile-worker.js`) {
+          if (workerBundleContent) {
+            res.writeHead(200, "Ok", { "Content-Type": "application/javascript" });
+            res.write(workerBundleContent);
+            res.end();
+            return;
+          }
+        }
 
         const resolveFilename = (path: string) => {
           if (path === "") {
@@ -86,9 +123,11 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
         void watchBundleLibrary(
           config.root,
           library,
-          (bundle) => {
+          async (bundle) => {
             bundles[library] = bundle;
             definitions[library] = bundle.definition;
+            // Rebuild worker bundle when any library changes
+            await buildWorkerBundleIfNeeded(false);
             server.ws.send({ type: "full-reload" });
           },
           { minify: false },
@@ -105,6 +144,15 @@ export function typespecBundlePlugin(options: TypeSpecBundlePluginOptions): Plug
             source: file.content,
           });
         }
+      }
+
+      // Emit the compile worker bundle
+      if (options.generateCompileWorker && workerBundleContent) {
+        this.emitFile({
+          type: "asset",
+          fileName: `${options.folderName}/compile-worker.js`,
+          source: workerBundleContent,
+        });
       }
     },
 

@@ -6,3 +6,4 @@ export {
   TypeSpecBundleFile,
   createTypeSpecBundle,
 } from "./bundler.js";
+export { createWorkerBundle, WorkerBundleOptions } from "./worker-bundler.js";

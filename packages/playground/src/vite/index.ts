@@ -1,6 +1,7 @@
 import { typespecBundlePlugin } from "@typespec/bundler/vite";
 import react from "@vitejs/plugin-react";
 import type { Plugin, ResolvedConfig, UserConfig } from "vite";
+import { getCompileWorkerHandlerCode } from "../workers/compile-worker-handler.js";
 import type { PlaygroundUserConfig } from "./types.js";
 
 export function definePlaygroundViteConfig(config: PlaygroundUserConfig): UserConfig {
@@ -31,6 +32,8 @@ export function definePlaygroundViteConfig(config: PlaygroundUserConfig): UserCo
         ? typespecBundlePlugin({
             folderName: "libs",
             libraries: config.libraries,
+            generateCompileWorker: config.enableCompileWorker ?? true,
+            compileWorkerHandlerCode: getCompileWorkerHandlerCode(),
           })
         : undefined,
     ],

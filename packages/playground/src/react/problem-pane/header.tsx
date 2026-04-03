@@ -1,7 +1,7 @@
 import { mergeClasses } from "@fluentui/react-components";
 import { ChevronDown16Regular, ErrorCircle16Filled, Warning16Filled } from "@fluentui/react-icons";
 import { memo, type MouseEventHandler, type ReactNode } from "react";
-import type { CompilationState } from "../types.js";
+import { hasProgram, isCrashed, isWorkerResult, type CompilationState } from "../types.js";
 import style from "./header.module.css";
 
 export interface ProblemPaneHeaderProps {
@@ -19,29 +19,42 @@ export const ProblemPaneHeader = memo(({ compilationState, ...props }: ProblemPa
   if (compilationState === undefined) {
     return noProblem;
   }
-  if ("internalCompilerError" in compilationState) {
+  if (isCrashed(compilationState)) {
     return (
       <Container status="error" {...props}>
         <ErrorCircle16Filled /> Internal Compiler Error
       </Container>
     );
   }
-  const diagnostics = compilationState.program.diagnostics;
-  if (diagnostics.length === 0) {
+
+  // Get diagnostics from either main-thread or worker result
+  let errorCount = 0;
+  let warningCount = 0;
+  if (hasProgram(compilationState)) {
+    for (const d of compilationState.program.diagnostics) {
+      if (d.severity === "error") errorCount++;
+      else warningCount++;
+    }
+  } else if (isWorkerResult(compilationState)) {
+    for (const d of compilationState.diagnostics) {
+      if (d.severity === "error") errorCount++;
+      else warningCount++;
+    }
+  }
+
+  if (errorCount === 0 && warningCount === 0) {
     return noProblem;
   }
-  const errors = diagnostics.filter((x) => x.severity === "error");
-  const warnings = diagnostics.filter((x) => x.severity === "warning");
   return (
-    <Container status={errors.length > 0 ? "error" : "warning"} {...props}>
-      {errors.length > 0 ? (
+    <Container status={errorCount > 0 ? "error" : "warning"} {...props}>
+      {errorCount > 0 ? (
         <>
-          <ErrorCircle16Filled className={style["error-icon"]} /> {errors.length} errors
+          <ErrorCircle16Filled className={style["error-icon"]} /> {errorCount} errors
         </>
       ) : null}
-      {warnings.length > 0 ? (
+      {warningCount > 0 ? (
         <>
-          <Warning16Filled className={style["warning-icon"]} /> {warnings.length} warnings
+          <Warning16Filled className={style["warning-icon"]} /> {warningCount} warnings
         </>
       ) : null}
     </Container>
