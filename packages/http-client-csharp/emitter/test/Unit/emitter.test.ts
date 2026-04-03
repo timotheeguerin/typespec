@@ -7,7 +7,6 @@ import { statSync } from "fs";
 import { beforeEach, describe, expect, it, Mock, vi } from "vitest";
 import { generate } from "../../src/emit-generate.js";
 import { execAsync, execCSharpGenerator } from "../../src/lib/utils.js";
-import { generate } from "../../src/emit-generate.js";
 import { CSharpEmitterOptions } from "../../src/options.js";
 import { CodeModel } from "../../src/type/code-model.js";
 import {
