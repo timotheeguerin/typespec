@@ -239,7 +239,22 @@ async function createEsBuildContext(
     format: "esm",
     target: "es2024",
     minify,
-    plugins: [virtualPlugin, nodeModulesPolyfillPlugin({}), ...plugins],
+    plugins: [
+      virtualPlugin,
+      nodeModulesPolyfillPlugin({
+        modules: {
+          fs: "empty",
+          path: true,
+          url: "empty",
+          child_process: "empty",
+          "node:fs": "empty",
+          "node:path": true,
+          "node:url": "empty",
+          "node:child_process": "empty",
+        },
+      }),
+      ...plugins,
+    ],
   });
 }
 
