@@ -16,6 +16,11 @@ import { LoadingSpinner } from "./loading-spinner";
 import "@typespec/playground-website/style.css";
 import "@typespec/playground/styles.css";
 
+// Configure the playground server URL for the C# emitter's browser stub.
+// This must be set before the emitter runs.
+(globalThis as any).__TYPESPEC_PLAYGROUND_SERVER_URL__ =
+  "https://csharp-playground-server.typespec.io";
+
 export interface WebsitePlaygroundProps {
   versionData: VersionData;
 }
