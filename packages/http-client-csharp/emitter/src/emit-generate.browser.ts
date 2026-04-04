@@ -13,8 +13,15 @@ export async function generate(
   configJson: string,
   options: GenerateOptions,
 ): Promise<void> {
-  const serverUrl =
-    (globalThis as any).__TYPESPEC_PLAYGROUND_SERVER_URL__ ?? "http://localhost:5174";
+  const serverUrl = (globalThis as any).__TYPESPEC_PLAYGROUND_SERVER_URL__;
+
+  if (!serverUrl) {
+    throw new Error(
+      "C# code generation requires a playground server. " +
+        "No server URL is configured. Set globalThis.__TYPESPEC_PLAYGROUND_SERVER_URL__ " +
+        "to the URL of a running C# playground server.",
+    );
+  }
 
   const response = await fetch(`${serverUrl}/generate`, {
     method: "POST",
