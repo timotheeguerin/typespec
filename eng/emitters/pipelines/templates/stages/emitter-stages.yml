@@ -410,11 +410,12 @@ stages:
 
                         # Build and push Docker image
                         echo "Building Docker image: $IMAGE"
+                        CONTEXT="$(Build.SourcesDirectory)/${{ parameters.PackagePath }}"
                         az acr build \
                           --registry "$REGISTRY" \
                           --image "$APP_NAME:$(Build.BuildId)" \
-                          --file ${{ parameters.PlaygroundServerDockerfile }} \
-                          $(Build.SourcesDirectory)/${{ parameters.PackagePath }}
+                          --file "$CONTEXT/${{ parameters.PlaygroundServerDockerfile }}" \
+                          "$CONTEXT"
 
                         # Create Container Apps environment if it doesn't exist
                         if ! az containerapp env show --name "$ENV_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
