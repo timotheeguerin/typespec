@@ -405,7 +405,7 @@ stages:
                         # Create ACR if it doesn't exist
                         if ! az acr show --name "$REGISTRY" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
                           echo "Creating container registry: $REGISTRY"
-                          az acr create --name "$REGISTRY" --resource-group "$RESOURCE_GROUP" --sku Basic --admin-enabled true
+                          az acr create --name "$REGISTRY" --resource-group "$RESOURCE_GROUP" --sku Basic --admin-enabled false
                         fi
 
                         # Build and push Docker image
