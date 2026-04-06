@@ -5,6 +5,7 @@ WORKDIR /src
 
 # Build the generator (populates dist/generator/)
 COPY generator/ generator/
+COPY eng/ eng/
 COPY global.json .
 RUN dotnet build generator -c Release
 

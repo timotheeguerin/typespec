@@ -1,7 +1,6 @@
 node_modules/
 dist/
 emitter/
-eng/
 .tspd/
 *.md
 *.tsp
