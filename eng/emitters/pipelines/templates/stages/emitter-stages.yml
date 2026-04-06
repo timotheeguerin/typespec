@@ -396,7 +396,7 @@ stages:
                       scriptLocation: inlineScript
                       inlineScript: |
                         set -e
-                        REGISTRY="azsdkengsys"
+                        REGISTRY="typespecacr"
                         RESOURCE_GROUP="typespec"
                         APP_NAME="${{ parameters.PlaygroundServerAppName }}"
                         IMAGE="$REGISTRY.azurecr.io/$APP_NAME:$(Build.BuildId)"
