@@ -22,9 +22,9 @@ var playgroundUrls = Environment.GetEnvironmentVariable("PLAYGROUND_URLS")
     ?? Environment.GetEnvironmentVariable("PLAYGROUND_URL");
 if (!string.IsNullOrEmpty(playgroundUrls))
 {
-    foreach (var url in playgroundUrls.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    foreach (var origin in playgroundUrls.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
     {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
         {
             allowedOrigins.Add(uri.GetLeftPart(UriPartial.Authority));
         }
