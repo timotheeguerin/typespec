@@ -8,6 +8,12 @@ export function registerMonacoDefaultWorkersForVite() {
           );
           return jsonWorker();
         }
+        case "typespec": {
+          const { default: typespecWorker } = await import(
+            "@typespec/playground/worker/playground-worker?worker" as any
+          );
+          return typespecWorker();
+        }
         default: {
           const { default: editorWorker } = await import(
             "monaco-editor/esm/vs/editor/editor.worker?worker" as any
