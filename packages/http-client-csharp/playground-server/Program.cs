@@ -154,7 +154,10 @@ app.MapPost("/generate", async (HttpRequest request) =>
     }
 }).RequireRateLimiting("generate");
 
-var url = Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://localhost:5174";
+var port = Environment.GetEnvironmentVariable("PORT")
+    ?? Environment.GetEnvironmentVariable("WEBSITES_PORT")
+    ?? "5174";
+var url = Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? $"http://+:{port}";
 Console.WriteLine($"C# playground server listening on {url}");
 app.Run(url);
 

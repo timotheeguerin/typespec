@@ -26,7 +26,6 @@ COPY --from=build /app .
 RUN groupadd -r playground && useradd -r -g playground playground
 USER playground
 
-ENV ASPNETCORE_URLS=http://+:5174
 ENV DOTNET_ENVIRONMENT=Production
 ENV GENERATOR_PATH=/app/generator/Microsoft.TypeSpec.Generator.dll
 
