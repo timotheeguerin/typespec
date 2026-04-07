@@ -398,7 +398,7 @@ stages:
                         set -e
                         REGISTRY="typespecacr"
                         RESOURCE_GROUP="typespec"
-                        ENV_NAME="typespec-playground"
+                        PLAN_NAME="typespec-playground-plan"
                         APP_NAME="${{ parameters.PlaygroundServerAppName }}"
                         IMAGE="$REGISTRY.azurecr.io/$APP_NAME:$(Build.BuildId)"
 
@@ -417,33 +417,41 @@ stages:
                           --file "$CONTEXT/${{ parameters.PlaygroundServerDockerfile }}" \
                           "$CONTEXT"
 
-                        # Create Container Apps environment if it doesn't exist
-                        if ! az containerapp env show --name "$ENV_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-                          echo "Creating Container Apps environment: $ENV_NAME"
-                          az containerapp env create --name "$ENV_NAME" --resource-group "$RESOURCE_GROUP"
+                        # Create App Service plan if it doesn't exist
+                        if ! az appservice plan show --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                          echo "Creating App Service plan: $PLAN_NAME"
+                          az appservice plan create \
+                            --name "$PLAN_NAME" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --is-linux \
+                            --sku B1
                         fi
 
-                        # Create or update Container App
-                        if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-                          echo "Updating Container App: $APP_NAME"
-                          az containerapp update \
+                        # Create or update Web App
+                        if az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                          echo "Updating Web App: $APP_NAME"
+                          az webapp config container set \
                             --name "$APP_NAME" \
                             --resource-group "$RESOURCE_GROUP" \
-                            --image "$IMAGE"
+                            --container-image-name "$IMAGE" \
+                            --container-registry-url "https://$REGISTRY.azurecr.io"
                         else
-                          echo "Creating Container App: $APP_NAME"
-                          az containerapp create \
+                          echo "Creating Web App: $APP_NAME"
+                          az webapp create \
                             --name "$APP_NAME" \
                             --resource-group "$RESOURCE_GROUP" \
-                            --environment "$ENV_NAME" \
-                            --image "$IMAGE" \
-                            --target-port 5174 \
-                            --ingress external \
-                            --min-replicas 1 \
-                            --registry-server "$REGISTRY.azurecr.io"
+                            --plan "$PLAN_NAME" \
+                            --container-image-name "$IMAGE" \
+                            --container-registry-url "https://$REGISTRY.azurecr.io"
+
+                          # Configure the app
+                          az webapp config appsettings set \
+                            --name "$APP_NAME" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --settings WEBSITES_PORT=5174
                         fi
 
-                        FQDN=$(az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
+                        FQDN="$APP_NAME.azurewebsites.net"
                         echo "Deployed successfully at https://$FQDN"
                       workingDirectory: $(Build.SourcesDirectory)
 
