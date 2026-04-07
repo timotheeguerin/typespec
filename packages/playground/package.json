@@ -47,6 +47,14 @@
       "types": "./dist/src/react/viewers/index.d.ts",
       "default": "./dist/react/viewers/index.js"
     },
+    "./worker": {
+      "types": "./dist/src/worker/index.d.ts",
+      "default": "./dist/worker/index.js"
+    },
+    "./worker/playground-worker": {
+      "types": "./dist/src/worker/playground-worker.d.ts",
+      "default": "./dist/worker/playground-worker.js"
+    },
     "./style.css": "./dist/style.css",
     "./styles.css": "./dist/style.css"
   },

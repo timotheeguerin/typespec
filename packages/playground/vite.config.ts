@@ -33,6 +33,8 @@ export default defineConfig({
         "state-storage": "src/state-storage.ts",
         "react/index": "src/react/index.ts",
         "react/viewers/index": "src/react/viewers/index.tsx",
+        "worker/index": "src/worker/index.ts",
+        "worker/playground-worker": "src/worker/playground-worker.ts",
         "tooling/index": "src/tooling/index.ts",
         "vite/index": "src/vite/index.ts",
       },
