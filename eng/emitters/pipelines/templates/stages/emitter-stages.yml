@@ -444,6 +444,13 @@ stages:
                             --container-image-name "$IMAGE" \
                             --container-registry-url "https://$REGISTRY.azurecr.io"
 
+                          # Enable managed identity and grant ACR pull access
+                          az webapp identity assign --name "$APP_NAME" --resource-group "$RESOURCE_GROUP"
+                          PRINCIPAL_ID=$(az webapp identity show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query principalId -o tsv)
+                          ACR_ID=$(az acr show --name "$REGISTRY" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
+                          az role assignment create --assignee "$PRINCIPAL_ID" --role AcrPull --scope "$ACR_ID"
+                          az webapp config set --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --generic-configurations '{"acrUseManagedIdentityCreds": true}'
+
                           # Configure the app
                           az webapp config appsettings set \
                             --name "$APP_NAME" \
