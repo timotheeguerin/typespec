@@ -14,11 +14,21 @@ var allowedOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     "http://localhost:5173", // vite dev
     "http://localhost:4173", // vite preview
     "http://localhost:3000",
+    "https://typespec.io",
+    "https://www.typespec.io",
 };
-var playgroundUrl = Environment.GetEnvironmentVariable("PLAYGROUND_URL");
-if (!string.IsNullOrEmpty(playgroundUrl) && Uri.TryCreate(playgroundUrl, UriKind.Absolute, out var uri))
+// Add additional origins from PLAYGROUND_URLS (comma-separated) or PLAYGROUND_URL (single)
+var playgroundUrls = Environment.GetEnvironmentVariable("PLAYGROUND_URLS")
+    ?? Environment.GetEnvironmentVariable("PLAYGROUND_URL");
+if (!string.IsNullOrEmpty(playgroundUrls))
 {
-    allowedOrigins.Add(uri.GetLeftPart(UriPartial.Authority));
+    foreach (var url in playgroundUrls.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            allowedOrigins.Add(uri.GetLeftPart(UriPartial.Authority));
+        }
+    }
 }
 
 builder.Services.AddCors();
