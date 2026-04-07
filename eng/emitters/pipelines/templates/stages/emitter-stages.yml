@@ -457,15 +457,15 @@ stages:
                             --resource-group "$RESOURCE_GROUP" \
                             --container-image-name "$IMAGE" \
                             --container-registry-url "https://$REGISTRY.azurecr.io"
-
-                          # Configure the app
-                          az webapp config appsettings set \
-                            --name "$APP_NAME" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --settings \
-                              WEBSITES_PORT=5174 \
-                              PLAYGROUND_URLS="https://typespec.io,https://tspwebsitepr.z22.web.core.windows.net,https://cadlplayground.z22.web.core.windows.net"
                         fi
+
+                        # Configure app settings (runs on every deploy)
+                        az webapp config appsettings set \
+                          --name "$APP_NAME" \
+                          --resource-group "$RESOURCE_GROUP" \
+                          --settings \
+                            WEBSITES_PORT=5174 \
+                            PLAYGROUND_URLS="https://typespec.io,https://tspwebsitepr.z22.web.core.windows.net,https://cadlplayground.z22.web.core.windows.net"
 
                         FQDN="$APP_NAME.azurewebsites.net"
                         echo "Deployed successfully at https://$FQDN"
