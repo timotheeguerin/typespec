@@ -1971,6 +1971,9 @@ importers:
       '@typespec/versioning':
         specifier: workspace:^
         version: link:../versioning
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 6.0.1(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(tsx@4.21.0)(yaml@2.8.2))
       clsx:
         specifier: 'catalog:'
         version: 2.1.1
@@ -1983,6 +1986,9 @@ importers:
       monaco-editor:
         specifier: 'catalog:'
         version: 0.55.1
+      picocolors:
+        specifier: 'catalog:'
+        version: 1.1.1
       react:
         specifier: 'catalog:'
         version: 19.2.4
@@ -1995,6 +2001,9 @@ importers:
       swagger-ui-dist:
         specifier: 'catalog:'
         version: 5.32.0
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(tsx@4.21.0)(yaml@2.8.2)
       vscode-languageserver:
         specifier: 'catalog:'
         version: 9.0.1
@@ -2004,6 +2013,9 @@ importers:
       yaml:
         specifier: 'catalog:'
         version: 2.8.2
+      yargs:
+        specifier: 'catalog:'
+        version: 18.0.0
     devDependencies:
       '@babel/core':
         specifier: 'catalog:'
@@ -2041,12 +2053,12 @@ importers:
       '@types/swagger-ui-dist':
         specifier: 'catalog:'
         version: 3.30.6
+      '@types/yargs':
+        specifier: 'catalog:'
+        version: 17.0.35
       '@typespec/react-components':
         specifier: workspace:^
         version: link:../react-components
-      '@vitejs/plugin-react':
-        specifier: 'catalog:'
-        version: 6.0.1(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(tsx@4.21.0)(yaml@2.8.2))
       c8:
         specifier: 'catalog:'
         version: 11.0.0
@@ -2065,9 +2077,6 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
-      vite:
-        specifier: 'catalog:'
-        version: 8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(tsx@4.21.0)(yaml@2.8.2)
       vite-plugin-checker:
         specifier: 'catalog:'
         version: 0.12.0(eslint@10.0.3)(optionator@0.9.4)(typescript@5.9.3)(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(tsx@4.21.0)(yaml@2.8.2))

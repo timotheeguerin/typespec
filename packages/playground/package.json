@@ -18,6 +18,9 @@
   ],
   "type": "module",
   "main": "dist/src/index.js",
+  "bin": {
+    "typespec-playground": "cmd/typespec-playground.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/src/index.d.ts",
@@ -68,6 +71,7 @@
   },
   "files": [
     "lib/*.tsp",
+    "cmd/**",
     "dist/**",
     "!dist/test/**"
   ],
@@ -83,17 +87,21 @@
     "@typespec/protobuf": "workspace:^",
     "@typespec/rest": "workspace:^",
     "@typespec/versioning": "workspace:^",
+    "@vitejs/plugin-react": "catalog:",
     "clsx": "catalog:",
     "debounce": "catalog:",
     "lzutf8": "catalog:",
     "monaco-editor": "catalog:",
+    "picocolors": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-error-boundary": "catalog:",
     "swagger-ui-dist": "catalog:",
+    "vite": "catalog:",
     "vscode-languageserver": "catalog:",
     "vscode-languageserver-textdocument": "catalog:",
-    "yaml": "catalog:"
+    "yaml": "catalog:",
+    "yargs": "catalog:"
   },
   "devDependencies": {
     "@babel/core": "catalog:",
@@ -108,16 +116,15 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@types/swagger-ui-dist": "catalog:",
+    "@types/yargs": "catalog:",
     "@typespec/bundler": "workspace:^",
     "@typespec/react-components": "workspace:^",
-    "@vitejs/plugin-react": "catalog:",
     "c8": "catalog:",
     "cross-env": "catalog:",
     "es-module-shims": "catalog:",
     "rimraf": "catalog:",
     "storybook": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:",
     "vite-plugin-checker": "catalog:",
     "vite-plugin-dts": "catalog:",
     "vitest": "catalog:"

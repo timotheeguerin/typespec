@@ -19,7 +19,13 @@ const externals = [
   "react/jsx-runtime",
   "vite",
   "@vitejs/plugin-react",
+  // Node built-ins used by CLI
+  "fs",
   "fs/promises",
+  "path",
+  "os",
+  "url",
+  "child_process",
 ];
 
 export default defineConfig({
@@ -35,6 +41,7 @@ export default defineConfig({
         "react/viewers/index": "src/react/viewers/index.tsx",
         "tooling/index": "src/tooling/index.ts",
         "vite/index": "src/vite/index.ts",
+        "cli/cli": "src/cli/cli.ts",
       },
       cssFileName: "style",
       formats: ["es"],
