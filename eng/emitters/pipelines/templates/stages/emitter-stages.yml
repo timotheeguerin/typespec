@@ -428,7 +428,7 @@ stages:
                             --name "$PLAN_NAME" \
                             --resource-group "$RESOURCE_GROUP" \
                             --is-linux \
-                            --sku B1
+                            --sku B2
                         fi
 
                         # Ensure managed identity and ACR pull access are configured
