@@ -3,10 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { FluentLayout } from "../fluent/fluent-layout";
 import { loadImportMap, type VersionData } from "../playground-component/import-map";
 
-const additionalPlaygroundPackages = [
-  "@typespec/http-client-csharp",
-  "@typespec/http-client-python",
-] as const;
+const additionalPlaygroundPackages = ["@typespec/http-client-python"];
 
 export const AsyncPlayground = ({
   latestVersion,
@@ -21,7 +18,10 @@ export const AsyncPlayground = ({
   }>(undefined as any);
   useEffect(() => {
     Promise.all([
-      loadImportMap({ latestVersion, additionalPackages: additionalPlaygroundPackages }),
+      loadImportMap({
+        latestVersion,
+        additionalPackages: additionalPlaygroundPackages,
+      }),
       import("../playground-component/playground"),
     ])
       .then((x) => setMod({ versionData: x[0] as any, WebsitePlayground: x[1].WebsitePlayground }))

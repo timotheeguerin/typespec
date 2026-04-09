@@ -21,6 +21,7 @@ async function fetchAdditionalPackageImports(
       const url = `${pkgsBaseUrl}/${name}/latest.json`;
       const response = await fetch(url);
       if (!response.ok) {
+        // eslint-disable-next-line no-console
         console.warn(`Failed to load latest index for ${name}: ${response.status}`);
         return undefined;
       }
@@ -54,9 +55,7 @@ export async function loadImportMap({
   const parsed = new URLSearchParams(window.location.search);
 
   const requestedVersion = parsed.get("version");
-  const importMapUrl = `${pkgsBaseUrl}/indexes/typespec/${
-    requestedVersion ?? latestVersion
-  }.json`;
+  const importMapUrl = `${pkgsBaseUrl}/indexes/typespec/${requestedVersion ?? latestVersion}.json`;
 
   const [mainResponse, additionalImports] = await Promise.all([
     fetch(importMapUrl),
