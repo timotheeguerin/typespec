@@ -374,6 +374,10 @@ stages:
                   - script: npm run ${{ parameters.PlaygroundBundleBuildScript }}
                     displayName: Build emitter for playground bundle
                     workingDirectory: $(Build.SourcesDirectory)/${{ parameters.PackagePath }}
+                  - task: NodeTool@0
+                    displayName: Install Node.js for playground bundle
+                    inputs:
+                      versionSpec: "22.x"
                   - script: pnpm install --filter "@typespec/bundle-uploader..."
                     displayName: Install bundle-uploader dependencies
                     workingDirectory: $(Build.SourcesDirectory)
