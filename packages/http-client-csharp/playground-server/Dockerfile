@@ -6,7 +6,7 @@ WORKDIR /src
 # Build the generator (populates dist/generator/)
 COPY generator/ generator/
 COPY eng/ eng/
-COPY global.json .
+# Skip global.json — it pins an SDK version that may not match the container
 RUN dotnet build generator -c Release
 
 # Build the server
