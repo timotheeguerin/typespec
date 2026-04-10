@@ -420,6 +420,11 @@ stages:
                           --file "$CONTEXT/${{ parameters.PlaygroundServerDockerfile }}" \
                           "$CONTEXT"
 
+                        # Enable ACR admin to get credentials for ACI pull
+                        az acr update --name "$REGISTRY" --admin-enabled true
+                        ACR_USERNAME=$(az acr credential show --name "$REGISTRY" --query username -o tsv)
+                        ACR_PASSWORD=$(az acr credential show --name "$REGISTRY" --query "passwords[0].value" -o tsv)
+
                         # Deploy to Azure Container Instances
                         echo "Deploying to ACI: $APP_NAME"
                         az container create \
@@ -427,8 +432,8 @@ stages:
                           --resource-group "$RESOURCE_GROUP" \
                           --image "$IMAGE" \
                           --registry-login-server "$REGISTRY.azurecr.io" \
-                          --acr-identity "[system]" \
-                          --assign-identity "[system]" \
+                          --registry-username "$ACR_USERNAME" \
+                          --registry-password "$ACR_PASSWORD" \
                           --cpu 2 \
                           --memory 4 \
                           --ports 5174 \
