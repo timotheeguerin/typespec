@@ -12,3 +12,4 @@ declare module "monaco-editor/esm/vs/editor/editor.worker.js" {
 
   export function initialize(callback: (ctx: IWorkerContext, createData: unknown) => object): void;
 }
+declare module "*.css";
