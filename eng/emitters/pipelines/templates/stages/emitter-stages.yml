@@ -457,9 +457,66 @@ stages:
 
                         FQDN=$(az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query ipAddress.fqdn -o tsv)
                         IP=$(az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query ipAddress.ip -o tsv)
-                        echo "Deployed successfully"
-                        echo "  FQDN: http://$FQDN:5174"
-                        echo "  IP:   http://$IP:5174"
+                        echo "ACI deployed: http://$FQDN:5174"
+
+                        # Set up Azure Front Door for HTTPS termination (idempotent)
+                        FD_PROFILE="$APP_NAME-fd"
+                        FD_ENDPOINT="$APP_NAME"
+                        if ! az afd profile show --profile-name "$FD_PROFILE" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                          echo "Creating Front Door profile: $FD_PROFILE"
+                          az afd profile create \
+                            --profile-name "$FD_PROFILE" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --sku Standard_AzureFrontDoor
+
+                          az afd endpoint create \
+                            --profile-name "$FD_PROFILE" \
+                            --endpoint-name "$FD_ENDPOINT" \
+                            --resource-group "$RESOURCE_GROUP"
+
+                          az afd origin-group create \
+                            --profile-name "$FD_PROFILE" \
+                            --origin-group-name "$APP_NAME-og" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --probe-request-type GET \
+                            --probe-protocol Http \
+                            --probe-path "/health"
+
+                          az afd origin create \
+                            --profile-name "$FD_PROFILE" \
+                            --origin-group-name "$APP_NAME-og" \
+                            --origin-name "$APP_NAME-origin" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --host-name "$FQDN" \
+                            --origin-host-header "$FQDN" \
+                            --http-port 5174 \
+                            --priority 1 \
+                            --weight 1000 \
+                            --enabled-state Enabled
+
+                          az afd route create \
+                            --profile-name "$FD_PROFILE" \
+                            --endpoint-name "$FD_ENDPOINT" \
+                            --origin-group "$APP_NAME-og" \
+                            --route-name "$APP_NAME-route" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --forwarding-protocol HttpOnly \
+                            --https-redirect Enabled \
+                            --supported-protocols Https Http
+                        else
+                          # Update origin host if ACI FQDN changed
+                          az afd origin update \
+                            --profile-name "$FD_PROFILE" \
+                            --origin-group-name "$APP_NAME-og" \
+                            --origin-name "$APP_NAME-origin" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --host-name "$FQDN" \
+                            --origin-host-header "$FQDN" \
+                            --http-port 5174
+                        fi
+
+                        FD_HOSTNAME=$(az afd endpoint show --profile-name "$FD_PROFILE" --endpoint-name "$FD_ENDPOINT" --resource-group "$RESOURCE_GROUP" --query hostName -o tsv)
+                        echo "HTTPS endpoint: https://$FD_HOSTNAME"
                       workingDirectory: $(Build.SourcesDirectory)
 
             templateContext:
