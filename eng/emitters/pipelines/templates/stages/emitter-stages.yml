@@ -402,7 +402,6 @@ stages:
                         set -e
                         REGISTRY="typespecacr"
                         RESOURCE_GROUP="typespec"
-                        PLAN_NAME="typespec-playground-plan"
                         APP_NAME="${{ parameters.PlaygroundServerAppName }}"
                         IMAGE="$REGISTRY.azurecr.io/$APP_NAME:$(Build.BuildId)"
 
@@ -421,65 +420,46 @@ stages:
                           --file "$CONTEXT/${{ parameters.PlaygroundServerDockerfile }}" \
                           "$CONTEXT"
 
-                        # Create App Service plan if it doesn't exist
-                        if ! az appservice plan show --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-                          echo "Creating App Service plan: $PLAN_NAME"
-                          az appservice plan create \
-                            --name "$PLAN_NAME" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --is-linux \
-                            --sku P1v3
+                        # Deploy to Azure Container Instances
+                        echo "Deploying to ACI: $APP_NAME"
+
+                        # Enable ACR admin to get credentials for ACI pull
+                        az acr update --name "$REGISTRY" --admin-enabled true
+                        ACR_USERNAME=$(az acr credential show --name "$REGISTRY" --query username -o tsv)
+                        ACR_PASSWORD=$(az acr credential show --name "$REGISTRY" --query "passwords[0].value" -o tsv)
+
+                        # Delete existing container if present (ACI doesn't support in-place update)
+                        if az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                          echo "Deleting existing container..."
+                          az container delete --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --yes
                         fi
 
-                        # Ensure managed identity and ACR pull access are configured
-                        echo "Configuring managed identity..."
-                        az webapp identity assign --name "$APP_NAME" --resource-group "$RESOURCE_GROUP"
-                        PRINCIPAL_ID=$(az webapp identity show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query principalId -o tsv)
-                        ACR_ID=$(az acr show --name "$REGISTRY" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
-                        echo "Principal ID: $PRINCIPAL_ID"
-                        echo "ACR ID: $ACR_ID"
-                        az role assignment create --assignee "$PRINCIPAL_ID" --role AcrPull --scope "$ACR_ID" || echo "Role assignment already exists"
-                        az webapp config set --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" \
-                          --generic-configurations '{"acrUseManagedIdentityCreds": true}'
-
-                        # Wait for role assignment to propagate
-                        echo "Waiting 30s for role assignment propagation..."
-                        sleep 30
-
-                        # Create or update Web App
-                        if az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-                          echo "Updating Web App: $APP_NAME"
-                          az webapp config container set \
-                            --name "$APP_NAME" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --container-image-name "$IMAGE" \
-                            --container-registry-url "https://$REGISTRY.azurecr.io"
-                        else
-                          echo "Creating Web App: $APP_NAME"
-                          az webapp create \
-                            --name "$APP_NAME" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --plan "$PLAN_NAME" \
-                            --container-image-name "mcr.microsoft.com/dotnet/aspnet:10.0"
-
-                          # Set the actual image after identity is ready
-                          az webapp config container set \
-                            --name "$APP_NAME" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --container-image-name "$IMAGE" \
-                            --container-registry-url "https://$REGISTRY.azurecr.io"
-                        fi
-
-                        # Configure app settings (runs on every deploy)
-                        az webapp config appsettings set \
+                        az container create \
                           --name "$APP_NAME" \
                           --resource-group "$RESOURCE_GROUP" \
-                          --settings \
-                            WEBSITES_PORT=5174 \
-                            PLAYGROUND_URLS="https://typespec.io,https://tspwebsitepr.z22.web.core.windows.net,https://cadlplayground.z22.web.core.windows.net"
+                          --image "$IMAGE" \
+                          --registry-login-server "$REGISTRY.azurecr.io" \
+                          --registry-username "$ACR_USERNAME" \
+                          --registry-password "$ACR_PASSWORD" \
+                          --cpu 2 \
+                          --memory 4 \
+                          --ports 5174 \
+                          --ip-address Public \
+                          --dns-name-label "$APP_NAME" \
+                          --os-type Linux \
+                          --environment-variables \
+                            DOTNET_ENVIRONMENT=Production \
+                            TMPDIR=/tmp \
+                            COMPlus_EnableDiagnostics=0 \
+                            DOTNET_EnableDiagnostics=0 \
+                            PLAYGROUND_URLS="https://typespec.io,https://tspwebsitepr.z22.web.core.windows.net,https://cadlplayground.z22.web.core.windows.net" \
+                          --restart-policy Always
 
-                        FQDN="$APP_NAME.azurewebsites.net"
-                        echo "Deployed successfully at https://$FQDN"
+                        FQDN=$(az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query ipAddress.fqdn -o tsv)
+                        IP=$(az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query ipAddress.ip -o tsv)
+                        echo "Deployed successfully"
+                        echo "  FQDN: http://$FQDN:5174"
+                        echo "  IP:   http://$IP:5174"
                       workingDirectory: $(Build.SourcesDirectory)
 
             templateContext:
