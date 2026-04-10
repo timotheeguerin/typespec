@@ -23,14 +23,9 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 
-RUN groupadd -r playground && useradd -r -g playground -m playground \
-    && mkdir -p /tmp/roslyn && chown -R playground:playground /tmp/roslyn
-USER playground
-
 ENV DOTNET_ENVIRONMENT=Production
 ENV GENERATOR_PATH=/app/generator/Microsoft.TypeSpec.Generator.dll
-# Roslyn needs a writable temp directory for persistent storage
-ENV TMPDIR=/tmp/roslyn
+ENV TMPDIR=/tmp
 
 EXPOSE 5174
 ENTRYPOINT ["dotnet", "playground-server.dll"]
