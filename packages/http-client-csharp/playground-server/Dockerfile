@@ -1,6 +1,6 @@
 # Build from the http-client-csharp package root:
 #   docker build -f playground-server/Dockerfile -t csharp-playground-server .
-FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Build the generator (populates dist/generator/)
@@ -19,7 +19,7 @@ RUN dotnet publish playground-server -c Release -o /app
 RUN cp -r dist/generator /app/generator
 
 # Need full SDK (not just aspnet) because the server spawns `dotnet` to run the generator DLL
-FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS runtime
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 

@@ -74,21 +74,6 @@ app.MapGet("/health", () => Results.Ok(new
     generatorPath
 }));
 
-// Debug endpoint: returns the first 5000 chars of the code model and configuration
-app.MapPost("/debug-generate", async (HttpRequest request) =>
-{
-    var body = await JsonSerializer.DeserializeAsync<GenerateRequest>(
-        request.Body, GenerateJsonContext.Default.GenerateRequest);
-    return Results.Ok(new
-    {
-        codeModelLength = body?.CodeModel?.Length ?? 0,
-        codeModelPreview = body?.CodeModel?.Substring(0, Math.Min(5000, body?.CodeModel?.Length ?? 0)),
-        configurationLength = body?.Configuration?.Length ?? 0,
-        configuration = body?.Configuration,
-        generatorName = body?.GeneratorName
-    });
-});
-
 app.MapPost("/generate", async (HttpRequest request) =>
 {
     var body = await JsonSerializer.DeserializeAsync<GenerateRequest>(
