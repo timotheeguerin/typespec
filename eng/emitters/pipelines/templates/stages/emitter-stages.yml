@@ -423,10 +423,25 @@ stages:
                         # Deploy to Azure Container Instances
                         echo "Deploying to ACI: $APP_NAME"
 
-                        # Enable ACR admin to get credentials for ACI pull
-                        az acr update --name "$REGISTRY" --admin-enabled true
-                        ACR_USERNAME=$(az acr credential show --name "$REGISTRY" --query username -o tsv)
-                        ACR_PASSWORD=$(az acr credential show --name "$REGISTRY" --query "passwords[0].value" -o tsv)
+                        # Create user-assigned managed identity for ACR pull (avoids admin account)
+                        IDENTITY_NAME="$APP_NAME-identity"
+                        if ! az identity show --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                          echo "Creating managed identity: $IDENTITY_NAME"
+                          az identity create --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP"
+                        fi
+                        IDENTITY_ID=$(az identity show --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
+                        IDENTITY_PRINCIPAL=$(az identity show --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP" --query principalId -o tsv)
+                        ACR_ID=$(az acr show --name "$REGISTRY" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
+
+                        # Assign AcrPull role (idempotent)
+                        az role assignment create \
+                          --assignee "$IDENTITY_PRINCIPAL" \
+                          --role AcrPull \
+                          --scope "$ACR_ID" 2>/dev/null || echo "AcrPull role already assigned"
+
+                        # Wait for role propagation on first create
+                        echo "Waiting 30s for role assignment propagation..."
+                        sleep 30
 
                         # Delete existing container if present (ACI doesn't support in-place update)
                         if az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
@@ -439,8 +454,8 @@ stages:
                           --resource-group "$RESOURCE_GROUP" \
                           --image "$IMAGE" \
                           --registry-login-server "$REGISTRY.azurecr.io" \
-                          --registry-username "$ACR_USERNAME" \
-                          --registry-password "$ACR_PASSWORD" \
+                          --acr-identity "$IDENTITY_ID" \
+                          --assign-identity "$IDENTITY_ID" \
                           --cpu 2 \
                           --memory 4 \
                           --ports 5174 \
