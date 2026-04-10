@@ -120,6 +120,7 @@ export class TypeSpecBundledPackageUploader {
     await blob.upload(content, content.length, {
       blobHTTPHeaders: {
         blobContentType: "application/json; charset=utf-8",
+        blobCacheControl: "no-cache, max-age=0",
       },
     });
   }
@@ -145,6 +146,7 @@ export class TypeSpecBundledPackageUploader {
     await blob.upload(content, content.length, {
       blobHTTPHeaders: {
         blobContentType: "application/json; charset=utf-8",
+        blobCacheControl: "no-cache, max-age=0",
       },
     });
   }
