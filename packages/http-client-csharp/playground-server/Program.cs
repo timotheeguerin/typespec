@@ -103,6 +103,10 @@ app.MapPost("/generate", async (HttpRequest request) =>
         var generatorName = body.GeneratorName ?? "ScmCodeModelGenerator";
 
         // Run the .NET generator as a subprocess (same approach as the TypeSpec emitter)
+        Console.WriteLine($"Starting generator: dotnet --roll-forward Major {generatorPath} {tempDir} -g {generatorName} --new-project");
+        Console.WriteLine($"Code model size: {body.CodeModel!.Length} chars");
+        Console.WriteLine($"Configuration: {body.Configuration}");
+
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
@@ -114,14 +118,35 @@ app.MapPost("/generate", async (HttpRequest request) =>
         };
 
         using var process = Process.Start(psi)!;
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        var stderr = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
 
-        if (process.ExitCode != 0)
+        // Stream stdout/stderr to console for logging
+        var stdoutTask = Task.Run(async () =>
+        {
+            string? line;
+            while ((line = await process.StandardOutput.ReadLineAsync()) != null)
+            {
+                Console.WriteLine($"[generator stdout] {line}");
+            }
+        });
+        var stderrTask = Task.Run(async () =>
+        {
+            string? line;
+            while ((line = await process.StandardError.ReadLineAsync()) != null)
+            {
+                Console.Error.WriteLine($"[generator stderr] {line}");
+            }
+        });
+
+        await process.WaitForExitAsync();
+        await Task.WhenAll(stdoutTask, stderrTask);
+
+        var exitCode = process.ExitCode;
+        Console.WriteLine($"Generator exited with code {exitCode}");
+
+        if (exitCode != 0)
         {
             return Results.Json(
-                new GenerateErrorResponse($"Generator failed with exit code {process.ExitCode}", stderr),
+                new GenerateErrorResponse($"Generator failed with exit code {exitCode}", "See server logs for details"),
                 GenerateJsonContext.Default.GenerateErrorResponse,
                 statusCode: 500);
         }
