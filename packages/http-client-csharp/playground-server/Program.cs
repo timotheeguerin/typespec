@@ -136,8 +136,10 @@ app.MapPost("/generate", async (HttpRequest request) =>
         // Set env vars to prevent segfaults in container environment
         psi.Environment["DOTNET_DefaultStackSize"] = "0x200000"; // 2MB stack
         psi.Environment["COMPlus_DefaultStackSize"] = "200000";
-        psi.Environment["DOTNET_gcServer"] = "0"; // Disable server GC (can segfault in containers)
+        psi.Environment["DOTNET_gcServer"] = "0"; // Disable server GC
         psi.Environment["COMPlus_EnableDiagnostics"] = "0";
+        psi.Environment["DOTNET_ReadyToRun"] = "0"; // Disable R2R, force JIT
+        psi.Environment["DOTNET_TieredCompilation"] = "0"; // Disable tiered compilation
 
         using var process = Process.Start(psi)!;
 
