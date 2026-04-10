@@ -26,6 +26,9 @@ COPY --from=build /app .
 ENV DOTNET_ENVIRONMENT=Production
 ENV GENERATOR_PATH=/app/generator/Microsoft.TypeSpec.Generator.dll
 ENV TMPDIR=/tmp
+# Disable .NET diagnostics to prevent segfaults in containers
+ENV COMPlus_EnableDiagnostics=0
+ENV DOTNET_EnableDiagnostics=0
 
 EXPOSE 5174
 ENTRYPOINT ["dotnet", "playground-server.dll"]
