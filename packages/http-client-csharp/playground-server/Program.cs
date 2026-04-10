@@ -67,12 +67,29 @@ else
     Console.WriteLine($"Generator DLL: {generatorPath}");
 }
 
-app.MapGet("/health", () => Results.Ok(new
+app.MapGet("/health", () =>
 {
-    status = "ok",
-    generatorFound = File.Exists(generatorPath),
-    generatorPath
-}));
+    string dotnetVersion;
+    try
+    {
+        var psi = new ProcessStartInfo("dotnet", "--version") { RedirectStandardOutput = true, UseShellExecute = false };
+        var proc = Process.Start(psi)!;
+        dotnetVersion = proc.StandardOutput.ReadToEnd().Trim();
+        proc.WaitForExit();
+    }
+    catch (Exception ex) { dotnetVersion = ex.Message; }
+
+    return Results.Ok(new
+    {
+        status = "ok",
+        generatorFound = File.Exists(generatorPath),
+        generatorPath,
+        dotnetVersion,
+        runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+        os = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+        arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString()
+    });
+});
 
 app.MapPost("/generate", async (HttpRequest request) =>
 {
