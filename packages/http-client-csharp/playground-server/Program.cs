@@ -79,10 +79,15 @@ app.MapGet("/health", () =>
     }
     catch (Exception ex) { dotnetVersion = ex.Message; }
 
-    // Check for core dumps
-    var dumpFiles = Directory.Exists("/tmp")
-        ? Directory.GetFiles("/tmp", "coredump.*").Select(Path.GetFileName).ToArray()
-        : Array.Empty<string?>();
+    // Check for core dumps in /tmp and subdirectories
+    var dumpFiles = new List<string>();
+    if (Directory.Exists("/tmp"))
+    {
+        foreach (var f in Directory.GetFiles("/tmp", "coredump*", SearchOption.TopDirectoryOnly))
+            dumpFiles.Add(f);
+        foreach (var f in Directory.GetFiles("/tmp", "*.dmp", SearchOption.AllDirectories))
+            dumpFiles.Add(f);
+    }
 
     return Results.Ok(new
     {
@@ -154,6 +159,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
         using var process = Process.Start(psi)!;
 
         // Stream stdout/stderr to console for logging
+        var stderrLines = new List<string>();
         var stdoutTask = Task.Run(async () =>
         {
             string? line;
@@ -168,6 +174,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
             while ((line = await process.StandardError.ReadLineAsync()) != null)
             {
                 Console.Error.WriteLine($"[generator stderr] {line}");
+                stderrLines.Add(line);
             }
         });
 
@@ -180,7 +187,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
         if (exitCode != 0)
         {
             return Results.Json(
-                new GenerateErrorResponse($"Generator failed with exit code {exitCode}", "See server logs for details"),
+                new GenerateErrorResponse($"Generator failed with exit code {exitCode}", string.Join("\n", stderrLines.TakeLast(50))),
                 GenerateJsonContext.Default.GenerateErrorResponse,
                 statusCode: 500);
         }
