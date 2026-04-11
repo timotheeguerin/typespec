@@ -75,6 +75,7 @@ namespace Microsoft.TypeSpec.Generator
             FilterAllCustomizedMembers(output);
 
             LoggingHelpers.LogElapsedTime("All visitors have been applied");
+            CodeModelGenerator.Instance.Emitter.Info($"SkipPostProcessing={CodeModelGenerator.Instance.SkipPostProcessing}");
 
             if (CodeModelGenerator.Instance.SkipPostProcessing)
             {
