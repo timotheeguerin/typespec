@@ -92,10 +92,17 @@ namespace Microsoft.TypeSpec.Generator
             int fileCount = 0;
             foreach (var outputType in output.TypeProviders)
             {
+                Console.Error.WriteLine($"[diag] Processing type {fileCount}: {outputType.Name}");
+                Console.Error.Flush();
+
                 // Ensure back-compatibility processing is done after all visitors have run
                 outputType.ProcessTypeForBackCompatibility();
+                Console.Error.WriteLine($"[diag] BackCompat done for {outputType.Name}");
+                Console.Error.Flush();
 
                 var writer = CodeModelGenerator.Instance.GetWriter(outputType);
+                Console.Error.WriteLine($"[diag] Writer created for {outputType.Name}, calling Write()");
+                Console.Error.Flush();
                 var codeFile = writer.Write();
                 Console.Error.WriteLine($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
                 Console.Error.Flush();
@@ -106,6 +113,8 @@ namespace Microsoft.TypeSpec.Generator
 
                 foreach (var serialization in outputType.SerializationProviders)
                 {
+                    Console.Error.WriteLine($"[diag] Processing serialization for {outputType.Name}: {serialization.Name}");
+                    Console.Error.Flush();
                     writer = CodeModelGenerator.Instance.GetWriter(serialization);
                     codeFile = writer.Write();
                     Console.Error.WriteLine($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
