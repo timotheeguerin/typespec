@@ -35,6 +35,9 @@ COPY playground-server/sshd_config /etc/ssh/
 ENV DOTNET_ENVIRONMENT=Production
 ENV GENERATOR_PATH=/app/generator/Microsoft.TypeSpec.Generator.dll
 ENV TMPDIR=/tmp
+# Increase default stack size to 8MB (may be restricted in App Service)
+ENV DOTNET_DefaultStackSize=0x800000
+ENV COMPlus_DefaultStackSize=800000
 
 EXPOSE 5174 2222
 COPY playground-server/entrypoint.sh /entrypoint.sh
