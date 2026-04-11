@@ -97,23 +97,28 @@ namespace Microsoft.TypeSpec.Generator
 
                 var writer = CodeModelGenerator.Instance.GetWriter(outputType);
                 var codeFile = writer.Write();
-                CodeModelGenerator.Instance.Emitter.Info($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
+                Console.Error.WriteLine($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
+                Console.Error.Flush();
                 await generatedCodeWorkspace.AddGeneratedFile(codeFile);
-                CodeModelGenerator.Instance.Emitter.Info($"[diag] Added file {fileCount}: {codeFile.Name}");
+                Console.Error.WriteLine($"[diag] Added file {fileCount}: {codeFile.Name}");
+                Console.Error.Flush();
                 fileCount++;
 
                 foreach (var serialization in outputType.SerializationProviders)
                 {
                     writer = CodeModelGenerator.Instance.GetWriter(serialization);
                     codeFile = writer.Write();
-                    CodeModelGenerator.Instance.Emitter.Info($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
+                    Console.Error.WriteLine($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
+                    Console.Error.Flush();
                     await generatedCodeWorkspace.AddGeneratedFile(codeFile);
-                    CodeModelGenerator.Instance.Emitter.Info($"[diag] Added file {fileCount}: {codeFile.Name}");
+                    Console.Error.WriteLine($"[diag] Added file {fileCount}: {codeFile.Name}");
+                    Console.Error.Flush();
                     fileCount++;
                 }
             }
 
-            CodeModelGenerator.Instance.Emitter.Info($"[diag] All {fileCount} files added to workspace");
+            Console.Error.WriteLine($"[diag] All {fileCount} files added to workspace");
+            Console.Error.Flush();
 
             LoggingHelpers.LogElapsedTime("All generated types have been written into memory");
 
