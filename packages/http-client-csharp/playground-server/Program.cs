@@ -81,11 +81,9 @@ app.MapGet("/health", () =>
 
     // Check for core dumps in /tmp and subdirectories
     var dumpFiles = new List<string>();
-    if (Directory.Exists("/tmp"))
+    if (Directory.Exists("/home"))
     {
-        foreach (var f in Directory.GetFiles("/tmp", "coredump*", SearchOption.TopDirectoryOnly))
-            dumpFiles.Add(f);
-        foreach (var f in Directory.GetFiles("/tmp", "*.dmp", SearchOption.AllDirectories))
+        foreach (var f in Directory.GetFiles("/home", "coredump*", SearchOption.TopDirectoryOnly))
             dumpFiles.Add(f);
     }
 
@@ -104,7 +102,7 @@ app.MapGet("/health", () =>
 
 app.MapGet("/coredump/{filename}", (string filename) =>
 {
-    var path = Path.Combine("/tmp", filename);
+    var path = Path.Combine("/home", filename);
     if (!File.Exists(path) || !filename.StartsWith("coredump"))
         return Results.NotFound();
     return Results.File(path, "application/octet-stream", filename);
@@ -162,7 +160,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
         // Collect mini dump on crash for diagnostics
         psi.Environment["DOTNET_DbgEnableMiniDump"] = "1";
         psi.Environment["DOTNET_DbgMiniDumpType"] = "1"; // Mini dump
-        psi.Environment["DOTNET_DbgMiniDumpName"] = "/tmp/coredump.%p";
+        psi.Environment["DOTNET_DbgMiniDumpName"] = "/home/coredump.%p";
 
         using var process = Process.Start(psi)!;
 
