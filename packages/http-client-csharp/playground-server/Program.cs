@@ -128,6 +128,8 @@ app.MapPost("/generate", async (HttpRequest request) =>
     var generatedDir = Path.Combine(tempDir, "src", "Generated");
     Directory.CreateDirectory(generatedDir);
 
+    var exitCode = -1;
+
     try
     {
         // Write the input files the generator expects
@@ -187,7 +189,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
         await process.WaitForExitAsync();
         await Task.WhenAll(stdoutTask, stderrTask);
 
-        var exitCode = process.ExitCode;
+        exitCode = process.ExitCode;
         Console.WriteLine($"Generator exited with code {exitCode}");
 
         if (exitCode != 0)
