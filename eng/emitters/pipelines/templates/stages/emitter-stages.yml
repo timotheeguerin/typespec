@@ -498,7 +498,8 @@ stages:
                             --probe-path "/health" \
                             --probe-interval-in-seconds 30 \
                             --sample-size 4 \
-                            --successful-samples-required 3
+                            --successful-samples-required 3 \
+                            --additional-latency-in-milliseconds 50
 
                           az afd origin create \
                             --profile-name "$FD_PROFILE" \
@@ -508,9 +509,11 @@ stages:
                             --host-name "$FQDN" \
                             --origin-host-header "$FQDN" \
                             --http-port 5174 \
+                            --https-port 443 \
                             --priority 1 \
                             --weight 1000 \
-                            --enabled-state Enabled
+                            --enabled-state Enabled \
+                            --enforce-certificate-name-check false
 
                           az afd route create \
                             --profile-name "$FD_PROFILE" \
@@ -520,7 +523,8 @@ stages:
                             --resource-group "$RESOURCE_GROUP" \
                             --forwarding-protocol HttpOnly \
                             --https-redirect Enabled \
-                            --supported-protocols Https Http
+                            --supported-protocols Http Https \
+                            --link-to-default-domain Enabled
                         else
                           # Update origin host if ACI FQDN changed
                           az afd origin update \
