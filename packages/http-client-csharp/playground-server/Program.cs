@@ -138,64 +138,62 @@ app.MapPost("/generate", async (HttpRequest request) =>
 
         var generatorName = body.GeneratorName ?? "ScmCodeModelGenerator";
 
-        // Run the .NET generator as a subprocess (same approach as the TypeSpec emitter)
-        Console.WriteLine($"Starting generator: dotnet --roll-forward Major {generatorPath} {tempDir} -g {generatorName} --new-project");
+        // Run the generator in-process by loading the assembly and invoking its entry point
+        Console.WriteLine($"Starting generator in-process: {generatorPath}");
         Console.WriteLine($"Code model size: {body.CodeModel!.Length} chars");
         Console.WriteLine($"Configuration: {body.Configuration}");
+        Console.WriteLine($"Temp dir: {tempDir}");
 
-        var psi = new ProcessStartInfo
+        var args = new[] { tempDir, "-g", generatorName, "--new-project" };
+
+        var assembly = System.Reflection.Assembly.LoadFrom(generatorPath);
+        var entryPoint = assembly.EntryPoint;
+        if (entryPoint == null)
         {
-            FileName = "dotnet",
-            ArgumentList = { "--roll-forward", "Major", generatorPath, tempDir, "-g", generatorName, "--new-project" },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        // Set env vars to prevent segfaults in container environment
-        psi.Environment["DOTNET_DefaultStackSize"] = "0x200000"; // 2MB stack
-        psi.Environment["COMPlus_DefaultStackSize"] = "200000";
-        psi.Environment["DOTNET_gcServer"] = "0"; // Disable server GC
-        psi.Environment["COMPlus_EnableDiagnostics"] = "0";
-        psi.Environment["DOTNET_ReadyToRun"] = "0"; // Disable R2R, force JIT
-        psi.Environment["DOTNET_TieredCompilation"] = "0"; // Disable tiered compilation
-        // Collect mini dump on crash for diagnostics
-        psi.Environment["DOTNET_DbgEnableMiniDump"] = "1";
-        psi.Environment["DOTNET_DbgMiniDumpType"] = "4"; // Full dump for lldb analysis
-        psi.Environment["DOTNET_DbgMiniDumpName"] = "/home/coredump.%p";
+            return Results.Json(
+                new GenerateErrorResponse("Generator assembly has no entry point", ""),
+                GenerateJsonContext.Default.GenerateErrorResponse,
+                statusCode: 500);
+        }
 
-        using var process = Process.Start(psi)!;
-
-        // Stream stdout/stderr to console for logging
-        var stderrLines = new List<string>();
-        var stdoutTask = Task.Run(async () =>
+        try
         {
-            string? line;
-            while ((line = await process.StandardOutput.ReadLineAsync()) != null)
+            var result = entryPoint.Invoke(null, new object[] { args });
+            if (result is Task<int> taskInt)
             {
-                Console.WriteLine($"[generator stdout] {line}");
+                exitCode = await taskInt;
             }
-        });
-        var stderrTask = Task.Run(async () =>
-        {
-            string? line;
-            while ((line = await process.StandardError.ReadLineAsync()) != null)
+            else if (result is Task task)
             {
-                Console.Error.WriteLine($"[generator stderr] {line}");
-                stderrLines.Add(line);
+                await task;
+                exitCode = 0;
             }
-        });
+            else if (result is int intResult)
+            {
+                exitCode = intResult;
+            }
+            else
+            {
+                exitCode = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException ?? ex;
+            Console.Error.WriteLine($"[generator error] {inner.Message}");
+            Console.Error.WriteLine(inner.StackTrace);
+            return Results.Json(
+                new GenerateErrorResponse($"Generator threw exception: {inner.Message}", inner.StackTrace ?? ""),
+                GenerateJsonContext.Default.GenerateErrorResponse,
+                statusCode: 500);
+        }
 
-        await process.WaitForExitAsync();
-        await Task.WhenAll(stdoutTask, stderrTask);
-
-        exitCode = process.ExitCode;
         Console.WriteLine($"Generator exited with code {exitCode}");
 
         if (exitCode != 0)
         {
             return Results.Json(
-                new GenerateErrorResponse($"Generator failed with exit code {exitCode}", string.Join("\n", stderrLines.TakeLast(50))),
+                new GenerateErrorResponse($"Generator failed with exit code {exitCode}", ""),
                 GenerateJsonContext.Default.GenerateErrorResponse,
                 statusCode: 500);
         }
