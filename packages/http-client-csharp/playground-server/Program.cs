@@ -222,7 +222,15 @@ app.MapPost("/generate", async (HttpRequest request) =>
     finally
     {
         // Clean up temp directory
-        try { Directory.Delete(tempDir, recursive: true); } catch { }
+        // Keep temp dir on failure for manual debugging via SSH
+        if (exitCode == 0)
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+        else
+        {
+            Console.WriteLine($"Keeping temp dir for debugging: {tempDir}");
+        }
     }
 }).RequireRateLimiting("generate");
 
