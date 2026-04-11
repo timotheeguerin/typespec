@@ -71,8 +71,6 @@ namespace Microsoft.TypeSpec.Generator
 
             var output = CodeModelGenerator.Instance.OutputLibrary;
             Directory.CreateDirectory(Path.Combine(generatedSourceOutputPath, "Models"));
-            List<Task> generateFilesTasks = new();
-
             // Build all TypeProviders
             foreach (var type in output.TypeProviders)
             {
@@ -98,20 +96,24 @@ namespace Microsoft.TypeSpec.Generator
                 outputType.ProcessTypeForBackCompatibility();
 
                 var writer = CodeModelGenerator.Instance.GetWriter(outputType);
-                generateFilesTasks.Add(generatedCodeWorkspace.AddGeneratedFile(writer.Write()));
+                var codeFile = writer.Write();
+                CodeModelGenerator.Instance.Emitter.Info($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
+                await generatedCodeWorkspace.AddGeneratedFile(codeFile);
+                CodeModelGenerator.Instance.Emitter.Info($"[diag] Added file {fileCount}: {codeFile.Name}");
                 fileCount++;
 
                 foreach (var serialization in outputType.SerializationProviders)
                 {
                     writer = CodeModelGenerator.Instance.GetWriter(serialization);
-                    generateFilesTasks.Add(generatedCodeWorkspace.AddGeneratedFile(writer.Write()));
+                    codeFile = writer.Write();
+                    CodeModelGenerator.Instance.Emitter.Info($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
+                    await generatedCodeWorkspace.AddGeneratedFile(codeFile);
+                    CodeModelGenerator.Instance.Emitter.Info($"[diag] Added file {fileCount}: {codeFile.Name}");
                     fileCount++;
                 }
             }
 
-            CodeModelGenerator.Instance.Emitter.Info($"[diag] Before Task.WhenAll for {fileCount} AddGeneratedFile tasks");
-            // Add all the generated files to the workspace
-            await Task.WhenAll(generateFilesTasks);
+            CodeModelGenerator.Instance.Emitter.Info($"[diag] All {fileCount} files added to workspace");
 
             LoggingHelpers.LogElapsedTime("All generated types have been written into memory");
 
