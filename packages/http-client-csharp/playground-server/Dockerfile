@@ -41,6 +41,8 @@ ENV TMPDIR=/tmp
 # Disable .NET diagnostics to prevent segfaults in containers
 ENV COMPlus_EnableDiagnostics=0
 ENV DOTNET_EnableDiagnostics=0
+# Disable memory-mapped file locking (Roslyn uses mmap for assembly loading)
+ENV DOTNET_SYSTEM_IO_DISABLEFILELOCKING=1
 
 EXPOSE 5174 2222
 COPY playground-server/entrypoint.sh /entrypoint.sh
