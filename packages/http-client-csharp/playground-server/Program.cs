@@ -138,62 +138,52 @@ app.MapPost("/generate", async (HttpRequest request) =>
 
         var generatorName = body.GeneratorName ?? "ScmCodeModelGenerator";
 
-        // Run the generator in-process by loading the assembly and invoking its entry point
-        Console.WriteLine($"Starting generator in-process: {generatorPath}");
+        // Run the .NET generator as a subprocess
+        Console.WriteLine($"Starting generator: dotnet --roll-forward Major {generatorPath} {tempDir} -g {generatorName} --new-project");
         Console.WriteLine($"Code model size: {body.CodeModel!.Length} chars");
         Console.WriteLine($"Configuration: {body.Configuration}");
-        Console.WriteLine($"Temp dir: {tempDir}");
 
-        var args = new[] { tempDir, "-g", generatorName, "--new-project" };
-
-        var assembly = System.Reflection.Assembly.LoadFrom(generatorPath);
-        var entryPoint = assembly.EntryPoint;
-        if (entryPoint == null)
+        var psi = new ProcessStartInfo
         {
-            return Results.Json(
-                new GenerateErrorResponse("Generator assembly has no entry point", ""),
-                GenerateJsonContext.Default.GenerateErrorResponse,
-                statusCode: 500);
-        }
+            FileName = "dotnet",
+            ArgumentList = { "--roll-forward", "Major", generatorPath, tempDir, "-g", generatorName, "--new-project" },
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
 
-        try
-        {
-            var result = entryPoint.Invoke(null, new object[] { args });
-            if (result is Task<int> taskInt)
-            {
-                exitCode = await taskInt;
-            }
-            else if (result is Task task)
-            {
-                await task;
-                exitCode = 0;
-            }
-            else if (result is int intResult)
-            {
-                exitCode = intResult;
-            }
-            else
-            {
-                exitCode = 0;
-            }
-        }
-        catch (Exception ex)
-        {
-            var inner = ex.InnerException ?? ex;
-            Console.Error.WriteLine($"[generator error] {inner.Message}");
-            Console.Error.WriteLine(inner.StackTrace);
-            return Results.Json(
-                new GenerateErrorResponse($"Generator threw exception: {inner.Message}", inner.StackTrace ?? ""),
-                GenerateJsonContext.Default.GenerateErrorResponse,
-                statusCode: 500);
-        }
+        using var process = Process.Start(psi)!;
 
+        var stderrLines = new List<string>();
+        var stdoutTask = Task.Run(async () =>
+        {
+            string? line;
+            while ((line = await process.StandardOutput.ReadLineAsync()) != null)
+            {
+                Console.WriteLine($"[generator stdout] {line}");
+            }
+        });
+        var stderrTask = Task.Run(async () =>
+        {
+            string? line;
+            while ((line = await process.StandardError.ReadLineAsync()) != null)
+            {
+                Console.Error.WriteLine($"[generator stderr] {line}");
+                stderrLines.Add(line);
+            }
+        });
+
+        await process.WaitForExitAsync();
+        await Task.WhenAll(stdoutTask, stderrTask);
+
+        exitCode = process.ExitCode;
         Console.WriteLine($"Generator exited with code {exitCode}");
 
         if (exitCode != 0)
         {
             return Results.Json(
-                new GenerateErrorResponse($"Generator failed with exit code {exitCode}", ""),
+                new GenerateErrorResponse($"Generator failed with exit code {exitCode}", string.Join("\n", stderrLines.TakeLast(50))),
                 GenerateJsonContext.Default.GenerateErrorResponse,
                 statusCode: 500);
         }
