@@ -37,12 +37,14 @@ ENV PATH="$PATH:/root/.dotnet/tools"
 
 ENV DOTNET_ENVIRONMENT=Production
 ENV GENERATOR_PATH=/app/generator/Microsoft.TypeSpec.Generator.dll
-ENV TMPDIR=/tmp
-# Disable .NET diagnostics to prevent segfaults in containers
+ENV TMPDIR=/home/tmp
+ENV DOTNET_RUNNING_IN_CONTAINER=true
+# Disable .NET diagnostics
 ENV COMPlus_EnableDiagnostics=0
 ENV DOTNET_EnableDiagnostics=0
-# Disable memory-mapped file locking (Roslyn uses mmap for assembly loading)
 ENV DOTNET_SYSTEM_IO_DISABLEFILELOCKING=1
+# Use the interpreter instead of JIT (avoids potential JIT SIGSEGV)
+ENV DOTNET_EnableWriteXorExecute=0
 
 EXPOSE 5174 2222
 COPY playground-server/entrypoint.sh /entrypoint.sh
