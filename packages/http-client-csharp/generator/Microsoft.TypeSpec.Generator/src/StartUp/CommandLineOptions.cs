@@ -35,11 +35,5 @@ namespace Microsoft.TypeSpec.Generator
 
         [Option(longName: NewProjectOptionName, shortName: 'n', Required = false, Default = false, Hidden = false, HelpText = CmdLineNewProjectOptionHelpText)]
         public bool IsNewProject { get; set; }
-
-        private const string SkipPostProcessingOptionName = "skip-post-processing";
-        private const string CmdLineSkipPostProcessingOptionHelpText = "Skip Roslyn post-processing (simplification, formatting, unused type removal). Used for playground scenarios.";
-
-        [Option(longName: SkipPostProcessingOptionName, Required = false, Default = false, Hidden = true, HelpText = CmdLineSkipPostProcessingOptionHelpText)]
-        public bool SkipPostProcessing { get; set; }
     }
 }

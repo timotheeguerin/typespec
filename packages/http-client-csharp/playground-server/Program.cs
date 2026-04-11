@@ -139,14 +139,14 @@ app.MapPost("/generate", async (HttpRequest request) =>
         var generatorName = body.GeneratorName ?? "ScmCodeModelGenerator";
 
         // Run the .NET generator as a subprocess
-        Console.WriteLine($"Starting generator: dotnet --roll-forward Major {generatorPath} {tempDir} -g {generatorName} --new-project --skip-post-processing");
+        Console.WriteLine($"Starting generator: dotnet --roll-forward Major {generatorPath} {tempDir} -g {generatorName} --new-project");
         Console.WriteLine($"Code model size: {body.CodeModel!.Length} chars");
         Console.WriteLine($"Configuration: {body.Configuration}");
 
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            ArgumentList = { "--roll-forward", "Major", generatorPath, tempDir, "-g", generatorName, "--new-project", "--skip-post-processing" },
+            ArgumentList = { "--roll-forward", "Major", generatorPath, tempDir, "-g", generatorName, "--new-project" },
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

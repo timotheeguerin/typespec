@@ -355,7 +355,6 @@ namespace Microsoft.TypeSpec.Generator
                 {
                     CodeModelGenerator.Instance = generator.Value;
                     CodeModelGenerator.Instance.IsNewProject = options.IsNewProject;
-                    CodeModelGenerator.Instance.SkipPostProcessing = options.SkipPostProcessing;
 
                     // Apply discovered plugins (if any)
                     if (Plugins != null)

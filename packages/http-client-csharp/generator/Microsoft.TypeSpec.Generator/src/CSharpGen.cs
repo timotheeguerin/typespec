@@ -75,40 +75,6 @@ namespace Microsoft.TypeSpec.Generator
             FilterAllCustomizedMembers(output);
 
             LoggingHelpers.LogElapsedTime("All visitors have been applied");
-            CodeModelGenerator.Instance.Emitter.Info($"SkipPostProcessing={CodeModelGenerator.Instance.SkipPostProcessing}");
-
-            if (CodeModelGenerator.Instance.SkipPostProcessing)
-            {
-                // Playground mode: write raw generated code without Roslyn post-processing
-                foreach (var outputType in output.TypeProviders)
-                {
-                    outputType.ProcessTypeForBackCompatibility();
-
-                    var writer = CodeModelGenerator.Instance.GetWriter(outputType);
-                    var file = writer.Write();
-                    if (!string.IsNullOrEmpty(file.Content))
-                    {
-                        var filename = Path.Combine(outputPath, file.Name);
-                        Directory.CreateDirectory(Path.GetDirectoryName(filename)!);
-                        await File.WriteAllTextAsync(filename, file.Content);
-                    }
-
-                    foreach (var serialization in outputType.SerializationProviders)
-                    {
-                        writer = CodeModelGenerator.Instance.GetWriter(serialization);
-                        file = writer.Write();
-                        if (!string.IsNullOrEmpty(file.Content))
-                        {
-                            var filename = Path.Combine(outputPath, file.Name);
-                            Directory.CreateDirectory(Path.GetDirectoryName(filename)!);
-                            await File.WriteAllTextAsync(filename, file.Content);
-                        }
-                    }
-                }
-
-                LoggingHelpers.LogElapsedTime("All files have been written to disk (skip-post-processing)");
-                return;
-            }
 
             foreach (var outputType in output.TypeProviders)
             {

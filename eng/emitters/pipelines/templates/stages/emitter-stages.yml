@@ -416,20 +416,21 @@ stages:
                         CONTEXT="$(Build.SourcesDirectory)/${{ parameters.PackagePath }}"
                         az acr build \
                           --registry "$REGISTRY" \
+                          --platform windows \
                           --image "$APP_NAME:$(Build.BuildId)" \
                           --file "$CONTEXT/${{ parameters.PlaygroundServerDockerfile }}" \
                           "$CONTEXT"
 
-                        # Deploy to Azure App Service
-                        PLAN_NAME="typespec-playground-plan"
+                        # Deploy to Azure App Service (Windows container for Roslyn compatibility)
+                        PLAN_NAME="typespec-playground-plan-win"
 
-                        # Create App Service plan if it doesn't exist
+                        # Create Windows App Service plan if it doesn't exist
                         if ! az appservice plan show --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-                          echo "Creating App Service plan: $PLAN_NAME"
+                          echo "Creating Windows App Service plan: $PLAN_NAME"
                           az appservice plan create \
                             --name "$PLAN_NAME" \
                             --resource-group "$RESOURCE_GROUP" \
-                            --is-linux \
+                            --hyper-v \
                             --sku P1v3
                         fi
 
