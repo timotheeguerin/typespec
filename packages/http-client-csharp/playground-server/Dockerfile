@@ -23,6 +23,15 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 
+# Install SSH for App Service remote access and dotnet-dump for crash analysis
+RUN apt-get update && apt-get install -y openssh-server \
+    && echo "root:Docker!" | chpasswd \
+    && mkdir -p /run/sshd \
+    && dotnet tool install -g dotnet-dump \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY playground-server/sshd_config /etc/ssh/
+ENV PATH="$PATH:/root/.dotnet/tools"
+
 ENV DOTNET_ENVIRONMENT=Production
 ENV GENERATOR_PATH=/app/generator/Microsoft.TypeSpec.Generator.dll
 ENV TMPDIR=/tmp
@@ -30,5 +39,7 @@ ENV TMPDIR=/tmp
 ENV COMPlus_EnableDiagnostics=0
 ENV DOTNET_EnableDiagnostics=0
 
-EXPOSE 5174
-ENTRYPOINT ["dotnet", "playground-server.dll"]
+EXPOSE 5174 2222
+COPY playground-server/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
