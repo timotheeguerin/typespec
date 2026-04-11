@@ -433,17 +433,15 @@ stages:
                         IDENTITY_PRINCIPAL=$(az identity show --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP" --query principalId -o tsv)
                         ACR_ID=$(az acr show --name "$REGISTRY" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
 
-                        # Assign AcrPull role (idempotent - will succeed even if already exists)
-                        echo "Assigning AcrPull role to identity..."
-                        az role assignment create \
-                          --assignee-object-id "$IDENTITY_PRINCIPAL" \
-                          --assignee-principal-type ServicePrincipal \
-                          --role AcrPull \
-                          --scope "$ACR_ID" || true
-
-                        # Wait for AAD role propagation (can take up to 2 minutes)
-                        echo "Waiting 90s for role assignment propagation..."
-                        sleep 90
+                        # NOTE: AcrPull role must be assigned manually once by an Owner:
+                        #   az role assignment create \
+                        #     --assignee-object-id <principalId from identity> \
+                        #     --assignee-principal-type ServicePrincipal \
+                        #     --role AcrPull \
+                        #     --scope <ACR resource ID>
+                        echo "Identity: $IDENTITY_ID"
+                        echo "Identity Principal: $IDENTITY_PRINCIPAL"
+                        echo "ACR ID: $ACR_ID"
 
                         # Delete existing container if present (ACI doesn't support in-place update)
                         if az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
