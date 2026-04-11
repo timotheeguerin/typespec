@@ -79,6 +79,11 @@ app.MapGet("/health", () =>
     }
     catch (Exception ex) { dotnetVersion = ex.Message; }
 
+    // Check for core dumps
+    var dumpFiles = Directory.Exists("/tmp")
+        ? Directory.GetFiles("/tmp", "coredump.*").Select(Path.GetFileName).ToArray()
+        : Array.Empty<string?>();
+
     return Results.Ok(new
     {
         status = "ok",
@@ -87,7 +92,8 @@ app.MapGet("/health", () =>
         dotnetVersion,
         runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
         os = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
-        arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString()
+        arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString(),
+        coreDumps = dumpFiles
     });
 });
 
@@ -140,6 +146,10 @@ app.MapPost("/generate", async (HttpRequest request) =>
         psi.Environment["COMPlus_EnableDiagnostics"] = "0";
         psi.Environment["DOTNET_ReadyToRun"] = "0"; // Disable R2R, force JIT
         psi.Environment["DOTNET_TieredCompilation"] = "0"; // Disable tiered compilation
+        // Collect mini dump on crash for diagnostics
+        psi.Environment["DOTNET_DbgEnableMiniDump"] = "1";
+        psi.Environment["DOTNET_DbgMiniDumpType"] = "1"; // Mini dump
+        psi.Environment["DOTNET_DbgMiniDumpName"] = "/tmp/coredump.%p";
 
         using var process = Process.Start(psi)!;
 
