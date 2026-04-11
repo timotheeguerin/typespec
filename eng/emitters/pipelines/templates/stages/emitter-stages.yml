@@ -496,7 +496,9 @@ stages:
                             --probe-request-type GET \
                             --probe-protocol Http \
                             --probe-path "/health" \
-                            --probe-interval-in-seconds 30
+                            --probe-interval-in-seconds 30 \
+                            --sample-size 4 \
+                            --successful-samples-required 3
 
                           az afd origin create \
                             --profile-name "$FD_PROFILE" \
