@@ -495,7 +495,8 @@ stages:
                             --resource-group "$RESOURCE_GROUP" \
                             --probe-request-type GET \
                             --probe-protocol Http \
-                            --probe-path "/health"
+                            --probe-path "/health" \
+                            --probe-interval-in-seconds 30
 
                           az afd origin create \
                             --profile-name "$FD_PROFILE" \
