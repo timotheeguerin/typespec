@@ -19,7 +19,7 @@ import "@typespec/playground/styles.css";
 // Configure the playground server URL for the C# emitter's browser stub.
 // This must be set before the emitter runs.
 (globalThis as any).__TYPESPEC_PLAYGROUND_SERVER_URL__ =
-  "https://csharp-playground-server-hnhfbfcdc6fnc4gh.b02.azurefd.net";
+  "https://csharp-playground-server.azurewebsites.net";
 
 export interface WebsitePlaygroundProps {
   versionData: VersionData;

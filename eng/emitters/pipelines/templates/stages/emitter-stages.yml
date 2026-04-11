@@ -420,125 +420,56 @@ stages:
                           --file "$CONTEXT/${{ parameters.PlaygroundServerDockerfile }}" \
                           "$CONTEXT"
 
-                        # Deploy to Azure Container Instances
-                        echo "Deploying to ACI: $APP_NAME"
+                        # Deploy to Azure App Service
+                        PLAN_NAME="typespec-playground-plan"
 
-                        # Create user-assigned managed identity for ACR pull (avoids admin account)
-                        IDENTITY_NAME="$APP_NAME-identity"
-                        if ! az identity show --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-                          echo "Creating managed identity: $IDENTITY_NAME"
-                          az identity create --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP"
+                        # Create App Service plan if it doesn't exist
+                        if ! az appservice plan show --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                          echo "Creating App Service plan: $PLAN_NAME"
+                          az appservice plan create \
+                            --name "$PLAN_NAME" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --is-linux \
+                            --sku P1v3
                         fi
-                        IDENTITY_ID=$(az identity show --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
-                        IDENTITY_PRINCIPAL=$(az identity show --name "$IDENTITY_NAME" --resource-group "$RESOURCE_GROUP" --query principalId -o tsv)
+
+                        # Create or update Web App
+                        if az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+                          echo "Updating Web App: $APP_NAME"
+                        else
+                          echo "Creating Web App: $APP_NAME"
+                          az webapp create \
+                            --name "$APP_NAME" \
+                            --resource-group "$RESOURCE_GROUP" \
+                            --plan "$PLAN_NAME" \
+                            --container-image-name "$IMAGE" \
+                            --container-registry-url "https://$REGISTRY.azurecr.io"
+                        fi
+
+                        # Ensure managed identity and ACR pull access
+                        az webapp identity assign --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" 2>/dev/null || true
+                        PRINCIPAL_ID=$(az webapp identity show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query principalId -o tsv)
                         ACR_ID=$(az acr show --name "$REGISTRY" --resource-group "$RESOURCE_GROUP" --query id -o tsv)
+                        az role assignment create --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type ServicePrincipal --role AcrPull --scope "$ACR_ID" 2>/dev/null || true
+                        az webapp config set --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" \
+                          --generic-configurations '{"acrUseManagedIdentityCreds": true}'
 
-                        # NOTE: AcrPull role must be assigned manually once by an Owner:
-                        #   az role assignment create \
-                        #     --assignee-object-id <principalId from identity> \
-                        #     --assignee-principal-type ServicePrincipal \
-                        #     --role AcrPull \
-                        #     --scope <ACR resource ID>
-                        echo "Identity: $IDENTITY_ID"
-                        echo "Identity Principal: $IDENTITY_PRINCIPAL"
-                        echo "ACR ID: $ACR_ID"
-
-                        # Delete existing container if present (ACI doesn't support in-place update)
-                        if az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-                          echo "Deleting existing container..."
-                          az container delete --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --yes
-                        fi
-
-                        az container create \
+                        # Update container image
+                        az webapp config container set \
                           --name "$APP_NAME" \
                           --resource-group "$RESOURCE_GROUP" \
-                          --image "$IMAGE" \
-                          --registry-login-server "$REGISTRY.azurecr.io" \
-                          --acr-identity "$IDENTITY_ID" \
-                          --assign-identity "$IDENTITY_ID" \
-                          --cpu 2 \
-                          --memory 4 \
-                          --ports 5174 \
-                          --ip-address Public \
-                          --dns-name-label "$APP_NAME" \
-                          --os-type Linux \
-                          --environment-variables \
-                            DOTNET_ENVIRONMENT=Production \
-                            TMPDIR=/tmp \
-                            COMPlus_EnableDiagnostics=0 \
-                            DOTNET_EnableDiagnostics=0 \
-                            PLAYGROUND_URLS="https://typespec.io,https://tspwebsitepr.z22.web.core.windows.net,https://cadlplayground.z22.web.core.windows.net" \
-                          --restart-policy Always
+                          --container-image-name "$IMAGE" \
+                          --container-registry-url "https://$REGISTRY.azurecr.io"
 
-                        FQDN=$(az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query ipAddress.fqdn -o tsv)
-                        IP=$(az container show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query ipAddress.ip -o tsv)
-                        echo "ACI deployed: http://$FQDN:5174"
+                        # Configure app settings
+                        az webapp config appsettings set \
+                          --name "$APP_NAME" \
+                          --resource-group "$RESOURCE_GROUP" \
+                          --settings \
+                            WEBSITES_PORT=5174 \
+                            PLAYGROUND_URLS="https://typespec.io,https://tspwebsitepr.z22.web.core.windows.net,https://cadlplayground.z22.web.core.windows.net"
 
-                        # Set up Azure Front Door for HTTPS termination (idempotent)
-                        FD_PROFILE="$APP_NAME-fd"
-                        FD_ENDPOINT="$APP_NAME"
-                        if ! az afd profile show --profile-name "$FD_PROFILE" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-                          echo "Creating Front Door profile: $FD_PROFILE"
-                          az afd profile create \
-                            --profile-name "$FD_PROFILE" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --sku Standard_AzureFrontDoor
-
-                          az afd endpoint create \
-                            --profile-name "$FD_PROFILE" \
-                            --endpoint-name "$FD_ENDPOINT" \
-                            --resource-group "$RESOURCE_GROUP"
-
-                          az afd origin-group create \
-                            --profile-name "$FD_PROFILE" \
-                            --origin-group-name "$APP_NAME-og" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --probe-request-type GET \
-                            --probe-protocol Http \
-                            --probe-path "/health" \
-                            --probe-interval-in-seconds 30 \
-                            --sample-size 4 \
-                            --successful-samples-required 3 \
-                            --additional-latency-in-milliseconds 50
-
-                          az afd origin create \
-                            --profile-name "$FD_PROFILE" \
-                            --origin-group-name "$APP_NAME-og" \
-                            --origin-name "$APP_NAME-origin" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --host-name "$FQDN" \
-                            --origin-host-header "$FQDN" \
-                            --http-port 5174 \
-                            --https-port 443 \
-                            --priority 1 \
-                            --weight 1000 \
-                            --enabled-state Enabled \
-                            --enforce-certificate-name-check false
-
-                          az afd route create \
-                            --profile-name "$FD_PROFILE" \
-                            --endpoint-name "$FD_ENDPOINT" \
-                            --origin-group "$APP_NAME-og" \
-                            --route-name "$APP_NAME-route" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --forwarding-protocol HttpOnly \
-                            --https-redirect Enabled \
-                            --supported-protocols Http Https \
-                            --link-to-default-domain Enabled
-                        else
-                          # Update origin host if ACI FQDN changed
-                          az afd origin update \
-                            --profile-name "$FD_PROFILE" \
-                            --origin-group-name "$APP_NAME-og" \
-                            --origin-name "$APP_NAME-origin" \
-                            --resource-group "$RESOURCE_GROUP" \
-                            --host-name "$FQDN" \
-                            --origin-host-header "$FQDN" \
-                            --http-port 5174
-                        fi
-
-                        FD_HOSTNAME=$(az afd endpoint show --profile-name "$FD_PROFILE" --endpoint-name "$FD_ENDPOINT" --resource-group "$RESOURCE_GROUP" --query hostName -o tsv)
-                        echo "HTTPS endpoint: https://$FD_HOSTNAME"
+                        echo "Deployed to https://$APP_NAME.azurewebsites.net"
                       workingDirectory: $(Build.SourcesDirectory)
 
             templateContext:
