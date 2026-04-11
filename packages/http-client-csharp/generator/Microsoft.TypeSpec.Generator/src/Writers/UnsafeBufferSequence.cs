@@ -17,6 +17,9 @@ internal sealed partial class UnsafeBufferSequence : IBufferWriter<char>, IDispo
     private volatile UnsafeBufferSegment[] _buffers; // this is an array so items can be accessed by ref
     private volatile int _count;
     private readonly int _segmentSize;
+    // Use a private pool instead of ArrayPool.Shared to avoid mmap-backed allocations
+    // that can cause SIGSEGV in sandboxed container environments (e.g., Azure App Service).
+    private static readonly ArrayPool<char> _pool = ArrayPool<char>.Create();
 
     /// <summary>
     /// Initializes a new instance of <see cref="UnsafeBufferSequence"/>.
@@ -92,7 +95,7 @@ internal sealed partial class UnsafeBufferSequence : IBufferWriter<char>, IDispo
                 _buffers.CopyTo(resized, 0);
             }
             _buffers = resized;
-            _buffers[_count].Array = ArrayPool<char>.Shared.Rent(sizeToRent);
+            _buffers[_count].Array = _pool.Rent(sizeToRent);
             _count = bufferCount == 1 ? bufferCount : _count + 1;
         }
     }
@@ -125,7 +128,7 @@ internal sealed partial class UnsafeBufferSequence : IBufferWriter<char>, IDispo
 
         for (int i = 0; i < bufferCountToFree; i++)
         {
-            ArrayPool<char>.Shared.Return(buffersToFree[i].Array);
+            _pool.Return(buffersToFree[i].Array);
         }
     }
 
