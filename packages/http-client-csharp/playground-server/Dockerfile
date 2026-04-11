@@ -15,7 +15,11 @@ COPY playground-server/ playground-server/
 RUN dotnet publish playground-server -c Release -o /app
 
 # Copy generator output
+# Copy a test code model for manual debugging
 RUN cp -r dist/generator /app/generator
+RUN mkdir -p /app/test-data && \
+    cp generator/TestProjects/Spector/http/routes/tspCodeModel.json /app/test-data/ && \
+    cp generator/TestProjects/Spector/http/routes/Configuration.json /app/test-data/
 
 # Need full SDK (not just aspnet) because the server spawns `dotnet` to run the generator DLL
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
