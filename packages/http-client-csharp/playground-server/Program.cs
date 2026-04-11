@@ -102,6 +102,14 @@ app.MapGet("/health", () =>
     });
 });
 
+app.MapGet("/coredump/{filename}", (string filename) =>
+{
+    var path = Path.Combine("/tmp", filename);
+    if (!File.Exists(path) || !filename.StartsWith("coredump"))
+        return Results.NotFound();
+    return Results.File(path, "application/octet-stream", filename);
+});
+
 app.MapPost("/generate", async (HttpRequest request) =>
 {
     var body = await JsonSerializer.DeserializeAsync<GenerateRequest>(
