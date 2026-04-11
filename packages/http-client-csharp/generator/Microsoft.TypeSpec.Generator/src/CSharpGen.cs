@@ -28,15 +28,21 @@ namespace Microsoft.TypeSpec.Generator
             CodeModelGenerator.Instance.Emitter.Info("Starting code generation");
             CodeModelGenerator.Instance.Stopwatch.Start();
 
+            CodeModelGenerator.Instance.Emitter.Info("[diag] Before GeneratedCodeWorkspace.Initialize()");
             GeneratedCodeWorkspace.Initialize();
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After GeneratedCodeWorkspace.Initialize()");
             var outputPath = CodeModelGenerator.Instance.Configuration.OutputDirectory;
             var generatedSourceOutputPath = CodeModelGenerator.Instance.Configuration.ProjectGeneratedDirectory;
 
             // Resolve PackageReference items from the .csproj so custom code referencing
             // external NuGet types (e.g., Azure.Storage.Common) compiles correctly.
+            CodeModelGenerator.Instance.Emitter.Info("[diag] Before AddPackageReferencesFromProject");
             await GeneratedCodeWorkspace.AddPackageReferencesFromProject();
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After AddPackageReferencesFromProject");
 
+            CodeModelGenerator.Instance.Emitter.Info("[diag] Before Create(customCode)");
             GeneratedCodeWorkspace customCodeWorkspace = await GeneratedCodeWorkspace.Create(isCustomCodeProject: true);
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After Create(customCode)");
             // The generated attributes need to be added into the workspace before loading the custom code. Otherwise,
             // Roslyn doesn't load the attributes completely and we are unable to get the attribute arguments.
 
@@ -47,12 +53,21 @@ namespace Microsoft.TypeSpec.Generator
             }
 
             await Task.WhenAll(generateAttributeTasks);
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After AddInMemoryFile attributes");
 
-            CodeModelGenerator.Instance.SourceInputModel = new SourceInputModel(
-                await customCodeWorkspace.GetCompilationAsync(),
-                await GeneratedCodeWorkspace.LoadBaselineContract());
+            CodeModelGenerator.Instance.Emitter.Info("[diag] Before customCodeWorkspace.GetCompilationAsync()");
+            var customCompilation = await customCodeWorkspace.GetCompilationAsync();
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After customCodeWorkspace.GetCompilationAsync()");
 
+            CodeModelGenerator.Instance.Emitter.Info("[diag] Before LoadBaselineContract()");
+            var baselineContract = await GeneratedCodeWorkspace.LoadBaselineContract();
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After LoadBaselineContract()");
+
+            CodeModelGenerator.Instance.SourceInputModel = new SourceInputModel(customCompilation, baselineContract);
+
+            CodeModelGenerator.Instance.Emitter.Info("[diag] Before Create(generatedCode)");
             GeneratedCodeWorkspace generatedCodeWorkspace = await GeneratedCodeWorkspace.Create(isCustomCodeProject: false);
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After Create(generatedCode)");
 
             var output = CodeModelGenerator.Instance.OutputLibrary;
             Directory.CreateDirectory(Path.Combine(generatedSourceOutputPath, "Models"));
@@ -76,6 +91,7 @@ namespace Microsoft.TypeSpec.Generator
 
             LoggingHelpers.LogElapsedTime("All visitors have been applied");
 
+            int fileCount = 0;
             foreach (var outputType in output.TypeProviders)
             {
                 // Ensure back-compatibility processing is done after all visitors have run
@@ -83,14 +99,17 @@ namespace Microsoft.TypeSpec.Generator
 
                 var writer = CodeModelGenerator.Instance.GetWriter(outputType);
                 generateFilesTasks.Add(generatedCodeWorkspace.AddGeneratedFile(writer.Write()));
+                fileCount++;
 
                 foreach (var serialization in outputType.SerializationProviders)
                 {
                     writer = CodeModelGenerator.Instance.GetWriter(serialization);
                     generateFilesTasks.Add(generatedCodeWorkspace.AddGeneratedFile(writer.Write()));
+                    fileCount++;
                 }
             }
 
+            CodeModelGenerator.Instance.Emitter.Info($"[diag] Before Task.WhenAll for {fileCount} AddGeneratedFile tasks");
             // Add all the generated files to the workspace
             await Task.WhenAll(generateFilesTasks);
 
@@ -101,9 +120,12 @@ namespace Microsoft.TypeSpec.Generator
 
             LoggingHelpers.LogElapsedTime("All old generated files have been deleted");
 
+            CodeModelGenerator.Instance.Emitter.Info("[diag] Before PostProcessAsync()");
             await generatedCodeWorkspace.PostProcessAsync();
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After PostProcessAsync()");
 
             // Write the generated files to the output directory
+            CodeModelGenerator.Instance.Emitter.Info("[diag] Before GetGeneratedFilesAsync()");
             await foreach (var file in generatedCodeWorkspace.GetGeneratedFilesAsync())
             {
                 if (string.IsNullOrEmpty(file.Text))
@@ -115,6 +137,7 @@ namespace Microsoft.TypeSpec.Generator
                 Directory.CreateDirectory(Path.GetDirectoryName(filename)!);
                 await File.WriteAllTextAsync(filename, file.Text);
             }
+            CodeModelGenerator.Instance.Emitter.Info("[diag] After GetGeneratedFilesAsync()");
 
             // Write additional output files (e.g. configuration schemas, .targets files)
             await CodeModelGenerator.Instance.WriteAdditionalFiles(outputPath);

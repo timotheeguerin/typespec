@@ -1,6 +1,6 @@
 # Build from the http-client-csharp package root:
 #   docker build -f playground-server/Dockerfile -t csharp-playground-server .
-FROM mcr.microsoft.com/dotnet/sdk:10.0-nanoserver-ltsc2022 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Build the generator (populates dist/generator/)
@@ -15,16 +15,29 @@ COPY playground-server/ playground-server/
 RUN dotnet publish playground-server -c Release -o /app
 
 # Copy generator output and test data
-RUN powershell -Command "Copy-Item -Path 'dist/generator' -Destination '/app/generator' -Recurse"
-RUN powershell -Command "New-Item -ItemType Directory -Path '/app/test-data' -Force; Copy-Item 'generator/TestProjects/Spector/http/routes/tspCodeModel.json' '/app/test-data/'; Copy-Item 'generator/TestProjects/Spector/http/routes/Configuration.json' '/app/test-data/'"
+RUN cp -r dist/generator /app/generator
+RUN mkdir -p /app/test-data && \
+    cp generator/TestProjects/Spector/http/routes/tspCodeModel.json /app/test-data/ && \
+    cp generator/TestProjects/Spector/http/routes/Configuration.json /app/test-data/
 
 # Need full SDK (not just aspnet) because the server spawns `dotnet` to run the generator DLL
-FROM mcr.microsoft.com/dotnet/sdk:10.0-nanoserver-ltsc2022 AS runtime
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 
-ENV DOTNET_ENVIRONMENT=Production
-ENV GENERATOR_PATH=C:\\app\\generator\\Microsoft.TypeSpec.Generator.dll
+# Install SSH for remote debugging
+RUN apt-get update && apt-get install -y openssh-server \
+    && echo "root:Docker!" | chpasswd \
+    && mkdir -p /run/sshd \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY playground-server/sshd_config /etc/ssh/
 
-EXPOSE 5174
-ENTRYPOINT ["dotnet", "playground-server.dll"]
+ENV DOTNET_ENVIRONMENT=Production
+ENV GENERATOR_PATH=/app/generator/Microsoft.TypeSpec.Generator.dll
+ENV TMPDIR=/tmp
+
+EXPOSE 5174 2222
+COPY playground-server/entrypoint.sh /entrypoint.sh
+COPY playground-server/test-generator.sh /app/test-generator.sh
+RUN chmod +x /entrypoint.sh /app/test-generator.sh
+ENTRYPOINT ["/entrypoint.sh"]
