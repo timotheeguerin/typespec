@@ -146,7 +146,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            ArgumentList = { "--roll-forward", "Major", generatorPath, tempDir, "-g", generatorName, "--new-project" },
+            ArgumentList = { "--roll-forward", "Major", generatorPath, tempDir, "-g", generatorName, "--new-project", "--skip-post-processing" },
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

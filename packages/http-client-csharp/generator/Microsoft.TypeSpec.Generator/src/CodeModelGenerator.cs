@@ -72,6 +72,7 @@ namespace Microsoft.TypeSpec.Generator
         }
 
         internal bool IsNewProject { get; set; }
+        internal bool SkipPostProcessing { get; set; }
         private InputLibrary _inputLibrary;
 
         public virtual Emitter Emitter { get; }

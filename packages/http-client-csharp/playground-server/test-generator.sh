@@ -10,7 +10,7 @@ cp /app/test-data/tspCodeModel.json "$DIR/"
 cp /app/test-data/Configuration.json "$DIR/"
 
 echo "Running generator in $DIR..."
-dotnet --roll-forward Major /app/generator/Microsoft.TypeSpec.Generator.dll "$DIR" -g ScmCodeModelGenerator --new-project
+dotnet --roll-forward Major /app/generator/Microsoft.TypeSpec.Generator.dll "$DIR" -g ScmCodeModelGenerator --new-project --skip-post-processing
 EXIT=$?
 
 echo "Exit code: $EXIT"
