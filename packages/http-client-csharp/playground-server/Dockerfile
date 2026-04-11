@@ -40,5 +40,6 @@ ENV DOTNET_EnableDiagnostics=0
 
 EXPOSE 5174 2222
 COPY playground-server/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY playground-server/test-generator.sh /app/test-generator.sh
+RUN chmod +x /entrypoint.sh /app/test-generator.sh
 ENTRYPOINT ["/entrypoint.sh"]
