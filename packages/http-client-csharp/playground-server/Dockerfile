@@ -23,8 +23,8 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 
-# Install SSH for App Service remote access and dotnet-dump for crash analysis
-RUN apt-get update && apt-get install -y openssh-server \
+# Install SSH, lldb, and dotnet-dump for crash analysis
+RUN apt-get update && apt-get install -y openssh-server lldb \
     && echo "root:Docker!" | chpasswd \
     && mkdir -p /run/sshd \
     && dotnet tool install -g dotnet-dump \

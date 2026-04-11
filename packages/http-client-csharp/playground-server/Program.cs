@@ -159,7 +159,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
         psi.Environment["DOTNET_TieredCompilation"] = "0"; // Disable tiered compilation
         // Collect mini dump on crash for diagnostics
         psi.Environment["DOTNET_DbgEnableMiniDump"] = "1";
-        psi.Environment["DOTNET_DbgMiniDumpType"] = "1"; // Mini dump
+        psi.Environment["DOTNET_DbgMiniDumpType"] = "4"; // Full dump for lldb analysis
         psi.Environment["DOTNET_DbgMiniDumpName"] = "/home/coredump.%p";
 
         using var process = Process.Start(psi)!;
