@@ -35,6 +35,10 @@ COPY playground-server/sshd_config /etc/ssh/
 ENV DOTNET_ENVIRONMENT=Production
 ENV GENERATOR_PATH=/app/generator/Microsoft.TypeSpec.Generator.dll
 ENV TMPDIR=/tmp
+# Collect full dump on crash
+ENV DOTNET_DbgEnableMiniDump=1
+ENV DOTNET_DbgMiniDumpType=4
+ENV DOTNET_DbgMiniDumpName=/home/coredump.%p
 
 EXPOSE 5174 2222
 COPY playground-server/entrypoint.sh /entrypoint.sh

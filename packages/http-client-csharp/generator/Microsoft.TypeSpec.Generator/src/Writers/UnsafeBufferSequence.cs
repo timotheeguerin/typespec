@@ -3,35 +3,58 @@
 
 using System;
 using System.Buffers;
-using System.Collections.Generic;
 
 namespace Microsoft.TypeSpec.Generator;
 
 /// <summary>
-/// Simple buffer sequence writer that avoids volatile/ref patterns and ArrayPool
-/// that can cause SIGSEGV in sandboxed container environments.
+/// This class is a helper to write to a <see cref="IBufferWriter{T}"/> in a thread safe manner.
+/// It uses the shared pool to allocate buffers and returns them to the pool when disposed.
+/// Since there is no way to ensure someone didn't keep a reference to one of the buffers
+/// it must be disposed of in the same context it was created and its referenced should not be stored or shared.
 /// </summary>
 internal sealed partial class UnsafeBufferSequence : IBufferWriter<char>, IDisposable
 {
-    private readonly List<UnsafeBufferSegment> _segments = new();
+    private volatile UnsafeBufferSegment[] _buffers; // this is an array so items can be accessed by ref
+    private volatile int _count;
     private readonly int _segmentSize;
+    // Use a private pool instead of ArrayPool.Shared to avoid mmap-backed allocations
+    // that can cause SIGSEGV in sandboxed container environments (e.g., Azure App Service).
+    private static readonly ArrayPool<char> _pool = ArrayPool<char>.Create();
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="UnsafeBufferSequence"/>.
+    /// </summary>
+    /// <param name="segmentSize">The size of each buffer segment.</param>
     public UnsafeBufferSequence(int segmentSize = 16384)
     {
+        // we perf tested a very large and a small model and found that the performance
+        // for 4k, 8k, 16k, 32k, was negligible for the small model but had a 30% alloc improvement
+        // from 4k to 16k on the very large model.
         _segmentSize = segmentSize;
+        _buffers = Array.Empty<UnsafeBufferSegment>();
     }
 
+    /// <summary>
+    /// Notifies the <see cref="UnsafeBufferSequence"/> that bytes bytes were written to the output <see cref="Span{T}"/> or <see cref="Memory{T}"/>.
+    /// You must request a new buffer after calling <see cref="Advance(int)"/> to continue writing more data; you cannot write to a previously acquired buffer.
+    /// </summary>
+    /// <param name="bytesWritten">The number of bytes written to the <see cref="Span{T}"/> or <see cref="Memory{T}"/>.</param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     public void Advance(int bytesWritten)
     {
-        var last = _segments[_segments.Count - 1];
+        ref UnsafeBufferSegment last = ref _buffers[_count - 1];
         last.Written += bytesWritten;
-        _segments[_segments.Count - 1] = last;
         if (last.Written > last.Array.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(bytesWritten));
         }
     }
 
+    /// <summary>
+    /// Returns a <see cref="Memory{T}"/> to write to that is at least the requested size, as specified by the <paramref name="sizeHint"/> parameter.
+    /// </summary>
+    /// <param name="sizeHint">The minimum length of the returned <see cref="Memory{T}"/>. If less than 256, a buffer of size 256 will be returned.</param>
+    /// <returns>A memory buffer of at least <paramref name="sizeHint"/> bytes. If <paramref name="sizeHint"/> is less than 256, a buffer of size 256 will be returned.</returns>
     public Memory<char> GetMemory(int sizeHint = 0)
     {
         if (sizeHint < 256)
@@ -41,39 +64,82 @@ internal sealed partial class UnsafeBufferSequence : IBufferWriter<char>, IDispo
 
         int sizeToRent = sizeHint > _segmentSize ? sizeHint : _segmentSize;
 
-        if (_segments.Count == 0)
+        if (_buffers.Length == 0)
         {
-            _segments.Add(new UnsafeBufferSegment { Array = new char[sizeToRent], Written = 0 });
+            ExpandBuffers(sizeToRent);
         }
 
-        var last = _segments[_segments.Count - 1];
-        int remaining = last.Array.Length - last.Written;
-        if (remaining >= sizeHint)
+        ref UnsafeBufferSegment last = ref _buffers[_count - 1];
+        Memory<char> free = last.Array.AsMemory(last.Written);
+        if (free.Length >= sizeHint)
         {
-            return last.Array.AsMemory(last.Written);
+            return free;
         }
 
-        // Allocate a new segment
-        _segments.Add(new UnsafeBufferSegment { Array = new char[sizeToRent], Written = 0 });
-        return _segments[_segments.Count - 1].Array;
+        // else allocate a new buffer:
+        ExpandBuffers(sizeToRent);
+
+        return _buffers[_count - 1].Array;
     }
 
+    private readonly object _lock = new object();
+    private void ExpandBuffers(int sizeToRent)
+    {
+        lock (_lock)
+        {
+            int bufferCount = _count == 0 ? 1 : _count * 2;
+
+            UnsafeBufferSegment[] resized = new UnsafeBufferSegment[bufferCount];
+            if (_count > 0)
+            {
+                _buffers.CopyTo(resized, 0);
+            }
+            _buffers = resized;
+            _buffers[_count].Array = _pool.Rent(sizeToRent);
+            _count = bufferCount == 1 ? bufferCount : _count + 1;
+        }
+    }
+
+    /// <summary>
+    /// Returns a <see cref="Span{T}"/> to write to that is at least the requested size, as specified by the <paramref name="sizeHint"/> parameter.
+    /// </summary>
+    /// <param name="sizeHint">The minimum length of the returned <see cref="Span{T}"/>. If less than 256, a buffer of size 256 will be returned.</param>
+    /// <returns>A buffer of at least <paramref name="sizeHint"/> bytes. If <paramref name="sizeHint"/> is less than 256, a buffer of size 256 will be returned.</returns>
     public Span<char> GetSpan(int sizeHint = 0)
     {
         Memory<char> memory = GetMemory(sizeHint);
         return memory.Span;
     }
 
+    /// <summary>
+    /// Disposes the SequenceWriter and returns the underlying buffers to the pool.
+    /// </summary>
     public void Dispose()
     {
-        _segments.Clear();
+        int bufferCountToFree;
+        UnsafeBufferSegment[] buffersToFree;
+        lock (_lock)
+        {
+            bufferCountToFree = _count;
+            buffersToFree = _buffers;
+            _count = 0;
+            _buffers = Array.Empty<UnsafeBufferSegment>();
+        }
+
+        for (int i = 0; i < bufferCountToFree; i++)
+        {
+            _pool.Return(buffersToFree[i].Array);
+        }
     }
 
     public Reader ExtractReader()
     {
-        var buffers = _segments.ToArray();
-        var count = buffers.Length;
-        _segments.Clear();
-        return new ReaderInstance(buffers, count);
+        lock (_lock)
+        {
+            Reader reader = new ReaderInstance(_buffers, _count);
+            _count = 0;
+            _buffers = Array.Empty<UnsafeBufferSegment>();
+            return reader;
+        }
     }
 }

@@ -182,6 +182,8 @@ namespace Microsoft.TypeSpec.Generator
         public void WriteMethod(MethodProvider method)
         {
             ArgumentNullException.ThrowIfNull(method, nameof(method));
+            Console.Error.WriteLine($"[diag] WriteMethod: {method.Signature.Name}");
+            Console.Error.Flush();
 
             using (WriteXmlDocs(method.XmlDocs))
             {
