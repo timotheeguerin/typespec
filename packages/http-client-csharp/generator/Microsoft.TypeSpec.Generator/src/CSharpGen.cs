@@ -28,6 +28,13 @@ namespace Microsoft.TypeSpec.Generator
             CodeModelGenerator.Instance.Emitter.Info("Starting code generation");
             CodeModelGenerator.Instance.Stopwatch.Start();
 
+            // Pre-warm JIT compilation of ParameterProvider interface methods
+            // to avoid potential dispatch issues in sandboxed container environments.
+            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(
+                typeof(Providers.ParameterProvider).GetMethod("Equals", new[] { typeof(Providers.ParameterProvider) })!.MethodHandle);
+            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(
+                typeof(Providers.ParameterProvider).GetMethod("GetHashCode", Type.EmptyTypes)!.MethodHandle);
+
             CodeModelGenerator.Instance.Emitter.Info("[diag] Before GeneratedCodeWorkspace.Initialize()");
             GeneratedCodeWorkspace.Initialize();
             CodeModelGenerator.Instance.Emitter.Info("[diag] After GeneratedCodeWorkspace.Initialize()");
