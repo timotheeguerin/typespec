@@ -132,14 +132,8 @@ internal partial class UnsafeBufferSequence
                 {
                     if (!_isDisposed)
                     {
-                        int buffersToReturnCount = _count;
-                        var buffersToReturn = _buffers;
                         _count = 0;
                         _buffers = Array.Empty<UnsafeBufferSegment>();
-                        for (int i = 0; i < buffersToReturnCount; i++)
-                        {
-                            ArrayPool<char>.Shared.Return(buffersToReturn[i].Array);
-                        }
                         _isDisposed = true;
                     }
                 }
