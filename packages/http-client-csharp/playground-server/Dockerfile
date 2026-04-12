@@ -3,10 +3,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Build the generator (populates dist/generator/)
+# Build the generator with ReadyToRun pre-compilation to minimize JIT at runtime
 COPY generator/ generator/
 COPY eng/ eng/
-RUN dotnet build generator -c Release
+RUN dotnet publish generator/Microsoft.TypeSpec.Generator/src -c Release -r linux-x64 --self-contained false -p:PublishReadyToRun=true -o dist/generator
 
 # Build the server
 COPY playground-server/playground-server.csproj playground-server/
