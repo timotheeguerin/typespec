@@ -5,8 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.TypeSpec.Generator.Primitives;
 using Microsoft.TypeSpec.Generator.Providers;
 using Microsoft.TypeSpec.Generator.SourceInput;
 using Microsoft.TypeSpec.Generator.Utilities;
@@ -92,7 +94,7 @@ namespace Microsoft.TypeSpec.Generator
             int fileCount = 0;
             foreach (var outputType in output.TypeProviders)
             {
-                Console.Error.WriteLine($"[diag] Processing type {fileCount}: {outputType.Name}");
+                Console.Error.WriteLine($"[diag] Processing type {fileCount}: {outputType.Name} (type: {outputType.GetType().Name})");
                 Console.Error.Flush();
 
                 // Ensure back-compatibility processing is done after all visitors have run
@@ -101,10 +103,41 @@ namespace Microsoft.TypeSpec.Generator
                 Console.Error.Flush();
 
                 var writer = CodeModelGenerator.Instance.GetWriter(outputType);
-                Console.Error.WriteLine($"[diag] Writer created for {outputType.Name}, calling Write()");
+                Console.Error.WriteLine($"[diag] Writer created for {outputType.Name} (methods: {outputType.Methods.Count}, props: {outputType.Properties.Count}), calling Write()");
                 Console.Error.Flush();
-                var codeFile = writer.Write();
-                Console.Error.WriteLine($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
+
+                // Run Write on a new thread with a large stack to rule out stack overflow
+                CodeFile? codeFile = null;
+                Exception? writeError = null;
+                var writeThread = new Thread(() =>
+                {
+                    try
+                    {
+                        codeFile = writer.Write();
+                    }
+                    catch (Exception ex)
+                    {
+                        writeError = ex;
+                    }
+                }, 64 * 1024 * 1024); // 64MB stack
+                writeThread.Start();
+                writeThread.Join();
+
+                if (writeError != null)
+                {
+                    Console.Error.WriteLine($"[diag] Write() THREW: {writeError.GetType().Name}: {writeError.Message}");
+                    Console.Error.WriteLine(writeError.StackTrace);
+                    Console.Error.Flush();
+                    throw writeError;
+                }
+                if (codeFile is null)
+                {
+                    Console.Error.WriteLine($"[diag] Write() returned null - thread may have crashed");
+                    Console.Error.Flush();
+                    throw new InvalidOperationException($"Write() for {outputType.Name} returned null");
+                }
+
+                Console.Error.WriteLine($"[diag] Adding file {fileCount}: {codeFile!.Name} ({codeFile.Content.Length} chars)");
                 Console.Error.Flush();
                 await generatedCodeWorkspace.AddGeneratedFile(codeFile);
                 Console.Error.WriteLine($"[diag] Added file {fileCount}: {codeFile.Name}");
