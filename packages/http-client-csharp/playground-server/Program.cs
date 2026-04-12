@@ -79,14 +79,6 @@ app.MapGet("/health", () =>
     }
     catch (Exception ex) { dotnetVersion = ex.Message; }
 
-    // Check for core dumps in /tmp and subdirectories
-    var dumpFiles = new List<string>();
-    if (Directory.Exists("/home"))
-    {
-        foreach (var f in Directory.GetFiles("/home", "coredump*", SearchOption.TopDirectoryOnly))
-            dumpFiles.Add(f);
-    }
-
     return Results.Ok(new
     {
         status = "ok",
@@ -95,17 +87,8 @@ app.MapGet("/health", () =>
         dotnetVersion,
         runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
         os = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
-        arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString(),
-        coreDumps = dumpFiles
+        arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString()
     });
-});
-
-app.MapGet("/coredump/{filename}", (string filename) =>
-{
-    var path = Path.Combine("/home", filename);
-    if (!File.Exists(path) || !filename.StartsWith("coredump"))
-        return Results.NotFound();
-    return Results.File(path, "application/octet-stream", filename);
 });
 
 app.MapPost("/generate", async (HttpRequest request) =>
@@ -127,8 +110,6 @@ app.MapPost("/generate", async (HttpRequest request) =>
     var tempDir = Path.Combine(Path.GetTempPath(), "tsp-playground", Guid.NewGuid().ToString("N"));
     var generatedDir = Path.Combine(tempDir, "src", "Generated");
     Directory.CreateDirectory(generatedDir);
-
-    var exitCode = -1;
 
     try
     {
@@ -155,6 +136,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
 
         using var process = Process.Start(psi)!;
 
+        // Stream stdout/stderr to console for logging
         var stderrLines = new List<string>();
         var stdoutTask = Task.Run(async () =>
         {
@@ -177,7 +159,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
         await process.WaitForExitAsync();
         await Task.WhenAll(stdoutTask, stderrTask);
 
-        exitCode = process.ExitCode;
+        var exitCode = process.ExitCode;
         Console.WriteLine($"Generator exited with code {exitCode}");
 
         if (exitCode != 0)
@@ -211,16 +193,7 @@ app.MapPost("/generate", async (HttpRequest request) =>
     }
     finally
     {
-        // Clean up temp directory
-        // Keep temp dir on failure for manual debugging via SSH
-        if (exitCode == 0)
-        {
-            try { Directory.Delete(tempDir, recursive: true); } catch { }
-        }
-        else
-        {
-            Console.WriteLine($"Keeping temp dir for debugging: {tempDir}");
-        }
+        try { Directory.Delete(tempDir, recursive: true); } catch { }
     }
 }).RequireRateLimiting("generate");
 

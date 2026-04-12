@@ -182,8 +182,6 @@ namespace Microsoft.TypeSpec.Generator
         public void WriteMethod(MethodProvider method)
         {
             ArgumentNullException.ThrowIfNull(method, nameof(method));
-            Console.Error.WriteLine($"[diag] WriteMethod: {method.Signature.Name}");
-            Console.Error.Flush();
 
             using (WriteXmlDocs(method.XmlDocs))
             {
@@ -1066,20 +1064,13 @@ namespace Microsoft.TypeSpec.Generator
             {
                 AppendRaw("(");
                 var iterator = arguments.GetEnumerator();
-                int argIdx = 0;
                 if (iterator.MoveNext())
                 {
-                    Console.Error.WriteLine($"[diag] WriteArguments arg {argIdx}: {iterator.Current?.GetType().FullName ?? "NULL"}");
-                    Console.Error.Flush();
-                    iterator.Current!.Write(this);
-                    argIdx++;
+                    iterator.Current.Write(this);
                     while (iterator.MoveNext())
                     {
                         AppendRaw(", ");
-                        Console.Error.WriteLine($"[diag] WriteArguments arg {argIdx}: {iterator.Current?.GetType().FullName ?? "NULL"}");
-                        Console.Error.Flush();
-                        iterator.Current!.Write(this);
-                        argIdx++;
+                        iterator.Current.Write(this);
                     }
                 }
                 AppendRaw(")");

@@ -104,10 +104,8 @@ namespace Microsoft.TypeSpec.Generator
 
         public async IAsyncEnumerable<(string Name, string Text)> GetGeneratedFilesAsync()
         {
-            CodeModelGenerator.Instance.Emitter.Info($"[diag] GetGeneratedFilesAsync: processing {_project.Documents.Count()} documents");
             List<Task<Document>> documents = new List<Task<Document>>();
             var memberRemover = new MemberRemoverRewriter();
-            int docIndex = 0;
             foreach (Document document in _project.Documents)
             {
                 if (!IsGeneratedDocument(document))
@@ -115,13 +113,9 @@ namespace Microsoft.TypeSpec.Generator
                     continue;
                 }
 
-                CodeModelGenerator.Instance.Emitter.Info($"[diag] GetGeneratedFilesAsync: queuing doc {docIndex}: {document.Name}");
                 documents.Add(ProcessDocument(document, memberRemover));
-                docIndex++;
             }
-            CodeModelGenerator.Instance.Emitter.Info($"[diag] GetGeneratedFilesAsync: before Task.WhenAll for {docIndex} docs");
             var docs = await Task.WhenAll(documents);
-            CodeModelGenerator.Instance.Emitter.Info($"[diag] GetGeneratedFilesAsync: after Task.WhenAll");
 
             LoggingHelpers.LogElapsedTime("Roslyn post processing complete");
 
@@ -268,7 +262,6 @@ namespace Microsoft.TypeSpec.Generator
         /// </summary>
         public async Task PostProcessAsync()
         {
-            CodeModelGenerator.Instance.Emitter.Info("[diag] PostProcessAsync: creating PostProcessor");
             var modelFactory = CodeModelGenerator.Instance.OutputLibrary.ModelFactory.Value;
             var nonRootTypes = CodeModelGenerator.Instance.NonRootTypes;
             var postProcessor = new PostProcessor(
@@ -276,26 +269,18 @@ namespace Microsoft.TypeSpec.Generator
                 modelFactoryFullName: modelFactory.Type.FullyQualifiedName,
                 additionalNonRootTypeNames: nonRootTypes);
 
-            CodeModelGenerator.Instance.Emitter.Info($"[diag] PostProcessAsync: UnreferencedTypesHandling={Configuration.UnreferencedTypesHandling}");
             switch (Configuration.UnreferencedTypesHandling)
             {
                 case Configuration.UnreferencedTypesHandlingOption.KeepAll:
-                    CodeModelGenerator.Instance.Emitter.Info("[diag] PostProcessAsync: KeepAll - skipping");
                     break;
                 case Configuration.UnreferencedTypesHandlingOption.Internalize:
-                    CodeModelGenerator.Instance.Emitter.Info("[diag] PostProcessAsync: Before InternalizeAsync");
                     _project = await postProcessor.InternalizeAsync(_project);
-                    CodeModelGenerator.Instance.Emitter.Info("[diag] PostProcessAsync: After InternalizeAsync");
                     break;
                 case Configuration.UnreferencedTypesHandlingOption.RemoveOrInternalize:
-                    CodeModelGenerator.Instance.Emitter.Info("[diag] PostProcessAsync: Before InternalizeAsync");
                     _project = await postProcessor.InternalizeAsync(_project);
-                    CodeModelGenerator.Instance.Emitter.Info("[diag] PostProcessAsync: After InternalizeAsync, Before RemoveAsync");
                     _project = await postProcessor.RemoveAsync(_project);
-                    CodeModelGenerator.Instance.Emitter.Info("[diag] PostProcessAsync: After RemoveAsync");
                     break;
             }
-            CodeModelGenerator.Instance.Emitter.Info("[diag] PostProcessAsync: complete");
         }
 
         /// <summary>

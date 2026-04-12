@@ -28,28 +28,15 @@ namespace Microsoft.TypeSpec.Generator
             CodeModelGenerator.Instance.Emitter.Info("Starting code generation");
             CodeModelGenerator.Instance.Stopwatch.Start();
 
-            // Pre-warm JIT compilation of ParameterProvider interface methods
-            // to avoid potential dispatch issues in sandboxed container environments.
-            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(
-                typeof(Providers.ParameterProvider).GetMethod("Equals", new[] { typeof(Providers.ParameterProvider) })!.MethodHandle);
-            System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(
-                typeof(Providers.ParameterProvider).GetMethod("GetHashCode", Type.EmptyTypes)!.MethodHandle);
-
-            CodeModelGenerator.Instance.Emitter.Info("[diag] Before GeneratedCodeWorkspace.Initialize()");
             GeneratedCodeWorkspace.Initialize();
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After GeneratedCodeWorkspace.Initialize()");
             var outputPath = CodeModelGenerator.Instance.Configuration.OutputDirectory;
             var generatedSourceOutputPath = CodeModelGenerator.Instance.Configuration.ProjectGeneratedDirectory;
 
             // Resolve PackageReference items from the .csproj so custom code referencing
             // external NuGet types (e.g., Azure.Storage.Common) compiles correctly.
-            CodeModelGenerator.Instance.Emitter.Info("[diag] Before AddPackageReferencesFromProject");
             await GeneratedCodeWorkspace.AddPackageReferencesFromProject();
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After AddPackageReferencesFromProject");
 
-            CodeModelGenerator.Instance.Emitter.Info("[diag] Before Create(customCode)");
             GeneratedCodeWorkspace customCodeWorkspace = await GeneratedCodeWorkspace.Create(isCustomCodeProject: true);
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After Create(customCode)");
             // The generated attributes need to be added into the workspace before loading the custom code. Otherwise,
             // Roslyn doesn't load the attributes completely and we are unable to get the attribute arguments.
 
@@ -60,24 +47,17 @@ namespace Microsoft.TypeSpec.Generator
             }
 
             await Task.WhenAll(generateAttributeTasks);
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After AddInMemoryFile attributes");
 
-            CodeModelGenerator.Instance.Emitter.Info("[diag] Before customCodeWorkspace.GetCompilationAsync()");
-            var customCompilation = await customCodeWorkspace.GetCompilationAsync();
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After customCodeWorkspace.GetCompilationAsync()");
+            CodeModelGenerator.Instance.SourceInputModel = new SourceInputModel(
+                await customCodeWorkspace.GetCompilationAsync(),
+                await GeneratedCodeWorkspace.LoadBaselineContract());
 
-            CodeModelGenerator.Instance.Emitter.Info("[diag] Before LoadBaselineContract()");
-            var baselineContract = await GeneratedCodeWorkspace.LoadBaselineContract();
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After LoadBaselineContract()");
-
-            CodeModelGenerator.Instance.SourceInputModel = new SourceInputModel(customCompilation, baselineContract);
-
-            CodeModelGenerator.Instance.Emitter.Info("[diag] Before Create(generatedCode)");
             GeneratedCodeWorkspace generatedCodeWorkspace = await GeneratedCodeWorkspace.Create(isCustomCodeProject: false);
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After Create(generatedCode)");
 
             var output = CodeModelGenerator.Instance.OutputLibrary;
             Directory.CreateDirectory(Path.Combine(generatedSourceOutputPath, "Models"));
+            List<Task> generateFilesTasks = new();
+
             // Build all TypeProviders
             foreach (var type in output.TypeProviders)
             {
@@ -96,43 +76,23 @@ namespace Microsoft.TypeSpec.Generator
 
             LoggingHelpers.LogElapsedTime("All visitors have been applied");
 
-            int fileCount = 0;
             foreach (var outputType in output.TypeProviders)
             {
-                Console.Error.WriteLine($"[diag] Processing type {fileCount}: {outputType.Name} (type: {outputType.GetType().Name})");
-                Console.Error.Flush();
-
                 // Ensure back-compatibility processing is done after all visitors have run
                 outputType.ProcessTypeForBackCompatibility();
 
                 var writer = CodeModelGenerator.Instance.GetWriter(outputType);
-                Console.Error.WriteLine($"[diag] Writer created for {outputType.Name} (methods: {outputType.Methods.Count}, props: {outputType.Properties.Count}), calling Write()");
-                Console.Error.Flush();
-                var codeFile = writer.Write();
-                Console.Error.WriteLine($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
-                Console.Error.Flush();
-                await generatedCodeWorkspace.AddGeneratedFile(codeFile);
-                Console.Error.WriteLine($"[diag] Added file {fileCount}: {codeFile.Name}");
-                Console.Error.Flush();
-                fileCount++;
+                generateFilesTasks.Add(generatedCodeWorkspace.AddGeneratedFile(writer.Write()));
 
                 foreach (var serialization in outputType.SerializationProviders)
                 {
-                    Console.Error.WriteLine($"[diag] Processing serialization for {outputType.Name}: {serialization.Name}");
-                    Console.Error.Flush();
                     writer = CodeModelGenerator.Instance.GetWriter(serialization);
-                    codeFile = writer.Write();
-                    Console.Error.WriteLine($"[diag] Adding file {fileCount}: {codeFile.Name} ({codeFile.Content.Length} chars)");
-                    Console.Error.Flush();
-                    await generatedCodeWorkspace.AddGeneratedFile(codeFile);
-                    Console.Error.WriteLine($"[diag] Added file {fileCount}: {codeFile.Name}");
-                    Console.Error.Flush();
-                    fileCount++;
+                    generateFilesTasks.Add(generatedCodeWorkspace.AddGeneratedFile(writer.Write()));
                 }
             }
 
-            Console.Error.WriteLine($"[diag] All {fileCount} files added to workspace");
-            Console.Error.Flush();
+            // Add all the generated files to the workspace
+            await Task.WhenAll(generateFilesTasks);
 
             LoggingHelpers.LogElapsedTime("All generated types have been written into memory");
 
@@ -141,12 +101,9 @@ namespace Microsoft.TypeSpec.Generator
 
             LoggingHelpers.LogElapsedTime("All old generated files have been deleted");
 
-            CodeModelGenerator.Instance.Emitter.Info("[diag] Before PostProcessAsync()");
             await generatedCodeWorkspace.PostProcessAsync();
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After PostProcessAsync()");
 
             // Write the generated files to the output directory
-            CodeModelGenerator.Instance.Emitter.Info("[diag] Before GetGeneratedFilesAsync()");
             await foreach (var file in generatedCodeWorkspace.GetGeneratedFilesAsync())
             {
                 if (string.IsNullOrEmpty(file.Text))
@@ -158,7 +115,6 @@ namespace Microsoft.TypeSpec.Generator
                 Directory.CreateDirectory(Path.GetDirectoryName(filename)!);
                 await File.WriteAllTextAsync(filename, file.Text);
             }
-            CodeModelGenerator.Instance.Emitter.Info("[diag] After GetGeneratedFilesAsync()");
 
             // Write additional output files (e.g. configuration schemas, .targets files)
             await CodeModelGenerator.Instance.WriteAdditionalFiles(outputPath);
