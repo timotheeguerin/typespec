@@ -25,8 +25,8 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 
-# Install SSH for remote debugging
-RUN apt-get update && apt-get install -y openssh-server \
+# Install SSH and lldb for remote debugging
+RUN apt-get update && apt-get install -y openssh-server lldb-18 \
     && echo "root:Docker!" | chpasswd \
     && mkdir -p /run/sshd \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
