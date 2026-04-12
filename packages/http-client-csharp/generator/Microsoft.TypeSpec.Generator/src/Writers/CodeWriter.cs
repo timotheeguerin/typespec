@@ -1066,13 +1066,20 @@ namespace Microsoft.TypeSpec.Generator
             {
                 AppendRaw("(");
                 var iterator = arguments.GetEnumerator();
+                int argIdx = 0;
                 if (iterator.MoveNext())
                 {
-                    iterator.Current.Write(this);
+                    Console.Error.WriteLine($"[diag] WriteArguments arg {argIdx}: {iterator.Current?.GetType().FullName ?? "NULL"}");
+                    Console.Error.Flush();
+                    iterator.Current!.Write(this);
+                    argIdx++;
                     while (iterator.MoveNext())
                     {
                         AppendRaw(", ");
-                        iterator.Current.Write(this);
+                        Console.Error.WriteLine($"[diag] WriteArguments arg {argIdx}: {iterator.Current?.GetType().FullName ?? "NULL"}");
+                        Console.Error.Flush();
+                        iterator.Current!.Write(this);
+                        argIdx++;
                     }
                 }
                 AppendRaw(")");
