@@ -2553,9 +2553,7 @@ export type LinterRuleDefinition<
   N extends string,
   DM extends DiagnosticMessages,
   Options extends Record<string, unknown> = Record<string, never>,
-> =
-  | LinterRuleDefinitionSync<N, DM, Options>
-  | LinterRuleDefinitionAsync<N, DM, Options>;
+> = LinterRuleDefinitionSync<N, DM, Options> | LinterRuleDefinitionAsync<N, DM, Options>;
 
 /** Resolved instance of a linter rule that will run. */
 export type LinterRule<
