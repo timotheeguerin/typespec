@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { createLinterRule, createTypeSpecLibrary } from "../../src/core/library.js";
 import { Linter, createLinter, resolveLinterDefinition } from "../../src/core/linter.js";
@@ -85,6 +85,27 @@ const noInterfaceFooAsync = createLinterRule({
             target,
           });
         });
+      },
+    };
+  },
+});
+
+const noModelWithName = createLinterRule({
+  name: "no-model-with-name",
+  description: "Prevents models with a configurable name",
+  severity: "warning",
+  messages: {
+    default: "Cannot use this model name",
+  },
+  defaultOptions: { bannedName: "Blocked" },
+  create(context) {
+    return {
+      model: (target) => {
+        if (target.name === context.options.bannedName) {
+          context.reportDiagnostic({
+            target,
+          });
+        }
       },
     };
   },
@@ -423,6 +444,131 @@ describe("compiler: linter", () => {
           strict: true,
         },
       );
+    });
+  });
+
+  describe("rule options", () => {
+    it("uses default options when enabled with true", async () => {
+      const linter = await createTestLinter(`model Blocked {}`, {
+        rules: [noModelWithName],
+      });
+      expectDiagnosticEmpty(
+        await linter.extendRuleSet({
+          enable: { "@typespec/test-linter/no-model-with-name": true },
+        }),
+      );
+      expectDiagnostics((await linter.lint()).diagnostics, {
+        severity: "warning",
+        code: "@typespec/test-linter/no-model-with-name",
+        message: "Cannot use this model name",
+      });
+    });
+
+    it("uses custom options when provided as object", async () => {
+      const linter = await createTestLinter(`model CustomBanned {}`, {
+        rules: [noModelWithName],
+      });
+      expectDiagnosticEmpty(
+        await linter.extendRuleSet({
+          enable: {
+            "@typespec/test-linter/no-model-with-name": { bannedName: "CustomBanned" },
+          },
+        }),
+      );
+      expectDiagnostics((await linter.lint()).diagnostics, {
+        severity: "warning",
+        code: "@typespec/test-linter/no-model-with-name",
+        message: "Cannot use this model name",
+      });
+    });
+
+    it("custom options override default options", async () => {
+      // "Blocked" is the default banned name, but we override to "Other"
+      // so "Blocked" should NOT trigger the rule
+      const linter = await createTestLinter(`model Blocked {}`, {
+        rules: [noModelWithName],
+      });
+      expectDiagnosticEmpty(
+        await linter.extendRuleSet({
+          enable: {
+            "@typespec/test-linter/no-model-with-name": { bannedName: "Other" },
+          },
+        }),
+      );
+      expectDiagnosticEmpty((await linter.lint()).diagnostics);
+    });
+
+    it("options are accessible in the rule context", async () => {
+      let capturedOptions: any;
+      const ruleWithCapture = createLinterRule({
+        name: "capture-options",
+        description: "",
+        severity: "warning",
+        messages: { default: "test" },
+        defaultOptions: { key1: "val1", key2: 42 },
+        create(context) {
+          capturedOptions = context.options;
+          return {};
+        },
+      });
+
+      const linter = await createTestLinter(`model Foo {}`, {
+        rules: [ruleWithCapture],
+      });
+      expectDiagnosticEmpty(
+        await linter.extendRuleSet({
+          enable: { "@typespec/test-linter/capture-options": { key1: "override" } },
+        }),
+      );
+      await linter.lint();
+      expect(capturedOptions).toEqual({ key1: "override", key2: 42 });
+    });
+
+    it("rule without options gets empty object in context", async () => {
+      let capturedOptions: any;
+      const ruleNoOptions = createLinterRule({
+        name: "no-options-rule",
+        description: "",
+        severity: "warning",
+        messages: { default: "test" },
+        create(context) {
+          capturedOptions = context.options;
+          return {};
+        },
+      });
+
+      const linter = await createTestLinter(`model Foo {}`, {
+        rules: [ruleNoOptions],
+      });
+      expectDiagnosticEmpty(
+        await linter.extendRuleSet({
+          enable: { "@typespec/test-linter/no-options-rule": true },
+        }),
+      );
+      await linter.lint();
+      expect(capturedOptions).toEqual({});
+    });
+
+    it("options from enable value override ruleset defaults", async () => {
+      const linter = await createTestLinter(`model Foo {} model Bar {}`, {
+        rules: [noModelWithName],
+        ruleSets: {
+          custom: {
+            enable: {
+              "@typespec/test-linter/no-model-with-name": { bannedName: "Foo" },
+            },
+          },
+        },
+      });
+
+      // Extend with the ruleset that bans "Foo"
+      expectDiagnosticEmpty(
+        await linter.extendRuleSet({ extends: ["@typespec/test-linter/custom"] }),
+      );
+      expectDiagnostics((await linter.lint()).diagnostics, {
+        severity: "warning",
+        code: "@typespec/test-linter/no-model-with-name",
+      });
     });
   });
 });
