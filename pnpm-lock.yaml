@@ -1279,9 +1279,15 @@ importers:
 
   packages/http-server-csharp:
     dependencies:
-      '@typespec/asset-emitter':
+      '@alloy-js/core':
+        specifier: 'catalog:'
+        version: 0.22.0
+      '@alloy-js/csharp':
+        specifier: 'catalog:'
+        version: 0.22.0
+      '@typespec/emitter-framework':
         specifier: workspace:^
-        version: link:../asset-emitter
+        version: link:../emitter-framework
       change-case:
         specifier: 'catalog:'
         version: 5.4.4
@@ -1298,6 +1304,12 @@ importers:
         specifier: 'catalog:'
         version: 18.0.0
     devDependencies:
+      '@alloy-js/cli':
+        specifier: 'catalog:'
+        version: 0.22.0
+      '@alloy-js/rollup-plugin':
+        specifier: 'catalog:'
+        version: 0.1.0(@babel/core@7.29.0)(@types/babel__core@7.20.5)(rollup@4.60.1)
       '@inquirer/prompts':
         specifier: 'catalog:'
         version: 8.4.1(@types/node@25.5.2)
