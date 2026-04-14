@@ -1,0 +1,58 @@
+import { Tester } from "../testing/test-host.js";
+import { type Children } from "@alloy-js/core";
+import { createCSharpNamePolicy, SourceFile } from "@alloy-js/csharp";
+import { t, type TesterInstance } from "@typespec/compiler/testing";
+import { Output } from "@typespec/emitter-framework";
+import { beforeEach, describe, expect, it } from "vitest";
+import { Controller } from "./controllers.jsx";
+import { getHttpOperation, type HttpOperation } from "@typespec/http";
+
+let runner: TesterInstance;
+
+beforeEach(async () => {
+  runner = await Tester.createInstance();
+});
+
+function Wrapper(props: { children: Children }) {
+  const policy = createCSharpNamePolicy();
+  return (
+    <Output program={runner.program} namePolicy={policy}>
+      <SourceFile path="test.cs">{props.children}</SourceFile>
+    </Output>
+  );
+}
+
+describe("Controller", () => {
+  it("renders a controller class with an action method", async () => {
+    const { PetStore, listPets } = await runner.compile(t.code`
+      @test interface ${t.interface("PetStore")} {
+        @route("/pets") @get ${t.op("listPets")}(): string[];
+      }
+    `);
+
+    const [httpOp] = getHttpOperation(runner.program, listPets);
+    const operations: HttpOperation[] = [httpOp];
+
+    expect(
+      <Wrapper>
+        <Controller type={PetStore} operations={operations} />
+      </Wrapper>,
+    ).toRenderTo(`
+      [ApiController]
+      public partial class PetStoreController : ControllerBase
+      {
+          internal virtual IPetStore PetStoreImpl { get; }
+          public PetStoreController(IPetStore operations)
+          {
+              PetStoreImpl = operations;
+          }
+          [HttpGet("/pets")]
+          public virtual async Task<IActionResult> ListPets()
+          {
+              var result = await PetStoreImpl.ListPetsAsync();
+              return Ok(result);
+          }
+      }
+    `);
+  });
+});
