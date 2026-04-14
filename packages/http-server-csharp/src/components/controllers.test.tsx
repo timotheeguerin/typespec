@@ -1,11 +1,11 @@
-import { Tester } from "../testing/test-host.js";
 import { type Children } from "@alloy-js/core";
 import { createCSharpNamePolicy, SourceFile } from "@alloy-js/csharp";
 import { t, type TesterInstance } from "@typespec/compiler/testing";
 import { Output } from "@typespec/emitter-framework";
-import { beforeEach, describe, expect, it } from "vitest";
-import { Controller } from "./controllers.jsx";
 import { getHttpOperation, type HttpOperation } from "@typespec/http";
+import { beforeEach, describe, expect, it } from "vitest";
+import { Tester } from "../testing/tester.js";
+import { Controller } from "./controllers.jsx";
 
 let runner: TesterInstance;
 

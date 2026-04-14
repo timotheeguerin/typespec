@@ -1,10 +1,14 @@
-import { Tester } from "../testing/test-host.js";
 import { type Children } from "@alloy-js/core";
-import { ClassDeclaration as CsClassDeclaration, createCSharpNamePolicy, SourceFile } from "@alloy-js/csharp";
+import {
+  createCSharpNamePolicy,
+  ClassDeclaration as CsClassDeclaration,
+  SourceFile,
+} from "@alloy-js/csharp";
 import { t, type TesterInstance } from "@typespec/compiler/testing";
 import { Output } from "@typespec/emitter-framework";
 import { getHttpOperation } from "@typespec/http";
 import { beforeEach, describe, expect, it } from "vitest";
+import { Tester } from "../testing/tester.js";
 import { ControllerAction } from "./controller-action.jsx";
 
 let runner: TesterInstance;
@@ -18,9 +22,7 @@ function Wrapper(props: { children: Children }) {
   return (
     <Output program={runner.program} namePolicy={policy}>
       <SourceFile path="test.cs">
-        <CsClassDeclaration name="TestController">
-          {props.children}
-        </CsClassDeclaration>
+        <CsClassDeclaration name="TestController">{props.children}</CsClassDeclaration>
       </SourceFile>
     </Output>
   );
