@@ -51,7 +51,8 @@
   "files": [
     "lib/**/*.tsp",
     "dist/**",
-    "!dist/test/**"
+    "!dist/test/**",
+    "!dist/**/*.test.*"
   ],
   "peerDependencies": {
     "@typespec/compiler": "workspace:^",

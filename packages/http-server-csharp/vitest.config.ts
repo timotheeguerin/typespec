@@ -10,8 +10,8 @@ export default mergeConfig(
   defineConfig({
     test: {
       testTimeout: 100_000,
-      include: ["src/**/*.test.ts", "src/**/*.test.tsx", "test/**/*.test.ts"],
-      exclude: ["src/cli/*.ts"],
+      include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      exclude: ["src/cli/*.ts", "test/**"],
       setupFiles: ["./src/testing/vitest.setup.ts"],
     },
     resolve: {

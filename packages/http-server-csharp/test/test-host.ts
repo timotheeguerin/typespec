@@ -1,6 +1,6 @@
 import { resolvePath } from "@typespec/compiler";
 import { createTester, TesterInstance } from "@typespec/compiler/testing";
-import { CSharpServiceEmitterOptions } from "../src/lib/lib.js";
+import { CSharpServiceEmitterOptions } from "../src/lib.js";
 
 const libraryName = "@typespec/http-server-csharp";
 
