@@ -17,7 +17,8 @@
     "emitDeclarationOnly": true,
     "outDir": "dist",
     "rootDir": ".",
-    "tsBuildInfoFile": "temp/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "temp/tsconfig.tsbuildinfo",
+    "types": ["@alloy-js/core/testing/matchers"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist", "src/lib/**", "src/cli/**"]
