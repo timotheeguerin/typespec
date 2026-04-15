@@ -11,6 +11,7 @@ catalog:
   "@alloy-js/core": ^0.22.0
   "@alloy-js/csharp": ^0.22.0
   "@alloy-js/markdown": ^0.22.0
+  "@alloy-js/msbuild": ^0.22.0
   "@alloy-js/python": ^0.3.0
   "@alloy-js/rollup-plugin": ^0.1.0
   "@alloy-js/typescript": ^0.22.0

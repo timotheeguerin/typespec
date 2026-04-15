@@ -64,6 +64,7 @@
   "dependencies": {
     "@alloy-js/core": "catalog:",
     "@alloy-js/csharp": "catalog:",
+    "@alloy-js/msbuild": "catalog:",
     "@typespec/emitter-framework": "workspace:^",
     "@typespec/http-canonicalization": "workspace:^",
     "change-case": "catalog:",
