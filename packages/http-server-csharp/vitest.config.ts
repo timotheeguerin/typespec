@@ -11,9 +11,6 @@ export default mergeConfig(
       exclude: ["src/cli/*.ts", "test/**"],
       setupFiles: ["./src/testing/vitest.setup.ts"],
     },
-    resolve: {
-      conditions: ["development"],
-    },
     plugins: [alloyPlugin()],
   }),
 );
