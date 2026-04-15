@@ -2,7 +2,11 @@ import { code, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import { isVoidType } from "@typespec/compiler";
 import type { HttpOperation } from "@typespec/http";
-import { getHttpVerbAttribute, getParameterBindingAttribute, getRouteTemplate } from "../utils/http-helpers.js";
+import {
+  getHttpVerbAttribute,
+  getParameterBindingAttribute,
+  getRouteTemplate,
+} from "../utils/http-helpers.js";
 import { getCSharpIdentifier, NameCasingType } from "../utils/naming.js";
 import { TypeExpression } from "./type-expression.jsx";
 
@@ -25,15 +29,14 @@ export function ControllerAction(props: ControllerActionProps): Children {
   const route = getRouteTemplate(props.operation.path);
 
   // Build parameter list from all HTTP parameters
-  const parameters = props.operation.parameters.parameters
-    .map((p) => {
-      const bindingAttr = getParameterBindingAttribute(p.type, p.name);
-      return {
-        name: getCSharpIdentifier(p.param.name, NameCasingType.Parameter),
-        type: (<TypeExpression type={p.param.type} />) as Children,
-        attributes: bindingAttr ? [bindingAttr] : undefined,
-      };
-    });
+  const parameters = props.operation.parameters.parameters.map((p) => {
+    const bindingAttr = getParameterBindingAttribute(p.type, p.name);
+    return {
+      name: getCSharpIdentifier(p.param.name, NameCasingType.Parameter),
+      type: (<TypeExpression type={p.param.type} />) as Children,
+      attributes: bindingAttr ? [bindingAttr] : undefined,
+    };
+  });
 
   // Add body parameter if present
   const body = props.operation.parameters.body;
@@ -50,9 +53,7 @@ export function ControllerAction(props: ControllerActionProps): Children {
 
   const hasReturnValue = !isVoidType(props.operation.operation.returnType);
 
-  const attributes: Children[] = [
-    code`[${verb}("${route}")]`,
-  ];
+  const attributes: Children[] = [code`[${verb}("${route}")]`];
 
   return (
     <cs.Method

@@ -6,8 +6,12 @@ import { SourceDirectory, SourceFile, type Children } from "@alloy-js/core";
 export function MockScaffolding(props: { interfaceRegistrations: string[] }): Children {
   return (
     <SourceDirectory path="mocks">
-      <SourceFile filetype="cs" path="IInitializer.cs">{getInitializerInterface()}</SourceFile>
-      <SourceFile filetype="cs" path="Initializer.cs">{getInitializerImplementation()}</SourceFile>
+      <SourceFile filetype="cs" path="IInitializer.cs">
+        {getInitializerInterface()}
+      </SourceFile>
+      <SourceFile filetype="cs" path="Initializer.cs">
+        {getInitializerImplementation()}
+      </SourceFile>
       {props.interfaceRegistrations.length > 0 && (
         <SourceFile filetype="cs" path="MockRegistration.cs">
           {getMockRegistration(props.interfaceRegistrations)}

@@ -149,10 +149,7 @@ export enum NameCasingType {
  * Checks if a string is a valid C# identifier.
  * Optionally allows dots for namespace identifiers.
  */
-export function isValidCSharpIdentifier(
-  identifier: string,
-  isNamespace: boolean = false,
-): boolean {
+export function isValidCSharpIdentifier(identifier: string, isNamespace: boolean = false): boolean {
   if (!isNamespace) return identifier?.match(/^[A-Za-z_][\w]*$/) !== null;
   return identifier?.match(/^[A-Za-z_][\w.]*$/) !== null;
 }
@@ -160,10 +157,7 @@ export function isValidCSharpIdentifier(
 /**
  * Replaces C# reserved words with safe alternatives (e.g., "class" → "ClassName").
  */
-export function replaceCSharpReservedWord(
-  identifier: string,
-  context?: NameCasingType,
-): string {
+export function replaceCSharpReservedWord(identifier: string, context?: NameCasingType): string {
   const check = reservedMap.get(identifier.toLowerCase());
   if (check !== undefined) {
     return getCSharpIdentifier(check, context, false);

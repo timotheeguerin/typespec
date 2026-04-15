@@ -41,7 +41,9 @@ export function LaunchSettings(props: LaunchSettingsProps): Children {
 
   return (
     <SourceDirectory path="Properties">
-      <SourceFile filetype="json" path="launchSettings.json">{launchSettings}</SourceFile>
+      <SourceFile filetype="json" path="launchSettings.json">
+        {launchSettings}
+      </SourceFile>
     </SourceDirectory>
   );
 }
@@ -79,8 +81,12 @@ export function AppSettings(): Children {
 
   return (
     <>
-      <SourceFile filetype="json" path="appsettings.json">{appSettings}</SourceFile>
-      <SourceFile filetype="json" path="appsettings.Development.json">{devAppSettings}</SourceFile>
+      <SourceFile filetype="json" path="appsettings.json">
+        {appSettings}
+      </SourceFile>
+      <SourceFile filetype="json" path="appsettings.Development.json">
+        {devAppSettings}
+      </SourceFile>
     </>
   );
 }

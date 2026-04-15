@@ -40,7 +40,9 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
-${useSwagger ? `else
+${
+  useSwagger
+    ? `else
 {
     app.UseSwagger();
     app.UseSwaggerUI(c => {
@@ -49,7 +51,9 @@ ${useSwagger ? `else
         c.RoutePrefix = "swagger";
     });
 }
-` : ""}
+`
+    : ""
+}
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.Use(async (context, next) =>
@@ -57,7 +61,9 @@ app.Use(async (context, next) =>
     context.Request.EnableBuffering();
     await next();
 });
-${useSwagger ? `
+${
+  useSwagger
+    ? `
 app.MapGet("/openapi.yaml", async (HttpContext context) =>
 {
     var externalFilePath = "${openApiPath}";
@@ -70,7 +76,9 @@ app.MapGet("/openapi.yaml", async (HttpContext context) =>
     context.Response.ContentType = "application/yaml";
     await context.Response.SendFileAsync(externalFilePath);
 });
-` : ""}
+`
+    : ""
+}
 app.UseRouting();
 
 app.UseAuthorization();
@@ -83,5 +91,9 @@ app.MapControllerRoute(
 
 app.Run();`;
 
-  return <SourceFile filetype="cs" path="Program.cs">{contents}</SourceFile>;
+  return (
+    <SourceFile filetype="cs" path="Program.cs">
+      {contents}
+    </SourceFile>
+  );
 }

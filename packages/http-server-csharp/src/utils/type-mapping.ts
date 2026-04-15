@@ -96,8 +96,4 @@ export function resolveCollectionType(option?: string): CollectionType {
 }
 
 /** Imprecise scalar names that warrant a diagnostic. */
-export const impreciseScalars: ReadonlySet<string> = new Set([
-  "numeric",
-  "integer",
-  "float",
-]);
+export const impreciseScalars: ReadonlySet<string> = new Set(["numeric", "integer", "float"]);

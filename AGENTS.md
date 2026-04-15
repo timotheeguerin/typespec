@@ -1,4 +1,5 @@
 <!-- BEGIN:alloy-docs -->
+
 # Alloy Framework
 
 Alloy is a code generation framework using JSX components.

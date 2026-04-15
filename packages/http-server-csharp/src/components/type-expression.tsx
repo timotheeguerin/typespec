@@ -1,4 +1,4 @@
-import { code, refkey as ayRefkey, type Children, type Refkey } from "@alloy-js/core";
+import { refkey as ayRefkey, code, type Children, type Refkey } from "@alloy-js/core";
 import { Reference } from "@alloy-js/csharp";
 import { getTypeName, isVoidType, type Scalar, type Type, type Union } from "@typespec/compiler";
 import type { Typekit } from "@typespec/compiler/typekit";

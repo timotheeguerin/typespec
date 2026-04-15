@@ -1,9 +1,9 @@
-import { code, For, refkey as ayRefkey, type Children, type Refkey } from "@alloy-js/core";
+import { refkey as ayRefkey, code, For, type Children, type Refkey } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import type { Interface, Operation } from "@typespec/compiler";
 import { isVoidType } from "@typespec/compiler";
-import { TypeExpression } from "./type-expression.jsx";
 import { getCSharpIdentifier, NameCasingType } from "../utils/naming.js";
+import { TypeExpression } from "./type-expression.jsx";
 
 const interfaceRefKeyPrefix = Symbol.for("http-server-csharp:interface");
 
@@ -27,7 +27,11 @@ export function BusinessLogicInterface(props: BusinessLogicInterfaceProps): Chil
   const operations = Array.from(props.type.operations.entries());
 
   return (
-    <cs.InterfaceDeclaration name={interfaceName} public refkey={businessLogicInterfaceRefkey(props.type)}>
+    <cs.InterfaceDeclaration
+      name={interfaceName}
+      public
+      refkey={businessLogicInterfaceRefkey(props.type)}
+    >
       <For each={operations} doubleHardline>
         {([name, op]) => <BusinessLogicMethod name={name} operation={op} />}
       </For>

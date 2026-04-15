@@ -3,7 +3,6 @@ import * as cs from "@alloy-js/csharp";
 import { isStdNamespace, type Model } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import { ClassDeclaration } from "@typespec/emitter-framework/csharp";
-import { TypeExpression } from "./type-expression.jsx";
 
 export interface ModelsProps {
   /** If true, emit JSON serialization attributes on model properties. */

@@ -75,9 +75,7 @@ code`Promise<${returnType}>`
 
 // ❌ Avoid — large block with &&
 {
-  props.typeParameters && (
-    <TypeParameterList parameters={props.typeParameters} />
-  );
+  props.typeParameters && <TypeParameterList parameters={props.typeParameters} />;
 }
 ```
 

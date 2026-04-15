@@ -23,7 +23,9 @@ export function Controller(props: ControllerProps): Children {
   const controllerName = `${baseName}Controller`;
   const implPropName = `${baseName}Impl`;
 
-  const interfaceRef = (<Reference refkey={businessLogicInterfaceRefkey(props.type)} />) as Children;
+  const interfaceRef = (
+    <Reference refkey={businessLogicInterfaceRefkey(props.type)} />
+  ) as Children;
 
   const attributes: Children[] = [code`[ApiController]`];
 
@@ -37,10 +39,7 @@ export function Controller(props: ControllerProps): Children {
     >
       <cs.Property name={implPropName} type={interfaceRef} internal virtual get />
       {"\n"}
-      <cs.Constructor
-        public
-        parameters={[{ name: "operations", type: interfaceRef }]}
-      >
+      <cs.Constructor public parameters={[{ name: "operations", type: interfaceRef }]}>
         {code`${implPropName} = operations;`}
       </cs.Constructor>
       {"\n"}

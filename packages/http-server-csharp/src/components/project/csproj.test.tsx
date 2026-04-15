@@ -13,7 +13,11 @@ function getFileContent(output: any, path: string): string | undefined {
 
 describe("Csproj", () => {
   it("renders a basic .csproj file", () => {
-    const output = render(<Output><Csproj projectName="TestProject" /></Output>);
+    const output = render(
+      <Output>
+        <Csproj projectName="TestProject" />
+      </Output>,
+    );
     const content = getFileContent(output, "TestProject.csproj");
     expect(content).toBeDefined();
     expect(content).toContain("Microsoft.NET.Sdk.Web");
@@ -22,7 +26,11 @@ describe("Csproj", () => {
   });
 
   it("includes SwaggerUI package when enabled", () => {
-    const output = render(<Output><Csproj projectName="TestProject" useSwaggerUI /></Output>);
+    const output = render(
+      <Output>
+        <Csproj projectName="TestProject" useSwaggerUI />
+      </Output>,
+    );
     const content = getFileContent(output, "TestProject.csproj");
     expect(content).toBeDefined();
     expect(content).toContain("SwashBuckle.AspNetCore");

@@ -45,7 +45,10 @@ export function getCSharpStatusCode(entry: HttpStatusCodesEntry): string | undef
 /**
  * Returns the ASP.NET Core controller return statement for a given HTTP status code.
  */
-export function getControllerReturnStatement(status: HttpStatusCodesEntry, hasValue: boolean): string {
+export function getControllerReturnStatement(
+  status: HttpStatusCodesEntry,
+  hasValue: boolean,
+): string {
   if (typeof status === "number") {
     switch (status) {
       case 200:
