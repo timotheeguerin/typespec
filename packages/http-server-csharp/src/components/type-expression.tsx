@@ -50,7 +50,9 @@ export function TypeExpression(props: TypeExpressionProps): Children {
 
 // --- Refkey helpers ---
 
-const refKeyPrefix = Symbol.for("http-server-csharp");
+// Must match the emitter-framework's C# refkey prefix so that references
+// resolve to declarations created by ClassDeclaration / EnumDeclaration.
+const refKeyPrefix = Symbol.for("emitter-framework:csharp");
 
 export function serverRefkey(...args: unknown[]): Refkey {
   if (args.length === 0) {

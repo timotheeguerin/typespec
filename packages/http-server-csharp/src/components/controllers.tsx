@@ -1,9 +1,10 @@
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
+import { Reference } from "@alloy-js/csharp";
 import type { Interface } from "@typespec/compiler";
 import type { HttpOperation } from "@typespec/http";
-import { getCSharpIdentifier, NameCasingType } from "../utils/naming.js";
 import { ControllerAction } from "./controller-action.jsx";
+import { businessLogicInterfaceRefkey } from "./interfaces.jsx";
 
 export interface ControllerProps {
   /** The TypeSpec interface this controller represents. */
@@ -20,8 +21,9 @@ export function Controller(props: ControllerProps): Children {
   const namePolicy = cs.useCSharpNamePolicy();
   const baseName = namePolicy.getName(props.type.name, "class");
   const controllerName = `${baseName}Controller`;
-  const interfaceName = `I${baseName}`;
   const implPropName = `${baseName}Impl`;
+
+  const interfaceRef = (<Reference refkey={businessLogicInterfaceRefkey(props.type)} />) as Children;
 
   const attributes: Children[] = [code`[ApiController]`];
 
@@ -33,11 +35,11 @@ export function Controller(props: ControllerProps): Children {
       baseType="ControllerBase"
       attributes={attributes}
     >
-      <cs.Property name={implPropName} type={interfaceName} internal virtual get />
+      <cs.Property name={implPropName} type={interfaceRef} internal virtual get />
       {"\n"}
       <cs.Constructor
         public
-        parameters={[{ name: "operations", type: interfaceName }]}
+        parameters={[{ name: "operations", type: interfaceRef }]}
       >
         {code`${implPropName} = operations;`}
       </cs.Constructor>

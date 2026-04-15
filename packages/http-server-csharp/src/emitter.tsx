@@ -1,4 +1,5 @@
 import { SourceDirectory } from "@alloy-js/core";
+import { createCSharpNamePolicy } from "@alloy-js/csharp";
 import { EmitContext } from "@typespec/compiler";
 import { Output, writeOutput } from "@typespec/emitter-framework";
 import { CSharpServiceEmitterOptions } from "./lib.js";
@@ -9,7 +10,7 @@ import { CSharpServiceEmitterOptions } from "./lib.js";
  */
 export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>) {
   const output = (
-    <Output program={context.program}>
+    <Output program={context.program} namePolicy={createCSharpNamePolicy()}>
       <SourceDirectory path=".">
         <SourceDirectory path="generated">
           <SourceDirectory path="models">{/* Models and Enums go here */}</SourceDirectory>

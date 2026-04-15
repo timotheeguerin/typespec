@@ -6,6 +6,7 @@ import { getHttpOperation, type HttpOperation } from "@typespec/http";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Tester } from "../testing/tester.js";
 import { Controller } from "./controllers.jsx";
+import { BusinessLogicInterface } from "./interfaces.jsx";
 
 let runner: TesterInstance;
 
@@ -35,9 +36,15 @@ describe("Controller", () => {
 
     expect(
       <Wrapper>
+        <BusinessLogicInterface type={PetStore} />
+        {"\n"}
         <Controller type={PetStore} operations={operations} />
       </Wrapper>,
     ).toRenderTo(`
+      public interface IPetStore
+      {
+          Task<string[]> ListPetsAsync();
+      }
       [ApiController]
       public partial class PetStoreController : ControllerBase
       {

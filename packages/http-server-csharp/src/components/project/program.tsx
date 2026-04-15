@@ -67,7 +67,7 @@ app.MapGet("/openapi.yaml", async (HttpContext context) =>
         await context.Response.WriteAsync("OpenAPI spec not found.");
         return;
     }
-    context.Response.ContentType = "application/json";
+    context.Response.ContentType = "application/yaml";
     await context.Response.SendFileAsync(externalFilePath);
 });
 ` : ""}

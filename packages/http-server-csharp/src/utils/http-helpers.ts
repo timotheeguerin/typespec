@@ -15,6 +15,10 @@ export function getHttpVerbAttribute(operation: HttpOperation): string {
       return "HttpPost";
     case "put":
       return "HttpPut";
+    case "head":
+      return "HttpHead";
+    case "options":
+      return "HttpOptions";
     default:
       return "HttpGet";
   }
@@ -46,6 +50,8 @@ export function getControllerReturnStatement(status: HttpStatusCodesEntry, hasVa
     switch (status) {
       case 200:
         return hasValue ? "return Ok(result);" : "return Ok();";
+      case 201:
+        return hasValue ? `return Created("", result);` : `return Created("", null);`;
       case 202:
         return hasValue ? "return Accepted(result);" : "return Accepted();";
       case 204:
@@ -66,9 +72,13 @@ export function getParameterBindingAttribute(
 ): string | undefined {
   switch (paramType) {
     case "query":
-      return paramName ? `[FromQuery(Name="${paramName}")]` : "[FromQuery]";
+      return paramName ? `FromQuery(Name="${paramName}")` : "FromQuery";
     case "header":
-      return paramName ? `[FromHeader(Name="${paramName}")]` : "[FromHeader]";
+      return paramName ? `FromHeader(Name="${paramName}")` : "FromHeader";
+    case "body":
+      return "FromBody";
+    case "path":
+      return paramName ? `FromRoute(Name="${paramName}")` : "FromRoute";
     default:
       return undefined;
   }

@@ -72,7 +72,10 @@ describe("ControllerAction", () => {
       class TestController
       {
           [HttpDelete("/pets/{petId}")]
-          public virtual async Task<IActionResult> DeletePet(string petId)
+          public virtual async Task<IActionResult> DeletePet(
+              [FromRoute(Name="petId")]
+              string petId
+          )
           {
               await PetStoreImpl.DeletePetAsync(petId);
               return Ok();

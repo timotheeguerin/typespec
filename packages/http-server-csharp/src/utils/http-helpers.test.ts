@@ -18,8 +18,16 @@ describe("getHttpVerbAttribute", () => {
     expect(getHttpVerbAttribute({ verb } as any)).toBe(expected);
   });
 
+  it("maps head to HttpHead", () => {
+    expect(getHttpVerbAttribute({ verb: "head" } as any)).toBe("HttpHead");
+  });
+
+  it("maps options to HttpOptions", () => {
+    expect(getHttpVerbAttribute({ verb: "options" } as any)).toBe("HttpOptions");
+  });
+
   it("defaults to HttpGet for unknown verbs", () => {
-    expect(getHttpVerbAttribute({ verb: "options" } as any)).toBe("HttpGet");
+    expect(getHttpVerbAttribute({ verb: "trace" } as any)).toBe("HttpGet");
   });
 });
 
@@ -64,8 +72,12 @@ describe("getControllerReturnStatement", () => {
     expect(getControllerReturnStatement(202, true)).toBe("return Accepted(result);");
   });
 
+  it("returns Created for 201", () => {
+    expect(getControllerReturnStatement(201, true)).toBe('return Created("", result);');
+    expect(getControllerReturnStatement(201, false)).toBe('return Created("", null);');
+  });
+
   it("returns StatusCode for other codes", () => {
-    expect(getControllerReturnStatement(201, true)).toBe("return StatusCode(201, result);");
     expect(getControllerReturnStatement(404, false)).toBe("return StatusCode(404);");
   });
 
@@ -76,21 +88,29 @@ describe("getControllerReturnStatement", () => {
 });
 
 describe("getParameterBindingAttribute", () => {
-  it("returns [FromQuery] for query params", () => {
-    expect(getParameterBindingAttribute("query")).toBe("[FromQuery]");
+  it("returns FromQuery for query params", () => {
+    expect(getParameterBindingAttribute("query")).toBe("FromQuery");
   });
 
-  it("returns [FromQuery(Name=...)] with name", () => {
-    expect(getParameterBindingAttribute("query", "filter")).toBe('[FromQuery(Name="filter")]');
+  it("returns FromQuery(Name=...) with name", () => {
+    expect(getParameterBindingAttribute("query", "filter")).toBe('FromQuery(Name="filter")');
   });
 
-  it("returns [FromHeader] for header params", () => {
-    expect(getParameterBindingAttribute("header")).toBe("[FromHeader]");
+  it("returns FromHeader for header params", () => {
+    expect(getParameterBindingAttribute("header")).toBe("FromHeader");
   });
 
-  it("returns undefined for path and body params", () => {
-    expect(getParameterBindingAttribute("path")).toBeUndefined();
-    expect(getParameterBindingAttribute("body")).toBeUndefined();
+  it("returns FromBody for body params", () => {
+    expect(getParameterBindingAttribute("body")).toBe("FromBody");
+  });
+
+  it("returns FromRoute for path params", () => {
+    expect(getParameterBindingAttribute("path")).toBe("FromRoute");
+    expect(getParameterBindingAttribute("path", "petId")).toBe('FromRoute(Name="petId")');
+  });
+
+  it("returns undefined for cookie params", () => {
+    expect(getParameterBindingAttribute("cookie")).toBeUndefined();
   });
 });
 

@@ -28,13 +28,10 @@ function checkPort(port: number, timeout: number = 100): Promise<boolean> {
       resolve(false);
     });
     server.listen(port, () => {
-      try {
-        setTimeout(() => resolve(true), timeout);
-      } catch {
-        resolve(false);
-      } finally {
+      setTimeout(() => {
         server.close();
-      }
+        resolve(true);
+      }, timeout);
     });
   });
 }

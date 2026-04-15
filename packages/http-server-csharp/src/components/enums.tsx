@@ -1,6 +1,6 @@
 import { For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import type { Enum, Union } from "@typespec/compiler";
+import { isStdNamespace, type Enum } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import { EnumDeclaration } from "@typespec/emitter-framework/csharp";
 
@@ -35,6 +35,7 @@ function getServiceEnums($: ReturnType<typeof useTsp>["$"]): Enum[] {
     }
   }
   for (const ns of globalNs.namespaces.values()) {
+    if (isStdNamespace(ns)) continue;
     collectEnumsFromNamespace(ns, enums);
   }
   return enums;

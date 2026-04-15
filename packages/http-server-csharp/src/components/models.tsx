@@ -1,8 +1,8 @@
-import { For, SourceDirectory, type Children } from "@alloy-js/core";
+import { For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import { isVoidType, type Model, type ModelProperty } from "@typespec/compiler";
+import { isStdNamespace, type Model } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
-import { ClassDeclaration, Property } from "@typespec/emitter-framework/csharp";
+import { ClassDeclaration } from "@typespec/emitter-framework/csharp";
 import { TypeExpression } from "./type-expression.jsx";
 
 export interface ModelsProps {
@@ -44,6 +44,7 @@ function getServiceModels($: ReturnType<typeof useTsp>["$"]): Model[] {
   }
 
   for (const ns of globalNs.namespaces.values()) {
+    if (isStdNamespace(ns)) continue;
     collectModelsFromNamespace($, ns, models);
   }
 

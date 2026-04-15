@@ -24,9 +24,8 @@ export function ControllerAction(props: ControllerActionProps): Children {
   const verb = getHttpVerbAttribute(props.operation);
   const route = getRouteTemplate(props.operation.path);
 
-  // Build parameter list for the action method
+  // Build parameter list from all HTTP parameters
   const parameters = props.operation.parameters.parameters
-    .filter((p) => p.param.model?.name === "")
     .map((p) => {
       const bindingAttr = getParameterBindingAttribute(p.type, p.name);
       return {
@@ -36,11 +35,18 @@ export function ControllerAction(props: ControllerActionProps): Children {
       };
     });
 
+  // Add body parameter if present
+  const body = props.operation.parameters.body;
+  if (body?.type) {
+    parameters.push({
+      name: "body",
+      type: (<TypeExpression type={body.type} />) as Children,
+      attributes: ["[FromBody]"],
+    });
+  }
+
   // Build the business logic call arguments
-  const callArgs = props.operation.parameters.parameters
-    .filter((p) => p.param.model?.name === "")
-    .map((p) => getCSharpIdentifier(p.param.name, NameCasingType.Parameter))
-    .join(", ");
+  const callArgs = parameters.map((p) => p.name).join(", ");
 
   const hasReturnValue = !isVoidType(props.operation.operation.returnType);
 

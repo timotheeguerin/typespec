@@ -1,10 +1,16 @@
-import { code, For, type Children } from "@alloy-js/core";
+import { code, For, refkey as ayRefkey, type Children, type Refkey } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import type { Interface, Operation } from "@typespec/compiler";
 import { isVoidType } from "@typespec/compiler";
-import { useTsp } from "@typespec/emitter-framework";
 import { TypeExpression } from "./type-expression.jsx";
 import { getCSharpIdentifier, NameCasingType } from "../utils/naming.js";
+
+const interfaceRefKeyPrefix = Symbol.for("http-server-csharp:interface");
+
+/** Creates a stable refkey for a business logic interface from its TypeSpec Interface type. */
+export function businessLogicInterfaceRefkey(type: Interface): Refkey {
+  return ayRefkey(interfaceRefKeyPrefix, type);
+}
 
 export interface BusinessLogicInterfaceProps {
   /** The TypeSpec interface to generate a business logic interface for. */
@@ -16,13 +22,12 @@ export interface BusinessLogicInterfaceProps {
  * from a TypeSpec interface. Each operation becomes an async Task method.
  */
 export function BusinessLogicInterface(props: BusinessLogicInterfaceProps): Children {
-  const { $ } = useTsp();
   const namePolicy = cs.useCSharpNamePolicy();
   const interfaceName = `I${namePolicy.getName(props.type.name, "class")}`;
   const operations = Array.from(props.type.operations.entries());
 
   return (
-    <cs.InterfaceDeclaration name={interfaceName} public>
+    <cs.InterfaceDeclaration name={interfaceName} public refkey={businessLogicInterfaceRefkey(props.type)}>
       <For each={operations} doubleHardline>
         {([name, op]) => <BusinessLogicMethod name={name} operation={op} />}
       </For>
@@ -40,7 +45,6 @@ interface BusinessLogicMethodProps {
  * Method names get an "Async" suffix (e.g., `ListPetsAsync`).
  */
 function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
-  const { $ } = useTsp();
   const namePolicy = cs.useCSharpNamePolicy();
   const methodName = `${namePolicy.getName(props.name, "class-method")}Async`;
 
