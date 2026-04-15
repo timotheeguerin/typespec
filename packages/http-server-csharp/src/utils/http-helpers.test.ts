@@ -3,7 +3,6 @@ import {
   getControllerReturnStatement,
   getCSharpStatusCode,
   getHttpVerbAttribute,
-  getParameterBindingAttribute,
   getRouteTemplate,
 } from "./http-helpers.js";
 
@@ -14,16 +13,16 @@ describe("getHttpVerbAttribute", () => {
     ["patch", "HttpPatch"],
     ["post", "HttpPost"],
     ["put", "HttpPut"],
-  ])("maps %s to %s", (verb, expected) => {
-    expect(getHttpVerbAttribute({ verb } as any)).toBe(expected);
+  ] as const)("maps %s to %s", (verb, expected) => {
+    expect(getHttpVerbAttribute(verb)).toBe(expected);
   });
 
   it("maps head to HttpHead", () => {
-    expect(getHttpVerbAttribute({ verb: "head" } as any)).toBe("HttpHead");
+    expect(getHttpVerbAttribute("head")).toBe("HttpHead");
   });
 
   it("defaults to HttpGet for unknown verbs", () => {
-    expect(getHttpVerbAttribute({ verb: "trace" } as any)).toBe("HttpGet");
+    expect(getHttpVerbAttribute("trace" as any)).toBe("HttpGet");
   });
 });
 
@@ -80,33 +79,6 @@ describe("getControllerReturnStatement", () => {
   it("returns Ok for status ranges", () => {
     expect(getControllerReturnStatement({ start: 200, end: 299 }, true)).toBe("return Ok(result);");
     expect(getControllerReturnStatement("*", false)).toBe("return Ok();");
-  });
-});
-
-describe("getParameterBindingAttribute", () => {
-  it("returns FromQuery for query params", () => {
-    expect(getParameterBindingAttribute("query")).toBe("FromQuery");
-  });
-
-  it("returns FromQuery(Name=...) with name", () => {
-    expect(getParameterBindingAttribute("query", "filter")).toBe('FromQuery(Name="filter")');
-  });
-
-  it("returns FromHeader for header params", () => {
-    expect(getParameterBindingAttribute("header")).toBe("FromHeader");
-  });
-
-  it("returns FromBody for body params", () => {
-    expect(getParameterBindingAttribute("body")).toBe("FromBody");
-  });
-
-  it("returns FromRoute for path params", () => {
-    expect(getParameterBindingAttribute("path")).toBe("FromRoute");
-    expect(getParameterBindingAttribute("path", "petId")).toBe('FromRoute(Name="petId")');
-  });
-
-  it("returns undefined for cookie params", () => {
-    expect(getParameterBindingAttribute("cookie")).toBeUndefined();
   });
 });
 

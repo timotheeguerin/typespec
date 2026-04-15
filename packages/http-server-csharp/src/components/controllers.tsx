@@ -2,15 +2,15 @@ import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import { Reference } from "@alloy-js/csharp";
 import type { Interface } from "@typespec/compiler";
-import type { HttpOperation } from "@typespec/http";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { ControllerAction } from "./controller-action.jsx";
 import { businessLogicInterfaceRefkey } from "./interfaces.jsx";
 
 export interface ControllerProps {
   /** The TypeSpec interface this controller represents. */
   type: Interface;
-  /** The HTTP operations belonging to this controller. */
-  operations: HttpOperation[];
+  /** The canonicalized HTTP operations belonging to this controller. */
+  operations: OperationHttpCanonicalization[];
 }
 
 /**

@@ -1288,6 +1288,9 @@ importers:
       '@typespec/emitter-framework':
         specifier: workspace:^
         version: link:../emitter-framework
+      '@typespec/http-canonicalization':
+        specifier: workspace:^
+        version: link:../http-canonicalization
       change-case:
         specifier: 'catalog:'
         version: 5.4.4

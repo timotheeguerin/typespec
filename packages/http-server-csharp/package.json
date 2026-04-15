@@ -65,6 +65,7 @@
     "@alloy-js/core": "catalog:",
     "@alloy-js/csharp": "catalog:",
     "@typespec/emitter-framework": "workspace:^",
+    "@typespec/http-canonicalization": "workspace:^",
     "change-case": "catalog:",
     "cross-spawn": "catalog:",
     "picocolors": "catalog:",

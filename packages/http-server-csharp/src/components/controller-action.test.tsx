@@ -5,8 +5,9 @@ import {
   SourceFile,
 } from "@alloy-js/csharp";
 import { t, type TesterInstance } from "@typespec/compiler/testing";
+import { $ } from "@typespec/compiler/typekit";
 import { Output } from "@typespec/emitter-framework";
-import { getHttpOperation } from "@typespec/http";
+import { HttpCanonicalizer, type OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Tester } from "../testing/tester.js";
 import { ControllerAction } from "./controller-action.jsx";
@@ -28,6 +29,11 @@ function Wrapper(props: { children: Children }) {
   );
 }
 
+function canonicalizeOp(opType: any): OperationHttpCanonicalization {
+  const canonicalizer = new HttpCanonicalizer($(runner.program));
+  return canonicalizer.canonicalize(opType) as OperationHttpCanonicalization;
+}
+
 describe("ControllerAction", () => {
   it("renders a GET action", async () => {
     const { listPets } = await runner.compile(t.code`
@@ -36,11 +42,11 @@ describe("ControllerAction", () => {
       }
     `);
 
-    const [httpOp] = getHttpOperation(runner.program, listPets);
+    const canonOp = canonicalizeOp(listPets);
 
     expect(
       <Wrapper>
-        <ControllerAction operation={httpOp} implFieldName="PetStoreImpl" />
+        <ControllerAction operation={canonOp} implFieldName="PetStoreImpl" />
       </Wrapper>,
     ).toRenderTo(`
       class TestController
@@ -62,11 +68,11 @@ describe("ControllerAction", () => {
       }
     `);
 
-    const [httpOp] = getHttpOperation(runner.program, deletePet);
+    const canonOp = canonicalizeOp(deletePet);
 
     expect(
       <Wrapper>
-        <ControllerAction operation={httpOp} implFieldName="PetStoreImpl" />
+        <ControllerAction operation={canonOp} implFieldName="PetStoreImpl" />
       </Wrapper>,
     ).toRenderTo(`
       class TestController

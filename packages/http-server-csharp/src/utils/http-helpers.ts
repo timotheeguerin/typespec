@@ -1,10 +1,10 @@
-import type { HttpOperation, HttpStatusCodesEntry } from "@typespec/http";
+import type { HttpStatusCodesEntry, HttpVerb } from "@typespec/http";
 
 /**
  * Maps an HTTP verb to its ASP.NET Core attribute name.
  */
-export function getHttpVerbAttribute(operation: HttpOperation): string {
-  switch (operation.verb) {
+export function getHttpVerbAttribute(verb: HttpVerb): string {
+  switch (verb) {
     case "delete":
       return "HttpDelete";
     case "get":
@@ -65,29 +65,7 @@ export function getControllerReturnStatement(
 }
 
 /**
- * Maps an HTTP operation parameter type to ASP.NET binding attribute.
- */
-export function getParameterBindingAttribute(
-  paramType: "path" | "query" | "header" | "cookie" | "body",
-  paramName?: string,
-): string | undefined {
-  switch (paramType) {
-    case "query":
-      return paramName ? `FromQuery(Name="${paramName}")` : "FromQuery";
-    case "header":
-      return paramName ? `FromHeader(Name="${paramName}")` : "FromHeader";
-    case "body":
-      return "FromBody";
-    case "path":
-      return paramName ? `FromRoute(Name="${paramName}")` : "FromRoute";
-    default:
-      return undefined;
-  }
-}
-
-/**
  * Extracts the route template from an HTTP operation path.
- * Converts TypeSpec path params to ASP.NET route params (e.g., `{id}`).
  */
 export function getRouteTemplate(path: string): string {
   return path;

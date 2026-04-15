@@ -1,8 +1,9 @@
 import { type Children } from "@alloy-js/core";
 import { createCSharpNamePolicy, SourceFile } from "@alloy-js/csharp";
 import { t, type TesterInstance } from "@typespec/compiler/testing";
+import { $ } from "@typespec/compiler/typekit";
 import { Output } from "@typespec/emitter-framework";
-import { getHttpOperation, type HttpOperation } from "@typespec/http";
+import { HttpCanonicalizer, type OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Tester } from "../testing/tester.js";
 import { Controller } from "./controllers.jsx";
@@ -23,6 +24,11 @@ function Wrapper(props: { children: Children }) {
   );
 }
 
+function canonicalizeOp(opType: any): OperationHttpCanonicalization {
+  const canonicalizer = new HttpCanonicalizer($(runner.program));
+  return canonicalizer.canonicalize(opType) as OperationHttpCanonicalization;
+}
+
 describe("Controller", () => {
   it("renders a controller class with an action method", async () => {
     const { PetStore, listPets } = await runner.compile(t.code`
@@ -31,14 +37,13 @@ describe("Controller", () => {
       }
     `);
 
-    const [httpOp] = getHttpOperation(runner.program, listPets);
-    const operations: HttpOperation[] = [httpOp];
+    const canonOp = canonicalizeOp(listPets);
 
     expect(
       <Wrapper>
         <BusinessLogicInterface type={PetStore} />
         {"\n"}
-        <Controller type={PetStore} operations={operations} />
+        <Controller type={PetStore} operations={[canonOp]} />
       </Wrapper>,
     ).toRenderTo(`
       public interface IPetStore
