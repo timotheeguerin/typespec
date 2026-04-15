@@ -22,10 +22,6 @@ describe("getHttpVerbAttribute", () => {
     expect(getHttpVerbAttribute({ verb: "head" } as any)).toBe("HttpHead");
   });
 
-  it("maps options to HttpOptions", () => {
-    expect(getHttpVerbAttribute({ verb: "options" } as any)).toBe("HttpOptions");
-  });
-
   it("defaults to HttpGet for unknown verbs", () => {
     expect(getHttpVerbAttribute({ verb: "trace" } as any)).toBe("HttpGet");
   });

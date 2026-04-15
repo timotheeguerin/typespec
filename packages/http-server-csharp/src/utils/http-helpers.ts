@@ -17,8 +17,6 @@ export function getHttpVerbAttribute(operation: HttpOperation): string {
       return "HttpPut";
     case "head":
       return "HttpHead";
-    case "options":
-      return "HttpOptions";
     default:
       return "HttpGet";
   }
