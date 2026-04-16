@@ -1,6 +1,11 @@
 import { Output, render } from "@alloy-js/core";
 import { describe, expect, it } from "vitest";
+import { Base64UrlJsonConverter } from "./base64-url-json-converter.jsx";
+import { HttpServiceExceptionFilter } from "./http-service-exception-filter.jsx";
 import { JsonConverters } from "./json-converters.jsx";
+import { JsonSerializationProvider } from "./json-serialization-provider.jsx";
+import { TimeSpanDurationConverter } from "./time-span-duration-converter.jsx";
+import { UnixEpochDateTimeConverter } from "./unix-epoch-date-time-converter.jsx";
 
 function findFileContent(output: any, pathSuffix: string): string | undefined {
   function search(dir: any): string | undefined {
@@ -22,37 +27,90 @@ function findFileContent(output: any, pathSuffix: string): string | undefined {
   return search(output);
 }
 
-describe("JsonConverters", () => {
-  it("renders TimeSpanDurationConverter", () => {
+describe("TimeSpanDurationConverter", () => {
+  it("renders converter with XmlConvert usage", () => {
     const output = render(
       <Output>
-        <JsonConverters />
+        <TimeSpanDurationConverter />
       </Output>,
     );
     const content = findFileContent(output, "TimeSpanDurationConverter.cs");
     expect(content).toBeDefined();
-    expect(content).toContain("TimeSpanDurationConverter");
+    expect(content).toContain("class TimeSpanDurationConverter");
+    expect(content).toContain("XmlConvert.ToTimeSpan");
   });
+});
 
-  it("renders Base64UrlJsonConverter", () => {
+describe("Base64UrlJsonConverter", () => {
+  it("renders converter with base64url encoding logic", () => {
     const output = render(
       <Output>
-        <JsonConverters />
+        <Base64UrlJsonConverter />
       </Output>,
     );
     const content = findFileContent(output, "Base64UrlJsonConverter.cs");
     expect(content).toBeDefined();
-    expect(content).toContain("Base64UrlJsonConverter");
+    expect(content).toContain("class Base64UrlJsonConverter");
+    expect(content).toContain("Convert.FromBase64String");
   });
+});
 
-  it("renders HttpServiceExceptionFilter", () => {
+describe("UnixEpochDateTimeConverter", () => {
+  it("renders converter with Unix epoch logic", () => {
+    const output = render(
+      <Output>
+        <UnixEpochDateTimeConverter />
+      </Output>,
+    );
+    const content = findFileContent(output, "UnixEpochDateTimeConverter.cs");
+    expect(content).toBeDefined();
+    expect(content).toContain("class UnixEpochDateTimeOffsetConverter");
+    expect(content).toContain("FromUnixTimeSeconds");
+  });
+});
+
+describe("HttpServiceExceptionFilter", () => {
+  it("renders exception filter", () => {
+    const output = render(
+      <Output>
+        <HttpServiceExceptionFilter />
+      </Output>,
+    );
+    const content = findFileContent(output, "HttpServiceExceptionFilter.cs");
+    expect(content).toBeDefined();
+    expect(content).toContain("class HttpServiceExceptionFilter");
+    expect(content).toContain("IExceptionFilter");
+  });
+});
+
+describe("JsonSerializationProvider", () => {
+  it("renders provider with all converters registered", () => {
+    const output = render(
+      <Output>
+        <JsonSerializationProvider />
+      </Output>,
+    );
+    const content = findFileContent(output, "JsonSerializationProvider.cs");
+    expect(content).toBeDefined();
+    expect(content).toContain("class JsonSerializationProvider");
+    expect(content).toContain("IJsonSerializationProvider");
+    expect(content).toContain("TimeSpanDurationConverter");
+    expect(content).toContain("Base64UrlJsonConverter");
+    expect(content).toContain("UnixEpochDateTimeOffsetConverter");
+  });
+});
+
+describe("JsonConverters", () => {
+  it("renders all converter files in lib directory", () => {
     const output = render(
       <Output>
         <JsonConverters />
       </Output>,
     );
-    const content = findFileContent(output, "HttpServiceExceptionFilter.cs");
-    expect(content).toBeDefined();
-    expect(content).toContain("HttpServiceExceptionFilter");
+    expect(findFileContent(output, "TimeSpanDurationConverter.cs")).toBeDefined();
+    expect(findFileContent(output, "Base64UrlJsonConverter.cs")).toBeDefined();
+    expect(findFileContent(output, "UnixEpochDateTimeConverter.cs")).toBeDefined();
+    expect(findFileContent(output, "HttpServiceExceptionFilter.cs")).toBeDefined();
+    expect(findFileContent(output, "JsonSerializationProvider.cs")).toBeDefined();
   });
 });
