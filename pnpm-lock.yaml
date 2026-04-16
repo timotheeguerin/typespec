@@ -1140,6 +1140,9 @@ importers:
         specifier: workspace:^
         version: link:../mutator-framework
     devDependencies:
+      '@alloy-js/rollup-plugin':
+        specifier: 'catalog:'
+        version: 0.1.0(@babel/core@7.29.0)(@types/babel__core@7.20.5)(rollup@4.60.1)
       '@types/node':
         specifier: 'catalog:'
         version: 25.5.2
