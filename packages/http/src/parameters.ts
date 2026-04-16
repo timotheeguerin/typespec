@@ -116,6 +116,7 @@ function getOperationParametersForVerb(
       },
     }),
   );
+
   for (const item of metadata) {
     switch (item.kind) {
       case "contentType":
