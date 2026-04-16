@@ -1,11 +1,12 @@
 import { type Children } from "@alloy-js/core";
 import { createCSharpNamePolicy, SourceFile } from "@alloy-js/csharp";
 import type { ModelProperty } from "@typespec/compiler";
+import { $ } from "@typespec/compiler/typekit";
 import { type TesterInstance } from "@typespec/compiler/testing";
-import { Output } from "@typespec/emitter-framework";
+import { Experimental_ComponentOverrides, Output } from "@typespec/emitter-framework";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Tester } from "../testing/tester.js";
-import { TypeExpression } from "./type-expression.jsx";
+import { createServerScalarOverrides, TypeExpression } from "./type-expression.jsx";
 
 let runner: TesterInstance;
 
@@ -15,9 +16,12 @@ beforeEach(async () => {
 
 function Wrapper(props: { children: Children }) {
   const policy = createCSharpNamePolicy();
+  const overrides = createServerScalarOverrides($(runner.program));
   return (
     <Output program={runner.program} namePolicy={policy}>
-      <SourceFile path="test.cs">{props.children}</SourceFile>
+      <Experimental_ComponentOverrides overrides={overrides}>
+        <SourceFile path="test.cs">{props.children}</SourceFile>
+      </Experimental_ComponentOverrides>
     </Output>
   );
 }
