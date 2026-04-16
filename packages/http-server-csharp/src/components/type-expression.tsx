@@ -1,11 +1,7 @@
-import { code, type Children } from "@alloy-js/core";
-import { refkey as ayRefkey, type Refkey } from "@alloy-js/core";
-import type { Scalar, Type } from "@typespec/compiler";
+import { refkey as ayRefkey, code, type Children, type Refkey } from "@alloy-js/core";
+import type { Scalar } from "@typespec/compiler";
 import type { Typekit } from "@typespec/compiler/typekit";
-import {
-  Experimental_ComponentOverridesConfig,
-  useTsp,
-} from "@typespec/emitter-framework";
+import { Experimental_ComponentOverridesConfig } from "@typespec/emitter-framework";
 import { TypeExpression } from "@typespec/emitter-framework/csharp";
 
 // Re-export EF's TypeExpression for use across the server emitter.

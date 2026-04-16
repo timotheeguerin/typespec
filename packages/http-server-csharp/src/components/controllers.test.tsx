@@ -3,7 +3,10 @@ import { createCSharpNamePolicy, SourceFile } from "@alloy-js/csharp";
 import { t, type TesterInstance } from "@typespec/compiler/testing";
 import { $ } from "@typespec/compiler/typekit";
 import { Output } from "@typespec/emitter-framework";
-import { HttpCanonicalizer, type OperationHttpCanonicalization } from "@typespec/http-canonicalization";
+import {
+  HttpCanonicalizer,
+  type OperationHttpCanonicalization,
+} from "@typespec/http-canonicalization";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Tester } from "../testing/tester.js";
 import { Controller } from "./controllers.jsx";

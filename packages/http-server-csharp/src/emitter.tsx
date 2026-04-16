@@ -2,11 +2,7 @@ import { SourceDirectory } from "@alloy-js/core";
 import { createCSharpNamePolicy } from "@alloy-js/csharp";
 import { EmitContext } from "@typespec/compiler";
 import { $ } from "@typespec/compiler/typekit";
-import {
-  Experimental_ComponentOverrides,
-  Output,
-  writeOutput,
-} from "@typespec/emitter-framework";
+import { Experimental_ComponentOverrides, Output, writeOutput } from "@typespec/emitter-framework";
 import { HttpCanonicalizer } from "@typespec/http-canonicalization";
 import { createServerScalarOverrides } from "./components/type-expression.jsx";
 import { HttpCanonicalizerContext } from "./context/http-canonicalizer-context.js";
