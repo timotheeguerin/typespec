@@ -4,6 +4,8 @@ import { EmitContext } from "@typespec/compiler";
 import { $ } from "@typespec/compiler/typekit";
 import { Experimental_ComponentOverrides, Output, writeOutput } from "@typespec/emitter-framework";
 import { HttpCanonicalizer } from "@typespec/http-canonicalization";
+import { Enums } from "./components/enums.jsx";
+import { Models } from "./components/models.jsx";
 import { createServerScalarOverrides } from "./components/type-expression.jsx";
 import { HttpCanonicalizerContext } from "./context/http-canonicalizer-context.js";
 import { CSharpServiceEmitterOptions } from "./lib.js";
@@ -23,8 +25,11 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
         <HttpCanonicalizerContext.Provider value={canonicalizer}>
           <SourceDirectory path=".">
             <SourceDirectory path="generated">
-              <SourceDirectory path="models">{/* Models and Enums go here */}</SourceDirectory>
-              <SourceDirectory path="controllers">{/* Controllers go here */}</SourceDirectory>
+              <SourceDirectory path="models">
+                <Models />
+                <Enums />
+              </SourceDirectory>
+              <SourceDirectory path="controllers">{/* Controllers TBD */}</SourceDirectory>
             </SourceDirectory>
           </SourceDirectory>
         </HttpCanonicalizerContext.Provider>

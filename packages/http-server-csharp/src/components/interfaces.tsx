@@ -2,7 +2,6 @@ import { refkey as ayRefkey, code, For, type Children, type Refkey } from "@allo
 import * as cs from "@alloy-js/csharp";
 import type { Interface, Operation } from "@typespec/compiler";
 import { isVoidType } from "@typespec/compiler";
-import { getCSharpIdentifier, NameCasingType } from "../utils/naming.js";
 import { TypeExpression } from "./type-expression.jsx";
 
 const interfaceRefKeyPrefix = Symbol.for("http-server-csharp:interface");
@@ -54,7 +53,7 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
 
   const parameters = Array.from(props.operation.parameters.properties.entries()).map(
     ([pName, prop]) => ({
-      name: getCSharpIdentifier(pName, NameCasingType.Parameter),
+      name: namePolicy.getName(pName, "type-parameter"),
       type: (<TypeExpression type={prop.type} />) as Children,
     }),
   );

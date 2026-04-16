@@ -6,7 +6,6 @@ import type {
   OperationHttpCanonicalization,
 } from "@typespec/http-canonicalization";
 import { getHttpVerbAttribute, getRouteTemplate } from "../utils/http-helpers.js";
-import { getCSharpIdentifier, NameCasingType } from "../utils/naming.js";
 import { TypeExpression } from "./type-expression.jsx";
 
 export interface ControllerActionProps {
@@ -49,7 +48,7 @@ export function ControllerAction(props: ControllerActionProps): Children {
       .map((p) => {
         const attr = getBindingAttribute(p);
         return {
-          name: getCSharpIdentifier(p.property.sourceType.name, NameCasingType.Parameter),
+          name: namePolicy.getName(p.property.sourceType.name, "type-parameter"),
           type: (<TypeExpression type={p.property.sourceType.type} />) as Children,
           attributes: attr ? [attr] : undefined,
         };
@@ -79,8 +78,8 @@ export function ControllerAction(props: ControllerActionProps): Children {
       attributes={[code`[${verb}("${route}")]`]}
     >
       {hasReturnValue
-        ? code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});\nreturn Ok(result);`
-        : code`await ${props.implFieldName}.${opName}Async(${callArgs});\nreturn Ok();`}
+        ? code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Ok(result);`
+        : code`await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Ok();`}
     </cs.Method>
   );
 }

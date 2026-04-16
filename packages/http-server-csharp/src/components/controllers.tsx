@@ -38,7 +38,7 @@ export function Controller(props: ControllerProps): Children {
       attributes={attributes}
     >
       <cs.Property name={implPropName} type={interfaceRef} internal virtual get />
-      {"\n"}
+      <hbr />
       <cs.Constructor public parameters={[{ name: "operations", type: interfaceRef }]}>
         {code`${implPropName} = operations;`}
       </cs.Constructor>
