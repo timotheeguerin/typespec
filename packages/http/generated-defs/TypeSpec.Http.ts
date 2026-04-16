@@ -246,7 +246,7 @@ export type PostDecorator = (
  * ```
  * @example Using MergePatch template for proper merge-patch semantics
  * ```typespec
- * @patch op update(...MergePatchUpdate<Pet>): void;
+ * @patch op update(@body pet: MergePatchUpdate<Pet>): void;
  * ```
  */
 export type PatchDecorator = (
