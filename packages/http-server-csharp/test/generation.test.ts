@@ -1,4 +1,3 @@
-import { Entity, Program } from "@typespec/compiler";
 import { resolveVirtualPath, TesterInstance, TestFileSystem } from "@typespec/compiler/testing";
 import assert, { deepStrictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
@@ -59,15 +58,6 @@ async function compileAndValidateSingleModel(
   expectedContent: string[],
 ): Promise<void> {
   await compileAndValidateMultiple(tester, code, [[fileToCheck, expectedContent]]);
-}
-
-async function compile(
-  tester: TesterInstance,
-  code: string,
-): Promise<{ program: Program; types: Record<string, Entity> }> {
-  const spec = getStandardService(code);
-  const [result, _] = await compileAndDiagnose(tester, spec);
-  return { program: result.program, types: { ...result } };
 }
 
 async function compileAndValidateMultiple(
