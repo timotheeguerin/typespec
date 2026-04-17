@@ -2,7 +2,7 @@
 # Change versionKind to one of: internal, fix, dependencies, feature, deprecation, breaking
 changeKind: feature
 packages:
-  - "@typespec/http-client-java"
+  - "@typespec/http-client-python"
 ---
 
-Add test case for `withRelativeNextLink`, `FlattenUnknownModel`, `FlattenReadOnlyModel` scenario.
+Add "Use with AI tools" section to Azure packages README template
