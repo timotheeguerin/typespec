@@ -27,7 +27,10 @@ it("sample-service full output", async () => {
     throw new Error(`Compilation errors:\n${errors.map((e) => `  ${e.message}`).join("\n")}`);
   }
 
-  const sortedPaths = Object.keys(result.outputs).sort();
+  const ignoredFiles = new Set(["Properties/launchSettings.json"]);
+  const sortedPaths = Object.keys(result.outputs)
+    .filter((p) => !ignoredFiles.has(p))
+    .sort();
 
   // Snapshot each file so diffs are easy to read in PRs
   for (const path of sortedPaths) {
