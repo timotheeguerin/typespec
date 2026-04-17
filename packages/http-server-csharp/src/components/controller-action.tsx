@@ -67,6 +67,36 @@ export function ControllerAction(props: ControllerActionProps): Children {
   const callArgs = parameters.map((p) => p.name).join(", ");
   const hasReturnValue = !isVoidType(props.operation.sourceType.returnType);
 
+  // Determine response type for ProducesResponseType attribute
+  const returnType = props.operation.sourceType.returnType;
+  let responseStatusCode = hasReturnValue ? "OK" : "NoContent";
+  let responseTypeExpr: Children | undefined = undefined;
+
+  if (hasReturnValue) {
+    // Try to get the success response type
+    if (returnType.kind === "Union") {
+      for (const variant of returnType.variants.values()) {
+        const vt = variant.type;
+        if (isVoidType(vt)) continue;
+        if (vt.kind === "Model" && vt.name?.toLowerCase() === "error") continue;
+        responseTypeExpr = (<TypeExpression type={vt} />) as Children;
+        break;
+      }
+    } else if (!isVoidType(returnType)) {
+      responseTypeExpr = (<TypeExpression type={returnType} />) as Children;
+    }
+  }
+
+  const attributes: Children[] = [
+    code`[${verb}]`,
+    code`[Route("${route}")]`,
+  ];
+  if (responseTypeExpr) {
+    attributes.push(code`[ProducesResponseType((int)HttpStatusCode.${responseStatusCode}, Type = typeof(${responseTypeExpr}))]`);
+  } else {
+    attributes.push(code`[ProducesResponseType((int)HttpStatusCode.${responseStatusCode}, Type = typeof(void))]`);
+  }
+
   return (
     <cs.Method
       name={opName}
@@ -75,11 +105,11 @@ export function ControllerAction(props: ControllerActionProps): Children {
       public
       returns={code`Task<IActionResult>`}
       parameters={parameters}
-      attributes={[code`[${verb}("${route}")]`]}
+      attributes={attributes}
     >
       {hasReturnValue
         ? code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Ok(result);`
-        : code`await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Ok();`}
+        : code`await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return NoContent();`}
     </cs.Method>
   );
 }

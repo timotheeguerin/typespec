@@ -1,4 +1,4 @@
-import { For, type Children } from "@alloy-js/core";
+import { code, For, type Children } from "@alloy-js/core";
 import { isStdNamespace, type Enum } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import { EnumDeclaration } from "@typespec/emitter-framework/csharp";
@@ -8,7 +8,7 @@ export interface EnumsProps {}
 
 /**
  * Iterates all enums in the TypeSpec program and emits C# enum declarations.
- * Each enum is emitted in its own source file.
+ * Each enum is emitted in its own source file with JSON serialization attributes.
  */
 export function Enums(_props: EnumsProps): Children {
   const { $ } = useTsp();
@@ -17,8 +17,13 @@ export function Enums(_props: EnumsProps): Children {
   return (
     <For each={enums}>
       {(en) => (
-        <CSharpFile path={`${en.name}.cs`}>
-          <EnumDeclaration type={en} />
+        <CSharpFile
+          path={`${en.name}.cs`}
+          using={["System.Text.Json", "System.Text.Json.Serialization"]}
+        >
+          {code`[JsonConverter(typeof(JsonStringEnumConverter))]`}
+          {"\n"}
+          <EnumDeclaration type={en} public />
         </CSharpFile>
       )}
     </For>

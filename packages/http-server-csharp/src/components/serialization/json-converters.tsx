@@ -1,5 +1,6 @@
 import { SourceDirectory, type Children } from "@alloy-js/core";
 import { Base64UrlJsonConverter } from "./base64-url-json-converter.jsx";
+import { ConstraintAttributes } from "./constraint-attributes.jsx";
 import { HttpServiceExceptionFilter } from "./http-service-exception-filter.jsx";
 import { JsonSerializationProvider } from "./json-serialization-provider.jsx";
 import { TimeSpanDurationConverter } from "./time-span-duration-converter.jsx";
@@ -17,6 +18,7 @@ export function JsonConverters(): Children {
       <UnixEpochDateTimeConverter />
       <HttpServiceExceptionFilter />
       <JsonSerializationProvider />
+      <ConstraintAttributes />
     </SourceDirectory>
   );
 }

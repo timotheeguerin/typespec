@@ -21,7 +21,7 @@ export function Models(props: ModelsProps): Children {
     <For each={models}>
       {(model) => (
         <CSharpFile path={`${model.name}.cs`}>
-          <ClassDeclaration type={model} jsonAttributes={props.jsonAttributes ?? true} />
+          <ClassDeclaration type={model} public partial jsonAttributes={props.jsonAttributes ?? true} />
         </CSharpFile>
       )}
     </For>

@@ -3,32 +3,59 @@ import { Namespace } from "@alloy-js/csharp";
 import { CSharpFile } from "../csharp-file.jsx";
 
 /**
- * Renders the UnixEpochDateTimeOffsetConverter.
- * Converts between Unix epoch timestamps and DateTimeOffset values.
+ * Renders the UnixEpochDateTimeConverter (DateTime) and UnixEpochDateTimeOffsetConverter (DateTimeOffset).
+ * Converts between Unix epoch timestamps and DateTime/DateTimeOffset values.
  */
 export function UnixEpochDateTimeConverter(): Children {
   return (
-    <CSharpFile
-      path="UnixEpochDateTimeConverter.cs"
-      using={["System.Text.Json", "System.Text.Json.Serialization"]}
-    >
-      <Namespace name="TypeSpec.Helpers.JsonConverters">
-        {code`
-          public class UnixEpochDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
-          {
-            public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    <>
+      <CSharpFile
+        path="UnixEpochDateTimeConverter.cs"
+        using={["System.Text.Json", "System.Text.Json.Serialization"]}
+      >
+        <Namespace name="TypeSpec.Helpers.JsonConverters">
+          {code`
+            public sealed class UnixEpochDateTimeConverter : JsonConverter<DateTime>
             {
-              long unixTime = reader.GetInt64();
-              return DateTimeOffset.FromUnixTimeSeconds(unixTime);
-            }
+              static readonly DateTime s_epoch = new DateTime(1970, 1, 1, 0, 0, 0);
 
-            public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
-            {
-              writer.WriteNumberValue(value.ToUnixTimeSeconds());
+              public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+              {
+                var formatted = reader.GetInt64()!;
+                return s_epoch.AddMilliseconds(formatted);
+              }
+
+              public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+              {
+                long unixTime = Convert.ToInt64((value - s_epoch).TotalMilliseconds);
+                writer.WriteNumberValue(unixTime);
+              }
             }
-          }
-        `}
-      </Namespace>
-    </CSharpFile>
+          `}
+        </Namespace>
+      </CSharpFile>
+      <CSharpFile
+        path="UnixEpochDateTimeOffsetConverter.cs"
+        using={["System.Text.Json", "System.Text.Json.Serialization"]}
+      >
+        <Namespace name="TypeSpec.Helpers.JsonConverters">
+          {code`
+            public class UnixEpochDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
+            {
+              public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+              {
+                long unixTime = reader.GetInt64();
+                return DateTimeOffset.FromUnixTimeSeconds(unixTime);
+              }
+
+              public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
+              {
+                writer.WriteNumberValue(value.ToUnixTimeSeconds());
+              }
+            }
+          `}
+        </Namespace>
+      </CSharpFile>
+    </>
   );
 }

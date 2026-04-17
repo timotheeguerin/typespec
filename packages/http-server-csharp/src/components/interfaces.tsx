@@ -1,7 +1,8 @@
 import { refkey as ayRefkey, code, For, type Children, type Refkey } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import type { Interface, Operation } from "@typespec/compiler";
-import { isVoidType } from "@typespec/compiler";
+import type { Interface, Operation, Program, Type } from "@typespec/compiler";
+import { isErrorModel, isVoidType } from "@typespec/compiler";
+import { useTsp } from "@typespec/emitter-framework";
 import { TypeExpression } from "./type-expression.jsx";
 
 const interfaceRefKeyPrefix = Symbol.for("http-server-csharp:interface");
@@ -44,6 +45,38 @@ interface BusinessLogicMethodProps {
 }
 
 /**
+ * Extracts the "success" type from a return type.
+ * If the return type is a Union, returns the first non-error variant.
+ * If the return type is void, returns undefined.
+ */
+function getSuccessReturnType(program: Program, returnType: Type): Type | undefined {
+  if (isVoidType(returnType)) return undefined;
+
+  if (returnType.kind === "Union") {
+    for (const variant of returnType.variants.values()) {
+      const variantType = variant.type;
+      if (isVoidType(variantType)) continue;
+      // Skip error models by checking the @error decorator or name convention
+      if (variantType.kind === "Model") {
+        try {
+          if (isErrorModel(program, variantType)) continue;
+        } catch {
+          // isErrorModel may fail on certain types
+        }
+        if (variantType.name && variantType.name.toLowerCase() === "error") {
+          continue;
+        }
+      }
+      return variantType;
+    }
+    // All variants are errors or void
+    return undefined;
+  }
+
+  return returnType;
+}
+
+/**
  * Renders a single async method signature in a business logic interface.
  * Method names get an "Async" suffix (e.g., `ListPetsAsync`).
  */
@@ -58,9 +91,11 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
     }),
   );
 
-  const returnType = isVoidType(props.operation.returnType)
-    ? code`Task`
-    : code`Task<${(<TypeExpression type={props.operation.returnType} />)}>`;
+  const { $ } = useTsp();
+  const successType = getSuccessReturnType($.program, props.operation.returnType);
+  const returnType = successType
+    ? code`Task<${(<TypeExpression type={successType} />)}>`
+    : code`Task`;
 
   return <cs.InterfaceMethod name={methodName} parameters={parameters} returns={returnType} />;
 }

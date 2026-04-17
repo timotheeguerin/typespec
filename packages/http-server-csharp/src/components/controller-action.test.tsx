@@ -54,7 +54,9 @@ describe("ControllerAction", () => {
     ).toRenderTo(`
       class TestController
       {
-          [HttpGet("/pets")]
+          [HttpGet]
+          [Route("/pets")]
+          [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string[]))]
           public virtual async Task<IActionResult> ListPets()
           {
               var result = await PetStoreImpl.ListPetsAsync();
@@ -80,14 +82,16 @@ describe("ControllerAction", () => {
     ).toRenderTo(`
       class TestController
       {
-          [HttpDelete("/pets/{petId}")]
+          [HttpDelete]
+          [Route("/pets/{petId}")]
+          [ProducesResponseType((int)HttpStatusCode.NoContent, Type = typeof(void))]
           public virtual async Task<IActionResult> DeletePet(
               [FromRoute(Name="petId")]
               string petId
           )
           {
               await PetStoreImpl.DeletePetAsync(petId);
-              return Ok();
+              return NoContent();
           }
       }
     `);

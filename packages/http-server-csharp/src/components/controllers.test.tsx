@@ -61,7 +61,9 @@ describe("Controller", () => {
           {
               PetStoreImpl = operations;
           }
-          [HttpGet("/pets")]
+          [HttpGet]
+          [Route("/pets")]
+          [ProducesResponseType((int)HttpStatusCode.OK, Type = typeof(string[]))]
           public virtual async Task<IActionResult> ListPets()
           {
               var result = await PetStoreImpl.ListPetsAsync();
