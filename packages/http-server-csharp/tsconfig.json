@@ -20,6 +20,6 @@
     "tsBuildInfoFile": "temp/tsconfig.tsbuildinfo",
     "types": ["@alloy-js/core/testing/matchers"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx"],
   "exclude": ["node_modules", "dist"]
 }

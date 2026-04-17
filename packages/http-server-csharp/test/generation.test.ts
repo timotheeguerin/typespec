@@ -1,9 +1,8 @@
-import { Entity, navigateProgram, Program } from "@typespec/compiler";
+import { Entity, Program } from "@typespec/compiler";
 import { resolveVirtualPath, TesterInstance, TestFileSystem } from "@typespec/compiler/testing";
 import assert, { deepStrictEqual } from "assert";
 import { beforeEach, describe, it } from "vitest";
-import { CSharpServiceEmitterOptions } from "../src/lib/lib.js";
-import { getPropertySource, getSourceModel } from "../src/lib/utils.js";
+import { CSharpServiceEmitterOptions } from "../src/lib.js";
 import { ApiTester, compileAndDiagnose, getStandardService } from "./test-host.js";
 
 function getGeneratedFile(fs: TestFileSystem, fileName: string): [string, string] {
@@ -103,63 +102,6 @@ let tester: TesterInstance;
 
 beforeEach(async () => {
   tester = await ApiTester.createInstance();
-});
-
-it("can source properties", async () => {
-  const result = await compile(
-    tester,
-    `
-      model Foo {
-        @visibility("update");
-        prop1: string;
-        prop2: string;
-        prop3: string;
-      }
-
-      model Bar is OptionalProperties<UpdateableProperties<OmitProperties<Foo, "prop3">>>;
-      `,
-  );
-  assert.ok(result);
-  assert.ok(result.types);
-  assert.ok(result.program);
-  navigateProgram(result.program, {
-    modelProperty: (prop) => {
-      if (prop.name === "prop2") {
-        const sourceModel = getPropertySource(result.program, prop);
-        assert.ok(sourceModel);
-        assert.deepStrictEqual(sourceModel.kind, "Model");
-        assert.deepStrictEqual(sourceModel.name, "Foo");
-      }
-    },
-  });
-});
-
-it("can source models", async () => {
-  const result = await compile(
-    tester,
-    `
-      model Foo {
-        @visibility("update");
-        prop1: string;
-        prop2: string;
-      }
-
-      model Bar is OptionalProperties<OmitProperties<Foo, "prop1">>;
-      `,
-  );
-  assert.ok(result);
-  assert.ok(result.types);
-  assert.ok(result.program);
-  navigateProgram(result.program, {
-    model: (model) => {
-      if (model.name === "Bar") {
-        const sourceModel = getSourceModel(result.program, model);
-        assert.ok(sourceModel);
-        assert.deepStrictEqual(sourceModel.kind, "Model");
-        assert.deepStrictEqual(sourceModel.name, "Foo");
-      }
-    },
-  });
 });
 
 it("generates standard scalar properties", async () => {

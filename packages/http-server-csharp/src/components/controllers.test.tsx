@@ -8,7 +8,7 @@ import {
   type OperationHttpCanonicalization,
 } from "@typespec/http-canonicalization";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Tester } from "../testing/tester.js";
+import { Tester } from "#test/tester.js";
 import { Controller } from "./controllers.jsx";
 import { BusinessLogicInterface } from "./interfaces.jsx";
 

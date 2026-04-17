@@ -4,7 +4,7 @@ import { t, type TesterInstance } from "@typespec/compiler/testing";
 import { Output } from "@typespec/emitter-framework";
 import { ClassDeclaration } from "@typespec/emitter-framework/csharp";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Tester } from "../testing/tester.js";
+import { Tester } from "#test/tester.js";
 
 let runner: TesterInstance;
 

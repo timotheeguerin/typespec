@@ -31,6 +31,9 @@
       "import": "./dist/src/testing/index.js"
     }
   },
+  "imports": {
+    "#test/*": "./test/*"
+  },
   "engines": {
     "node": ">=22.0.0"
   },
