@@ -48,7 +48,7 @@ export function ControllerAction(props: ControllerActionProps): Children {
       .map((p) => {
         const attr = getBindingAttribute(p);
         return {
-          name: namePolicy.getName(p.property.sourceType.name, "type-parameter"),
+          name: namePolicy.getName(p.property.sourceType.name, "parameter"),
           type: (<TypeExpression type={p.property.sourceType.type} />) as Children,
           attributes: attr ? [attr] : undefined,
         };
