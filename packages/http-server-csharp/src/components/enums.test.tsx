@@ -24,7 +24,7 @@ function Wrapper(props: { children: Children }) {
 describe("EnumDeclaration", () => {
   it("renders a simple enum", async () => {
     const { Color } = await runner.compile(t.code`
-      @test enum ${t.enum("Color")} {
+      enum ${t.enum("Color")} {
         Red,
         Green,
         Blue,
@@ -47,7 +47,7 @@ describe("EnumDeclaration", () => {
 
   it("renders an enum with multiple members", async () => {
     const { Direction } = await runner.compile(t.code`
-      @test enum ${t.enum("Direction")} {
+      enum ${t.enum("Direction")} {
         North,
         South,
         East,

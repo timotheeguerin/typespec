@@ -24,7 +24,7 @@ function Wrapper(props: { children: Children }) {
 describe("ClassDeclaration for models", () => {
   it("renders a simple model with properties", async () => {
     const { Pet } = await runner.compile(t.code`
-      @test model ${t.model("Pet")} {
+      model ${t.model("Pet")} {
         name: string;
         age: int32;
       }
@@ -50,7 +50,7 @@ describe("ClassDeclaration for models", () => {
 
   it("renders a model with optional property", async () => {
     const { Pet } = await runner.compile(t.code`
-      @test model ${t.model("Pet")} {
+      model ${t.model("Pet")} {
         name: string;
         tag?: string;
       }
@@ -76,10 +76,10 @@ describe("ClassDeclaration for models", () => {
 
   it("renders a model with inheritance", async () => {
     const { Pet, Dog } = await runner.compile(t.code`
-      @test model ${t.model("Pet")} {
+      model ${t.model("Pet")} {
         name: string;
       }
-      @test model ${t.model("Dog")} extends Pet {
+      model ${t.model("Dog")} extends Pet {
         breed: string;
       }
     `);
@@ -108,7 +108,7 @@ describe("ClassDeclaration for models", () => {
 
   it("renders a model with nullable union property", async () => {
     const { Pet } = await runner.compile(t.code`
-      @test model ${t.model("Pet")} {
+      model ${t.model("Pet")} {
         name: string | null;
       }
     `);

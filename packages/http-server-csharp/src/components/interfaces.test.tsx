@@ -24,7 +24,7 @@ function Wrapper(props: { children: Children }) {
 describe("BusinessLogicInterface", () => {
   it("renders an interface with async methods", async () => {
     const { PetStore } = await runner.compile(t.code`
-      @test interface ${t.interface("PetStore")} {
+      interface ${t.interface("PetStore")} {
         listPets(): string[];
         getPet(petId: string): string;
       }
@@ -46,7 +46,7 @@ describe("BusinessLogicInterface", () => {
 
   it("renders an interface with void return type", async () => {
     const { PetStore } = await runner.compile(t.code`
-      @test interface ${t.interface("PetStore")} {
+      interface ${t.interface("PetStore")} {
         deletePet(petId: string): void;
       }
     `);

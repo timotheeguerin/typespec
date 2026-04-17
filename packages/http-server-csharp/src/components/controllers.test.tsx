@@ -35,7 +35,7 @@ function canonicalizeOp(opType: any): OperationHttpCanonicalization {
 describe("Controller", () => {
   it("renders a controller class with an action method", async () => {
     const { PetStore, listPets } = await runner.compile(t.code`
-      @test interface ${t.interface("PetStore")} {
+      interface ${t.interface("PetStore")} {
         @route("/pets") @get ${t.op("listPets")}(): string[];
       }
     `);
