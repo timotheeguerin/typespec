@@ -1,3 +1,4 @@
+import { Tester } from "#test/tester.js";
 import { type Children } from "@alloy-js/core";
 import { createCSharpNamePolicy, SourceFile } from "@alloy-js/csharp";
 import type { ModelProperty } from "@typespec/compiler";
@@ -5,7 +6,6 @@ import { type TesterInstance } from "@typespec/compiler/testing";
 import { $ } from "@typespec/compiler/typekit";
 import { Experimental_ComponentOverrides, Output } from "@typespec/emitter-framework";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Tester } from "#test/tester.js";
 import { createServerScalarOverrides, TypeExpression } from "./type-expression.jsx";
 
 let runner: TesterInstance;

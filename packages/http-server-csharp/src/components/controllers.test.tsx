@@ -1,3 +1,4 @@
+import { Tester } from "#test/tester.js";
 import { type Children } from "@alloy-js/core";
 import { createCSharpNamePolicy, SourceFile } from "@alloy-js/csharp";
 import { t, type TesterInstance } from "@typespec/compiler/testing";
@@ -8,7 +9,6 @@ import {
   type OperationHttpCanonicalization,
 } from "@typespec/http-canonicalization";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Tester } from "#test/tester.js";
 import { Controller } from "./controllers.jsx";
 import { BusinessLogicInterface } from "./interfaces.jsx";
 

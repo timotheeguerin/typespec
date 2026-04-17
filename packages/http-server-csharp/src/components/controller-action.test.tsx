@@ -1,3 +1,4 @@
+import { Tester } from "#test/tester.js";
 import { type Children } from "@alloy-js/core";
 import {
   createCSharpNamePolicy,
@@ -12,7 +13,6 @@ import {
   type OperationHttpCanonicalization,
 } from "@typespec/http-canonicalization";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Tester } from "#test/tester.js";
 import { ControllerAction } from "./controller-action.jsx";
 
 let runner: TesterInstance;
