@@ -1,10 +1,26 @@
 import { readFile } from "fs/promises";
-import { join } from "path";
+import { existsSync, readdirSync, statSync } from "fs";
+import { join, relative } from "path";
 import { expect, it } from "vitest";
 import { EmitterTester } from "./test-host.js";
 
 const libraryName = "@typespec/http-server-csharp";
 const snapshotDir = join(import.meta.dirname, "snapshots/sample-service");
+
+/** Recursively collect all file paths relative to `root`. */
+function listFilesRecursive(root: string, dir: string = root): string[] {
+  const results: string[] = [];
+  if (!existsSync(dir)) return results;
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      results.push(...listFilesRecursive(root, full));
+    } else {
+      results.push(relative(root, full));
+    }
+  }
+  return results;
+}
 
 it("sample-service full output", async () => {
   const sampleServicePath = join(import.meta.dirname, "snapshots/sample-service.tsp");
@@ -36,4 +52,9 @@ it("sample-service full output", async () => {
   for (const path of sortedPaths) {
     await expect(result.outputs[path]).toMatchFileSnapshot(join(snapshotDir, path));
   }
+
+  // Check for stale snapshot files that are no longer emitted
+  const existingFiles = listFilesRecursive(snapshotDir).sort();
+  const staleFiles = existingFiles.filter((f) => !sortedPaths.includes(f));
+  expect(staleFiles, "Stale snapshot files found — delete them or update the emitter").toEqual([]);
 });
