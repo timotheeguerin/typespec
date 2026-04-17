@@ -1,4 +1,5 @@
 import { Output, render } from "@alloy-js/core";
+import { createCSharpNamePolicy } from "@alloy-js/csharp";
 import { describe, expect, it } from "vitest";
 import { Base64UrlJsonConverter } from "./base64-url-json-converter.jsx";
 import { HttpServiceExceptionFilter } from "./http-service-exception-filter.jsx";
@@ -30,7 +31,7 @@ function findFileContent(output: any, pathSuffix: string): string | undefined {
 describe("TimeSpanDurationConverter", () => {
   it("renders converter with XmlConvert usage", () => {
     const output = render(
-      <Output>
+      <Output namePolicy={createCSharpNamePolicy()}>
         <TimeSpanDurationConverter />
       </Output>,
     );
@@ -44,7 +45,7 @@ describe("TimeSpanDurationConverter", () => {
 describe("Base64UrlJsonConverter", () => {
   it("renders converter with base64url encoding logic", () => {
     const output = render(
-      <Output>
+      <Output namePolicy={createCSharpNamePolicy()}>
         <Base64UrlJsonConverter />
       </Output>,
     );
@@ -58,7 +59,7 @@ describe("Base64UrlJsonConverter", () => {
 describe("UnixEpochDateTimeConverter", () => {
   it("renders converter with Unix epoch logic", () => {
     const output = render(
-      <Output>
+      <Output namePolicy={createCSharpNamePolicy()}>
         <UnixEpochDateTimeConverter />
       </Output>,
     );
@@ -72,7 +73,7 @@ describe("UnixEpochDateTimeConverter", () => {
 describe("HttpServiceExceptionFilter", () => {
   it("renders exception filter", () => {
     const output = render(
-      <Output>
+      <Output namePolicy={createCSharpNamePolicy()}>
         <HttpServiceExceptionFilter />
       </Output>,
     );
@@ -86,7 +87,7 @@ describe("HttpServiceExceptionFilter", () => {
 describe("JsonSerializationProvider", () => {
   it("renders provider with all converters registered", () => {
     const output = render(
-      <Output>
+      <Output namePolicy={createCSharpNamePolicy()}>
         <JsonSerializationProvider />
       </Output>,
     );
@@ -103,7 +104,7 @@ describe("JsonSerializationProvider", () => {
 describe("JsonConverters", () => {
   it("renders all converter files in lib directory", () => {
     const output = render(
-      <Output>
+      <Output namePolicy={createCSharpNamePolicy()}>
         <JsonConverters />
       </Output>,
     );
