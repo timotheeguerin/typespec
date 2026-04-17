@@ -1,4 +1,5 @@
 import { code, type Children } from "@alloy-js/core";
+import { Namespace } from "@alloy-js/csharp";
 import { CSharpFile } from "../csharp-file.jsx";
 
 /**
@@ -7,14 +8,12 @@ import { CSharpFile } from "../csharp-file.jsx";
  */
 export function TimeSpanDurationConverter(): Children {
   return (
-    <CSharpFile path="TimeSpanDurationConverter.cs">
-      {code`
-        using System.Text.Json;
-        using System.Text.Json.Serialization;
-        using System.Xml;
-
-        namespace TypeSpec.Helpers.JsonConverters
-        {
+    <CSharpFile
+      path="TimeSpanDurationConverter.cs"
+      using={["System.Text.Json", "System.Text.Json.Serialization", "System.Xml"]}
+    >
+      <Namespace name="TypeSpec.Helpers.JsonConverters">
+        {code`
           public class TimeSpanDurationConverter : JsonConverter<TimeSpan>
           {
             public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -27,8 +26,8 @@ export function TimeSpanDurationConverter(): Children {
               writer.WriteStringValue(XmlConvert.ToString(value));
             }
           }
-        }
-      `}
+        `}
+      </Namespace>
     </CSharpFile>
   );
 }

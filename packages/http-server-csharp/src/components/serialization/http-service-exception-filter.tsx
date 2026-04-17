@@ -1,4 +1,5 @@
 import { code, type Children } from "@alloy-js/core";
+import { Namespace } from "@alloy-js/csharp";
 import { CSharpFile } from "../csharp-file.jsx";
 
 /**
@@ -7,13 +8,12 @@ import { CSharpFile } from "../csharp-file.jsx";
  */
 export function HttpServiceExceptionFilter(): Children {
   return (
-    <CSharpFile path="HttpServiceExceptionFilter.cs">
-      {code`
-        using Microsoft.AspNetCore.Mvc;
-        using Microsoft.AspNetCore.Mvc.Filters;
-
-        namespace TypeSpec.Helpers
-        {
+    <CSharpFile
+      path="HttpServiceExceptionFilter.cs"
+      using={["Microsoft.AspNetCore.Mvc", "Microsoft.AspNetCore.Mvc.Filters"]}
+    >
+      <Namespace name="TypeSpec.Helpers">
+        {code`
           public class HttpServiceExceptionFilter : IExceptionFilter
           {
             public void OnException(ExceptionContext context)
@@ -25,8 +25,8 @@ export function HttpServiceExceptionFilter(): Children {
               context.ExceptionHandled = true;
             }
           }
-        }
-      `}
+        `}
+      </Namespace>
     </CSharpFile>
   );
 }

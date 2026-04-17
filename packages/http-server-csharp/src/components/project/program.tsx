@@ -18,9 +18,7 @@ export function ProgramCs(props: ProgramCsProps): Children {
   const openApiPath = props.openApiPath ?? "openapi/openapi.yaml";
   const hasMocks = props.hasMocks ?? false;
 
-  const contents = `using TypeSpec.Helpers;
-
-var builder = WebApplication.CreateBuilder(args);
+  const contents = `var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews(options =>
@@ -89,7 +87,7 @@ app.MapControllerRoute(
 app.Run();`;
 
   return (
-    <CSharpFile path="Program.cs">
+    <CSharpFile path="Program.cs" using={["TypeSpec.Helpers"]}>
       {contents}
     </CSharpFile>
   );

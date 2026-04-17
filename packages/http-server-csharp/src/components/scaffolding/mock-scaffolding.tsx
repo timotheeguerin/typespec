@@ -1,4 +1,5 @@
-import { SourceDirectory, type Children } from "@alloy-js/core";
+import { code, SourceDirectory, type Children } from "@alloy-js/core";
+import { Namespace } from "@alloy-js/csharp";
 import { CSharpFile } from "../csharp-file.jsx";
 
 /**
@@ -6,53 +7,53 @@ import { CSharpFile } from "../csharp-file.jsx";
  */
 export function MockScaffolding(props: { interfaceRegistrations: string[] }): Children {
   return (
-    <SourceDirectory path="mocks">
-      <CSharpFile path="IInitializer.cs">
-        {getInitializerInterface()}
-      </CSharpFile>
-      <CSharpFile path="Initializer.cs">
-        {getInitializerImplementation()}
-      </CSharpFile>
-      {props.interfaceRegistrations.length > 0 && (
-        <CSharpFile path="MockRegistration.cs">
-          {getMockRegistration(props.interfaceRegistrations)}
-        </CSharpFile>
-      )}
-    </SourceDirectory>
+    <Namespace name="TypeSpec.Helpers">
+      <SourceDirectory path="mocks">
+        <InitializerInterface />
+        <InitializerImplementation />
+        {props.interfaceRegistrations.length > 0 && (
+          <MockRegistration interfaceRegistrations={props.interfaceRegistrations} />
+        )}
+      </SourceDirectory>
+    </Namespace>
   );
 }
 
-function getInitializerInterface(): string {
-  return `namespace TypeSpec.Helpers
-{
-    public interface IInitializer
-    {
-        object? Initialize(System.Type type);
-        T Initialize<T>() where T : class, new();
-    }
-}`;
+function InitializerInterface(): Children {
+  return (
+    <CSharpFile path="IInitializer.cs">
+      {code`
+        public interface IInitializer
+        {
+          object? Initialize(System.Type type);
+          T Initialize<T>() where T : class, new();
+        }
+      `}
+    </CSharpFile>
+  );
 }
 
-function getInitializerImplementation(): string {
-  return `namespace TypeSpec.Helpers
-{
-    public class Initializer : IInitializer
-    {
-        public Initializer(IDictionary<Type, object?> cache)
+function InitializerImplementation(): Children {
+  return (
+    <CSharpFile path="Initializer.cs">
+      {code`
+        public class Initializer : IInitializer
         {
+          public Initializer(IDictionary<Type, object?> cache)
+          {
             Cache = cache;
-        }
+          }
 
-        internal virtual IDictionary<Type, object?> Cache { get; }
+          internal virtual IDictionary<Type, object?> Cache { get; }
 
-        internal object? CacheAndReturn(Type type, object? instance)
-        {
+          internal object? CacheAndReturn(Type type, object? instance)
+          {
             Cache[type] = instance;
             return instance;
-        }
+          }
 
-        public object? Initialize(Type type)
-        {
+          public object? Initialize(Type type)
+          {
             if (Cache.ContainsKey(type)) return Cache[type];
             if (type == typeof(string)) return CacheAndReturn(type, string.Empty);
             if (type == typeof(int)) return CacheAndReturn(type, 0);
@@ -64,63 +65,66 @@ function getInitializerImplementation(): string {
             if (type == typeof(TimeSpan)) return CacheAndReturn(type, TimeSpan.Zero);
             if (type.IsArray)
             {
-                var element = type.GetElementType();
-                if (element == null) return null;
-                return CacheAndReturn(type, Array.CreateInstance(element, 0));
+              var element = type.GetElementType();
+              if (element == null) return null;
+              return CacheAndReturn(type, Array.CreateInstance(element, 0));
             }
             if (type.IsClass) return InitializeClass(type);
             if (type.IsEnum) return CacheAndReturn(type, Enum.GetValues(type).GetValue(0));
             return new object();
-        }
+          }
 
-        public T Initialize<T>() where T : class, new()
-        {
+          public T Initialize<T>() where T : class, new()
+          {
             var result = new T();
             var initialized = InitializeClass(typeof(T), result);
             return initialized as T ?? result;
-        }
+          }
 
-        private object? InitializeClass(Type type, object? instance = null)
-        {
+          private object? InitializeClass(Type type, object? instance = null)
+          {
             if (Cache.ContainsKey(type)) return Cache[type];
             var result = instance ?? Activator.CreateInstance(type);
             foreach (var property in type.GetProperties())
             {
-                if (property.CanWrite)
-                {
-                    property.SetValue(result, Initialize(property.PropertyType));
-                }
+              if (property.CanWrite)
+              {
+                property.SetValue(result, Initialize(property.PropertyType));
+              }
             }
             return CacheAndReturn(type, result);
+          }
         }
-    }
-}`;
+      `}
+    </CSharpFile>
+  );
 }
 
-function getMockRegistration(interfaceRegistrations: string[]): string {
-  const registrations = interfaceRegistrations
-    .map((r) => `            builder.Services.AddScoped<${r}>();`)
+function MockRegistration(props: { interfaceRegistrations: string[] }): Children {
+  const registrations = props.interfaceRegistrations
+    .map((r) => `builder.Services.AddScoped<${r}>();`)
     .join("\n");
 
-  return `using Microsoft.AspNetCore.Http.Features;
-
-namespace TypeSpec.Helpers
-{
-    public static class MockRegistration
-    {
-        public static void Register(WebApplicationBuilder builder)
+  return (
+    <CSharpFile path="MockRegistration.cs" using={["Microsoft.AspNetCore.Http.Features"]}>
+      {code`
+        public static class MockRegistration
         {
+          public static void Register(WebApplicationBuilder builder)
+          {
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddScoped<IJsonSerializationProvider, JsonSerializationProvider>();
             builder.Services.AddSingleton<IDictionary<Type, object?>>(new Dictionary<Type, object?>());
             builder.Services.AddScoped<IInitializer, Initializer>();
-${registrations}
+            ${registrations}
             builder.Services.Configure<FormOptions>(options =>
             {
-                options.MemoryBufferThreshold = int.MaxValue;
-                options.MultipartBodyLengthLimit = int.MaxValue;
+              options.MemoryBufferThreshold = int.MaxValue;
+              options.MultipartBodyLengthLimit = int.MaxValue;
             });
+          }
         }
-    }
-}`;
+      `}
+    </CSharpFile>
+  );
 }

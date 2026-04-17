@@ -1,8 +1,8 @@
 import { For, type Children } from "@alloy-js/core";
-import * as cs from "@alloy-js/csharp";
 import { isStdNamespace, type Model } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import { ClassDeclaration } from "@typespec/emitter-framework/csharp";
+import { CSharpFile } from "./csharp-file.jsx";
 
 export interface ModelsProps {
   /** If true, emit JSON serialization attributes on model properties. */
@@ -20,9 +20,9 @@ export function Models(props: ModelsProps): Children {
   return (
     <For each={models}>
       {(model) => (
-        <cs.SourceFile path={`${model.name}.cs`}>
+        <CSharpFile path={`${model.name}.cs`}>
           <ClassDeclaration type={model} jsonAttributes={props.jsonAttributes ?? true} />
-        </cs.SourceFile>
+        </CSharpFile>
       )}
     </For>
   );

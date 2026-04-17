@@ -6,6 +6,9 @@ export interface CSharpFileProps {
   /** Path of the source file */
   path: string;
 
+  /** A list of using directives to include. */
+  using?: string[];
+
   /** Source file content */
   children?: Children;
 }
@@ -16,7 +19,7 @@ export interface CSharpFileProps {
  */
 export function CSharpFile(props: CSharpFileProps): Children {
   return (
-    <SourceFile path={props.path}>
+    <SourceFile path={props.path} using={props.using}>
       <SourceFileHeader />
       {props.children}
     </SourceFile>

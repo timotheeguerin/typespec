@@ -1,4 +1,5 @@
 import { code, type Children } from "@alloy-js/core";
+import { Namespace } from "@alloy-js/csharp";
 import { CSharpFile } from "../csharp-file.jsx";
 
 /**
@@ -7,14 +8,16 @@ import { CSharpFile } from "../csharp-file.jsx";
  */
 export function JsonSerializationProvider(): Children {
   return (
-    <CSharpFile path="JsonSerializationProvider.cs">
-      {code`
-        using System.Text.Json;
-        using System.Text.Json.Serialization;
-        using TypeSpec.Helpers.JsonConverters;
-
-        namespace TypeSpec.Helpers
-        {
+    <CSharpFile
+      path="JsonSerializationProvider.cs"
+      using={[
+        "System.Text.Json",
+        "System.Text.Json.Serialization",
+        "TypeSpec.Helpers.JsonConverters",
+      ]}
+    >
+      <Namespace name="TypeSpec.Helpers">
+        {code`
           public interface IJsonSerializationProvider
           {
             JsonSerializerOptions Options { get; }
@@ -39,8 +42,8 @@ export function JsonSerializationProvider(): Children {
               };
             }
           }
-        }
-      `}
+        `}
+      </Namespace>
     </CSharpFile>
   );
 }

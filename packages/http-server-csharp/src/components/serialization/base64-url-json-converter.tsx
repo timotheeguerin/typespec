@@ -1,4 +1,5 @@
 import { code, type Children } from "@alloy-js/core";
+import { Namespace } from "@alloy-js/csharp";
 import { CSharpFile } from "../csharp-file.jsx";
 
 /**
@@ -7,13 +8,12 @@ import { CSharpFile } from "../csharp-file.jsx";
  */
 export function Base64UrlJsonConverter(): Children {
   return (
-    <CSharpFile path="Base64UrlJsonConverter.cs">
-      {code`
-        using System.Text.Json;
-        using System.Text.Json.Serialization;
-
-        namespace TypeSpec.Helpers.JsonConverters
-        {
+    <CSharpFile
+      path="Base64UrlJsonConverter.cs"
+      using={["System.Text.Json", "System.Text.Json.Serialization"]}
+    >
+      <Namespace name="TypeSpec.Helpers.JsonConverters">
+        {code`
           public class Base64UrlJsonConverter : JsonConverter<byte[]>
           {
             public override byte[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -36,8 +36,8 @@ export function Base64UrlJsonConverter(): Children {
               writer.WriteStringValue(base64Url);
             }
           }
-        }
-      `}
+        `}
+      </Namespace>
     </CSharpFile>
   );
 }

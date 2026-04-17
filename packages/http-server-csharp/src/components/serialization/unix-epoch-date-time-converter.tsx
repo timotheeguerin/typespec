@@ -1,4 +1,5 @@
 import { code, type Children } from "@alloy-js/core";
+import { Namespace } from "@alloy-js/csharp";
 import { CSharpFile } from "../csharp-file.jsx";
 
 /**
@@ -7,13 +8,12 @@ import { CSharpFile } from "../csharp-file.jsx";
  */
 export function UnixEpochDateTimeConverter(): Children {
   return (
-    <CSharpFile path="UnixEpochDateTimeConverter.cs">
-      {code`
-        using System.Text.Json;
-        using System.Text.Json.Serialization;
-
-        namespace TypeSpec.Helpers.JsonConverters
-        {
+    <CSharpFile
+      path="UnixEpochDateTimeConverter.cs"
+      using={["System.Text.Json", "System.Text.Json.Serialization"]}
+    >
+      <Namespace name="TypeSpec.Helpers.JsonConverters">
+        {code`
           public class UnixEpochDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
           {
             public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -27,8 +27,8 @@ export function UnixEpochDateTimeConverter(): Children {
               writer.WriteNumberValue(value.ToUnixTimeSeconds());
             }
           }
-        }
-      `}
+        `}
+      </Namespace>
     </CSharpFile>
   );
 }

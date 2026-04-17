@@ -1,8 +1,8 @@
 import { For, type Children } from "@alloy-js/core";
-import * as cs from "@alloy-js/csharp";
 import { isStdNamespace, type Enum } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import { EnumDeclaration } from "@typespec/emitter-framework/csharp";
+import { CSharpFile } from "./csharp-file.jsx";
 
 export interface EnumsProps {}
 
@@ -17,9 +17,9 @@ export function Enums(_props: EnumsProps): Children {
   return (
     <For each={enums}>
       {(en) => (
-        <cs.SourceFile path={`${en.name}.cs`}>
+        <CSharpFile path={`${en.name}.cs`}>
           <EnumDeclaration type={en} />
-        </cs.SourceFile>
+        </CSharpFile>
       )}
     </For>
   );
