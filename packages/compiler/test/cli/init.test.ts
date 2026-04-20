@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { CliCompilerHost } from "../../src/core/cli/types.js";
 import { CompilerPackageRoot } from "../../src/core/node-host.js";
 import { resolvePath } from "../../src/core/path-utils.js";
@@ -8,7 +8,7 @@ import { createTestFileSystem } from "../../src/testing/fs.js";
 import { TestFileSystem } from "../../src/testing/types.js";
 import { parseYaml as coreParseYaml } from "../../src/yaml/parser.js";
 
-vi.mock("../../src/package-manger/npm-registry-utils.js", () => ({
+vi.mock("../../src/package-manger/npm-registry.js", () => ({
   fetchLatestPackageManifest: vi.fn((packageName: string) =>
     Promise.resolve({ name: packageName, version: "1.0.0" }),
   ),
@@ -282,9 +282,8 @@ describe("no-prompt", () => {
   });
 
   it("should fallback to 'latest' when npm registry is unreachable", async () => {
-    const { fetchLatestPackageManifest } = await import(
-      "../../src/package-manger/npm-registry-utils.js"
-    );
+    const { fetchLatestPackageManifest } =
+      await import("../../src/package-manger/npm-registry.js");
     const mockedFetch = vi.mocked(fetchLatestPackageManifest);
     mockedFetch.mockRejectedValue(new Error("Network error"));
 

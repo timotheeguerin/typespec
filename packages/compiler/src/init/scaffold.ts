@@ -2,7 +2,7 @@ import { stringify } from "yaml";
 import type { TypeSpecRawConfig } from "../config/types.js";
 import { getDirectoryPath, joinPaths } from "../core/path-utils.js";
 import type { SystemHost } from "../core/types.js";
-import { fetchLatestPackageManifest } from "../package-manger/npm-registry-utils.js";
+import { fetchLatestPackageManifest } from "../package-manger/npm-registry.js";
 import type { PackageJson } from "../types/package-json.js";
 import { readUrlOrPath, resolveRelativeUrlOrPath } from "../utils/misc.js";
 import {
@@ -126,9 +126,7 @@ async function writePackageJson(host: SystemHost, config: ScaffoldingConfig) {
   }
 
   for (const key of Object.keys(config.emitters)) {
-    versionResolutions.push(
-      getPackageVersion(key, config.emitters[key]).then((v) => [key, v]),
-    );
+    versionResolutions.push(getPackageVersion(key, config.emitters[key]).then((v) => [key, v]));
   }
 
   const dependencies: Record<string, string> = Object.fromEntries(

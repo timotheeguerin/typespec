@@ -9,7 +9,7 @@ import {
 } from "../../src/init/scaffold.js";
 import { TestHost, createTestHost, resolveVirtualPath } from "../../src/testing/index.js";
 
-vi.mock("../../src/package-manger/npm-registry-utils.js", () => ({
+vi.mock("../../src/package-manger/npm-registry.js", () => ({
   fetchLatestPackageManifest: vi.fn((packageName: string) =>
     Promise.resolve({ name: packageName, version: "1.0.0" }),
   ),
