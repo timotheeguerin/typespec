@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CliCompilerHost } from "../../src/core/cli/types.js";
 import { CompilerPackageRoot } from "../../src/core/node-host.js";
 import { resolvePath } from "../../src/core/path-utils.js";
@@ -7,6 +7,12 @@ import { initTypeSpecProject } from "../../src/init/init.js";
 import { createTestFileSystem } from "../../src/testing/fs.js";
 import { TestFileSystem } from "../../src/testing/types.js";
 import { parseYaml as coreParseYaml } from "../../src/yaml/parser.js";
+
+vi.mock("../../src/package-manger/npm-registry-utils.js", () => ({
+  fetchLatestPackageManifest: vi.fn((packageName: string) =>
+    Promise.resolve({ name: packageName, version: "1.0.0" }),
+  ),
+}));
 
 const TEST_SCAFFOLDING = {
   foo: {
@@ -259,5 +265,38 @@ describe("no-prompt", () => {
     ).rejects.toThrowError(
       `Missing value for parameter "param1". Provide it using --args param1=value`,
     );
+  });
+
+  it("should resolve package versions from npm registry", async () => {
+    const { compilerHost } = await createTestFSWithCliCompilerHost();
+
+    await initTypeSpecProject(compilerHost, "/tmp/test-project", {
+      template: "foo",
+      "no-prompt": true,
+    });
+
+    const packageJson = await parseJson(compilerHost, "/tmp/test-project/package.json");
+    expect(packageJson.dependencies["@typespec/compiler"]).toBe("^1.0.0");
+    expect(packageJson.dependencies["@typespec/http"]).toBe("^1.0.0");
+    expect(packageJson.dependencies["@typespec/openapi3"]).toBe("^1.0.0");
+  });
+
+  it("should fallback to 'latest' when npm registry is unreachable", async () => {
+    const { fetchLatestPackageManifest } = await import(
+      "../../src/package-manger/npm-registry-utils.js"
+    );
+    const mockedFetch = vi.mocked(fetchLatestPackageManifest);
+    mockedFetch.mockRejectedValue(new Error("Network error"));
+
+    const { compilerHost } = await createTestFSWithCliCompilerHost();
+    await initTypeSpecProject(compilerHost, "/tmp/test-project", {
+      template: "foo",
+      "no-prompt": true,
+    });
+
+    const packageJson = await parseJson(compilerHost, "/tmp/test-project/package.json");
+    expect(packageJson.dependencies["@typespec/compiler"]).toBe("latest");
+
+    mockedFetch.mockResolvedValue({ name: "test", version: "1.0.0" } as any);
   });
 });
