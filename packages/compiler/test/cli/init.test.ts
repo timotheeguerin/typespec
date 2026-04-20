@@ -282,8 +282,7 @@ describe("no-prompt", () => {
   });
 
   it("should fallback to 'latest' when npm registry is unreachable", async () => {
-    const { fetchLatestPackageManifest } =
-      await import("../../src/package-manger/npm-registry.js");
+    const { fetchLatestPackageManifest } = await import("../../src/package-manger/npm-registry.js");
     const mockedFetch = vi.mocked(fetchLatestPackageManifest);
     mockedFetch.mockRejectedValue(new Error("Network error"));
 
