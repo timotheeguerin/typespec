@@ -1,5 +1,5 @@
 import { ok, strictEqual } from "assert";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parse } from "yaml";
 import { InitTemplate } from "../../src/init/init-template.js";
 import {
@@ -9,11 +9,17 @@ import {
 } from "../../src/init/scaffold.js";
 import { TestHost, createTestHost, resolveVirtualPath } from "../../src/testing/index.js";
 
-vi.mock("../../src/package-manger/npm-registry.js", () => ({
-  fetchLatestPackageManifest: vi.fn((packageName: string) =>
-    Promise.resolve({ name: packageName, version: "1.0.0" }),
-  ),
-}));
+const fetchMock = vi.fn().mockResolvedValue({
+  json: () => Promise.resolve({ name: "mock-pkg", version: "1.0.0" }),
+});
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", fetchMock);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 let testHost: TestHost;
 beforeEach(async () => {
