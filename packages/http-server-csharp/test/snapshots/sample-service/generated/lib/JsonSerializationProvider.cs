@@ -15,11 +15,12 @@ namespace TypeSpec.Helpers
         /// <summary>
         /// The options to use for serialization
         /// </summary>
-        public virtual JsonSerializerOptions Options { get; } = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
+        public virtual JsonSerializerOptions Options { get; } =
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            };
 
         /// <summary>
         /// Create an object from a json string

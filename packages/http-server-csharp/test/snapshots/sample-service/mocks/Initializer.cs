@@ -31,7 +31,7 @@ namespace TypeSpec.Helpers
         /// </summary>
         /// <param name="type"> The type to initialize</param>
         /// <returns>An instance of the given type. Or null if initialization was impossible.</returns>
-        public object? Initialize (Type type)
+        public object? Initialize(Type type)
         {
             if (Cache.ContainsKey(type))
             {
@@ -101,27 +101,36 @@ namespace TypeSpec.Helpers
             {
                 return CacheAndReturn(type, DateTimeOffset.UtcNow);
             }
-            if ( type == typeof(TimeSpan))
+            if (type == typeof(TimeSpan))
             {
                 return CacheAndReturn(type, TimeSpan.Zero);
             }
             if (type.IsArray)
             {
                 var element = type.GetElementType();
-                if (element == null) return null;
+                if (element == null)
+                    return null;
                 return CacheAndReturn(type, Array.CreateInstance(element, 0));
             }
             if (type.IsGenericType)
             {
                 var elementType = type.GetGenericArguments()[0];
-                if (elementType == null) return null;
-                
-                if (type.GetGenericTypeDefinition() == typeof(IEnumerable<>)){
-                    return CacheAndReturn(type, Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType)));
+                if (elementType == null)
+                    return null;
+
+                if (type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                {
+                    return CacheAndReturn(
+                        type,
+                        Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType))
+                    );
                 }
                 if (type.GetGenericTypeDefinition() == typeof(ISet<>))
                 {
-                    return CacheAndReturn(type, Activator.CreateInstance(typeof(HashSet<>).MakeGenericType(elementType)));
+                    return CacheAndReturn(
+                        type,
+                        Activator.CreateInstance(typeof(HashSet<>).MakeGenericType(elementType))
+                    );
                 }
             }
             if (type.IsClass)
@@ -129,13 +138,13 @@ namespace TypeSpec.Helpers
                 return InitializeClass(type);
             }
             var genericType = Nullable.GetUnderlyingType(type);
-            if ( (genericType != null))
+            if ((genericType != null))
             {
                 return Initialize(genericType);
             }
             if (type.IsEnum)
             {
-              return CacheAndReturn(type, Enum.GetValues(type).GetValue(0));
+                return CacheAndReturn(type, Enum.GetValues(type).GetValue(0));
             }
             return new object();
         }
@@ -145,7 +154,8 @@ namespace TypeSpec.Helpers
         /// </summary>
         /// <typeparam name="T">The type to initialize</typeparam>
         /// <returns>An instance of the given type</returns>
-        public T Initialize<T>() where T: class, new()
+        public T Initialize<T>()
+            where T : class, new()
         {
             var result = new T();
             var initialized = InitializeClass(typeof(T), result);

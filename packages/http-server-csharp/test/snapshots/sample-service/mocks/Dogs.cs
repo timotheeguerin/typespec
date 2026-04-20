@@ -8,15 +8,15 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using TypeSpec.Helpers.JsonConverters;
 using TypeSpec.Helpers;
+using TypeSpec.Helpers.JsonConverters;
 
 namespace PetStore
 {
     /// <summary>
-    /// This is a mock implementation of the business logic interface for 
+    /// This is a mock implementation of the business logic interface for
     /// demonstration and early development.  Feel free to overwrite this file.
-    /// Or replace it with another implementation, and register that implementation 
+    /// Or replace it with another implementation, and register that implementation
     /// in the dependency injection container
     /// </summary>
     public class Dogs : IDogs
@@ -25,7 +25,7 @@ namespace PetStore
         /// The controller constructor, using the dependency injection container to satisfy the paramters.
         /// </summary>
         /// <param name="initializer">The initializer class, registered with dependency injection</param>
-        /// <param name="accessor">The accessor for the HttpContext, allows your implementation to 
+        /// <param name="accessor">The accessor for the HttpContext, allows your implementation to
         /// get properties of the incoming request and to set properties of the outgoing response.</param>"
         public Dogs(IInitializer initializer, IHttpContextAccessor accessor)
         {
@@ -36,20 +36,19 @@ namespace PetStore
         private IInitializer _initializer;
 
         /// <summary>
-        /// Use this property in your implementation to access properties of the incoming HttpRequest 
+        /// Use this property in your implementation to access properties of the incoming HttpRequest
         /// and to set properties of the outgoing HttpResponse
         /// </summary>
         public IHttpContextAccessor HttpContextAccessor { get; }
 
-        public Task<Dog[]> ListAsync( )
+        public Task<Dog[]> ListAsync()
         {
             return Task.FromResult<Dog[]>([]);
         }
 
-        public Task<Dog> ReadAsync( long id)
+        public Task<Dog> ReadAsync(long id)
         {
             return Task.FromResult(_initializer.Initialize<Dog>());
         }
     }
 }
-  

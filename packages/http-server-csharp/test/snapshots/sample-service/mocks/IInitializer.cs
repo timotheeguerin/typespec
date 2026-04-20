@@ -21,6 +21,7 @@ namespace TypeSpec.Helpers
         /// </summary>
         /// <typeparam name="T">The type to initialize</typeparam>
         /// <returns>An instance of the given type</returns>
-        T Initialize<T>() where T : class, new();
+        T Initialize<T>()
+            where T : class, new();
     }
 }
