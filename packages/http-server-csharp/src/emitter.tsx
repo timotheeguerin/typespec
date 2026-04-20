@@ -154,7 +154,7 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
   // Collect interface names for mock registration
   const interfaces = getServiceInterfaces(context.program);
   const interfaceNames = interfaces.map((iface) => iface.name);
-  const interfaceRegistrations = interfaces.map((iface) => `I${iface.name}, Mock${iface.name}`);
+  const interfaceRegistrations = interfaces.map((iface) => `I${iface.name}, ${iface.name}`);
 
   // Resolve ports for project files
   let httpPort = options["http-port"] ?? 5000;

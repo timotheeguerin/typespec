@@ -213,7 +213,7 @@ function MockImplementation(props: MockImplementationProps): Children {
   const namePolicy = cs.useCSharpNamePolicy();
   const { $ } = useTsp();
   const interfaceName = `I${namePolicy.getName(props.type.name, "class")}`;
-  const className = `Mock${namePolicy.getName(props.type.name, "class")}`;
+  const className = namePolicy.getName(props.type.name, "class");
   const operations = Array.from(props.type.operations.entries());
 
   return (
