@@ -17,12 +17,19 @@ import { CSharpFile } from "./components/csharp-file.jsx";
 import { Enums } from "./components/enums.jsx";
 import { BusinessLogicInterface } from "./components/interfaces.jsx";
 import { Models } from "./components/models.jsx";
+import { Csproj } from "./components/project/csproj.jsx";
+import {
+  AppSettings,
+  LaunchSettings,
+} from "./components/project/launch-settings.jsx";
 import { ProgramCs } from "./components/project/program.jsx";
+import { Documentation } from "./components/scaffolding/documentation.jsx";
 import { MockScaffolding } from "./components/scaffolding/mock-scaffolding.jsx";
 import { JsonConverters } from "./components/serialization/json-converters.jsx";
 import { createServerScalarOverrides } from "./components/type-expression.jsx";
 import { HttpCanonicalizerContext } from "./context/http-canonicalizer-context.js";
 import { CSharpServiceEmitterOptions } from "./lib.js";
+import { getFreePort } from "./utils/port.js";
 
 /**
  * Collects all interfaces from the service namespace(s).
@@ -137,14 +144,29 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
   const scalarOverrides = createServerScalarOverrides(tk);
   const options = context.options;
   const serviceName = getServiceNamespaceName(context.program) ?? "ServiceProject";
+  const projectName = options["project-name"] ?? "ServiceProject";
   const emitMocks =
     options["emit-mocks"] === "mocks-only" || options["emit-mocks"] === "mocks-and-project-files";
   const emitProjectFiles =
     options["emit-mocks"] === "mocks-and-project-files";
+  const useSwaggerUI = options["use-swaggerui"] ?? false;
 
   // Collect interface names for mock registration
   const interfaces = getServiceInterfaces(context.program);
+  const interfaceNames = interfaces.map((iface) => iface.name);
   const interfaceRegistrations = interfaces.map((iface) => `I${iface.name}, Mock${iface.name}`);
+
+  // Resolve ports for project files
+  let httpPort = options["http-port"] ?? 5000;
+  let httpsPort = options["https-port"] ?? 7000;
+  if (emitProjectFiles) {
+    if (!options["http-port"]) {
+      httpPort = await getFreePort(5000, 5999);
+    }
+    if (!options["https-port"]) {
+      httpsPort = await getFreePort(7000, 7999);
+    }
+  }
 
   const output = (
     <Output program={context.program} namePolicy={createCSharpNamePolicy()}>
@@ -161,7 +183,23 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
                 <JsonConverters />
               </SourceDirectory>
               <ProgramCs hasMocks={emitMocks} />
-              {emitMocks && <MockScaffolding interfaceRegistrations={interfaceRegistrations} />}
+              {emitMocks && (
+                <MockScaffolding
+                  interfaceRegistrations={interfaceRegistrations}
+                  interfaces={interfaces}
+                />
+              )}
+              {emitProjectFiles && (
+                <>
+                  <Csproj projectName={projectName} useSwaggerUI={useSwaggerUI} />
+                  <LaunchSettings httpPort={httpPort} httpsPort={httpsPort} />
+                  <AppSettings />
+                </>
+              )}
+              <Documentation
+                interfaceNames={emitMocks ? interfaceNames : []}
+                useSwaggerUI={useSwaggerUI}
+              />
             </SourceDirectory>
           </Namespace>
         </HttpCanonicalizerContext.Provider>

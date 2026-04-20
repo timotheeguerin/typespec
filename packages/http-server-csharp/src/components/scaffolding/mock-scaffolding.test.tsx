@@ -26,7 +26,7 @@ describe("MockScaffolding", () => {
   it("renders initializer interface", () => {
     const output = render(
       <Output>
-        <MockScaffolding interfaceRegistrations={[]} />
+        <MockScaffolding interfaceRegistrations={[]} interfaces={[]} />
       </Output>,
     );
     const content = findFileContent(output, "IInitializer.cs");
@@ -37,7 +37,7 @@ describe("MockScaffolding", () => {
   it("renders initializer implementation", () => {
     const output = render(
       <Output>
-        <MockScaffolding interfaceRegistrations={[]} />
+        <MockScaffolding interfaceRegistrations={[]} interfaces={[]} />
       </Output>,
     );
     const content = findFileContent(output, "Initializer.cs");
@@ -48,7 +48,7 @@ describe("MockScaffolding", () => {
   it("renders mock registration with interface registrations", () => {
     const output = render(
       <Output>
-        <MockScaffolding interfaceRegistrations={["IPetStore, MockPetStore"]} />
+        <MockScaffolding interfaceRegistrations={["IPetStore, MockPetStore"]} interfaces={[]} />
       </Output>,
     );
     const content = findFileContent(output, "MockRegistration.cs");
