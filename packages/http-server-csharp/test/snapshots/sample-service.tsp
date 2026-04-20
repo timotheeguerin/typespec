@@ -1,13 +1,43 @@
-import "@typespec/http";
-import "@typespec/rest";
+// Sample TypeSpec service for snapshot testing.
+// This exercises models, enums, inheritance, operations, and multiple interfaces.
 
-using Http;
-using Rest;
-
-@service(#{title: "PetStore"})
+@service(#{ title: "PetStore" })
 namespace PetStore;
 
-// ── Enums ──────────────────────────────────────────────────
+/** Address information */
+model Address {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+/** A pet in the store */
+model Pet {
+  id: int64;
+  name: string;
+  tag?: string;
+  age?: int32;
+  address?: Address;
+}
+
+/** A dog, extending Pet */
+model Dog extends Pet {
+  breed: string;
+}
+
+/** An error response */
+@error
+model Error {
+  code: int32;
+  message: string;
+}
+
+/** Result of listing pets */
+model PetListResult {
+  items: Pet[];
+  nextLink?: string;
+}
 
 /** Color options for a pet */
 enum Color {
@@ -16,84 +46,36 @@ enum Color {
   Green,
 }
 
-/** Pet size category */
+/** Size categories */
 enum Size {
-  Small: "small",
-  Medium: "medium",
-  Large: "large",
+  Small,
+  Medium,
+  Large,
 }
 
-// ── Models ─────────────────────────────────────────────────
-
-/** Address model */
-model Address {
-  street: string;
-  city: string;
-  state: string;
-  zip: string;
-}
-
-/** Base model for all pets */
-model Pet {
-  @key id: int64;
-  name: string;
-  age: int32;
-  color?: Color;
-  size: Size;
-  tags: string[];
-  metadata?: Record<string>;
-  address: Address;
-  isActive: boolean;
-  weight: float64;
-  createdAt: utcDateTime;
-}
-
-/** A dog extends Pet */
-model Dog extends Pet {
-  breed: string;
-  isGoodBoy: boolean;
-}
-
-/** Error response */
-model Error {
-  code: int32;
-  message: string;
-}
-
-/** List result with pagination */
-model PetListResult {
-  items: Pet[];
-  nextLink?: url;
-}
-
-// ── Operations ─────────────────────────────────────────────
-
-@route("/pets")
+/** Pet store operations */
 interface Pets {
   /** List all pets */
-  @get list(@query skip?: int32, @query top?: int32): PetListResult | Error;
+  @route("/pets") @get list(@query skip?: int32, @query top?: int32): PetListResult | Error;
 
   /** Get a pet by ID */
-  @get read(@path id: int64): Pet | Error;
+  @route("/pets/{id}") @get read(@path id: int64): Pet | Error;
 
   /** Create a new pet */
-  @post create(@body pet: Pet): Pet | Error;
+  @route("/pets") @post create(@body body: Pet): Pet | Error;
 
   /** Update an existing pet */
-  @put update(@path id: int64, @body pet: Pet): Pet | Error;
+  @route("/pets/{id}") @put update(@path id: int64, @body body: Pet): Pet | Error;
 
   /** Delete a pet */
-  @delete delete(@path id: int64): void | Error;
+  @route("/pets/{id}") @delete delete(@path id: int64): void | Error;
 }
 
-@route("/dogs")
+/** Dog-specific operations */
 interface Dogs {
   /** List all dogs */
-  @get list(@query skip?: int32, @query top?: int32): Dog[] | Error;
+  @route("/dogs") @get list(): Dog[] | Error;
 
   /** Get a dog by ID */
-  @get read(@path id: int64): Dog | Error;
-
-  /** Create a new dog */
-  @post create(@body dog: Dog): Dog | Error;
+  @route("/dogs/{id}") @get read(@path id: int64): Dog | Error;
 }
