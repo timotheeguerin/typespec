@@ -7,14 +7,14 @@ packages:
   - "!packages/http-client-python/**"
 
 catalog:
-  "@alloy-js/cli": ^0.22.0
-  "@alloy-js/core": ^0.22.0
-  "@alloy-js/csharp": ^0.22.0
-  "@alloy-js/markdown": ^0.22.0
-  "@alloy-js/msbuild": ^0.22.0
+  "@alloy-js/cli": 0.23.0-dev.5
+  "@alloy-js/core": 0.23.0-dev.15
+  "@alloy-js/csharp": 0.23.0-dev.6
+  "@alloy-js/markdown": 0.23.0-dev.2
+  "@alloy-js/msbuild": 0.23.0-dev.2
   "@alloy-js/python": ^0.3.0
-  "@alloy-js/rollup-plugin": ^0.1.0
-  "@alloy-js/typescript": ^0.22.0
+  "@alloy-js/rollup-plugin": 0.1.1-dev.2
+  "@alloy-js/typescript": 0.23.0-dev.9
   "@astrojs/check": ^0.9.8
   "@astrojs/react": ^5.0.3
   "@astrojs/starlight": ^0.38.3
@@ -185,6 +185,13 @@ minimumReleaseAgeExclude:
   - "@alloy-js/*"
 
 overrides:
+  "@alloy-js/core": 0.23.0-dev.15
+  "@alloy-js/csharp": 0.23.0-dev.6
+  "@alloy-js/cli": 0.23.0-dev.5
+  "@alloy-js/msbuild": 0.23.0-dev.2
+  "@alloy-js/markdown": 0.23.0-dev.2
+  "@alloy-js/typescript": 0.23.0-dev.9
+  "@alloy-js/rollup-plugin": 0.1.1-dev.2
   cross-spawn@>=7.0.0 <7.0.5: ">=7.0.5"
   diff@>=6.0.0 <8.0.3: ">=8.0.3"
   dompurify: ^3.3.3
