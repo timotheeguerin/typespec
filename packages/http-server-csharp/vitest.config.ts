@@ -7,8 +7,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       testTimeout: 100_000,
-      include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-      exclude: ["src/cli/*.ts", "test/**"],
+      include: ["src/**/*.test.ts", "src/**/*.test.tsx", "test/**/*.test.ts"],
       setupFiles: ["./test/vitest.setup.ts"],
     },
     plugins: [alloyPlugin()],
