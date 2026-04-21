@@ -12,8 +12,7 @@ namespace TypeSpec.Helpers.JsonConverters
     /// </summary>
     public class StringConstraint : JsonConverterAttribute
     {
-        int? _minLength = null,
-            _maxLength = null;
+        int? _minLength = null, _maxLength = null;
 
         public StringConstraint() { }
 
@@ -48,12 +47,7 @@ namespace TypeSpec.Helpers.JsonConverters
 
     public class StringJsonConverter : JsonConverter<string>
     {
-        public StringJsonConverter(
-            int? minLength,
-            int? maxLength,
-            string? pattern,
-            JsonSerializerOptions? options = null
-        )
+        public StringJsonConverter(int? minLength, int? maxLength, string? pattern, JsonSerializerOptions? options = null)
         {
             MinLength = minLength;
             MaxLength = maxLength;
@@ -85,34 +79,23 @@ namespace TypeSpec.Helpers.JsonConverters
             return base.CanConvert(typeToConvert);
         }
 
-        public override string? Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
+        public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var innerConverter = GetInnerConverter(options);
             string? candidate = innerConverter.Read(ref reader, typeToConvert, options);
             if (MinLength.HasValue && (candidate == null || candidate.Length < MinLength.Value))
             {
-                throw new JsonException(
-                    $"String length less than minimum length {MinLength.Value}"
-                );
+                throw new JsonException($"String length less than minimum length {MinLength.Value}");
             }
 
             if (candidate != null)
             {
                 if (MaxLength.HasValue && candidate.Length > MaxLength.Value)
                 {
-                    throw new JsonException(
-                        $"String length greater than maximum length {MaxLength.Value}"
-                    );
+                    throw new JsonException($"String length greater than maximum length {MaxLength.Value}");
                 }
 
-                if (
-                    Pattern != null
-                    && !System.Text.RegularExpressions.Regex.IsMatch(candidate, Pattern)
-                )
+                if (Pattern != null && !System.Text.RegularExpressions.Regex.IsMatch(candidate, Pattern))
                 {
                     throw new JsonException($"String does not match pattern {Pattern}");
                 }
@@ -121,32 +104,21 @@ namespace TypeSpec.Helpers.JsonConverters
             return candidate;
         }
 
-        public override void Write(
-            Utf8JsonWriter writer,
-            string value,
-            JsonSerializerOptions options
-        )
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
             if (MinLength.HasValue && (value == null || value.Length < MinLength.Value))
             {
-                throw new JsonException(
-                    $"String length less than minimum length {MinLength.Value}"
-                );
+                throw new JsonException($"String length less than minimum length {MinLength.Value}");
             }
 
             if (value != null)
             {
                 if (MaxLength.HasValue && value.Length > MaxLength.Value)
                 {
-                    throw new JsonException(
-                        $"String length greater than maximum length {MaxLength.Value}"
-                    );
+                    throw new JsonException($"String length greater than maximum length {MaxLength.Value}");
                 }
 
-                if (
-                    Pattern != null
-                    && !System.Text.RegularExpressions.Regex.IsMatch(value, Pattern)
-                )
+                if (Pattern != null && !System.Text.RegularExpressions.Regex.IsMatch(value, Pattern))
                 {
                     throw new JsonException($"String does not match pattern {Pattern}");
                 }
