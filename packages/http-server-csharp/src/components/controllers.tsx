@@ -3,7 +3,7 @@ import * as cs from "@alloy-js/csharp";
 import { Reference } from "@alloy-js/csharp";
 import type { Interface } from "@typespec/compiler";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
-import { ControllerAction } from "./controller-action.jsx";
+import { ControllerAction } from "./controller-action/index.jsx";
 import { businessLogicInterfaceRefkey } from "./interfaces.jsx";
 import type { RequestModelInfo } from "./request-models.jsx";
 

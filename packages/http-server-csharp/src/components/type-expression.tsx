@@ -6,7 +6,7 @@ import { useTsp, Experimental_ComponentOverridesConfig } from "@typespec/emitter
 import { TypeExpression as EfTypeExpression } from "@typespec/emitter-framework/csharp";
 import { isUnionEnum } from "./enums.jsx";
 import { useEmitterOptions } from "../context/emitter-options-context.js";
-import { getAnonymousModelName } from "./models.jsx";
+import { getAnonymousModelName } from "./models/index.jsx";
 
 /**
  * Wrapper around emitter-framework's TypeExpression that handles

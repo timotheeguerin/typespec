@@ -1,16 +1,18 @@
 import { code, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import type { Type } from "@typespec/compiler";
 import { isErrorModel, isVoidType } from "@typespec/compiler";
-import type {
-  CanonicalHttpProperty,
-  OperationHttpCanonicalization,
-} from "@typespec/http-canonicalization";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { useTsp } from "@typespec/emitter-framework";
-import { getDocComment } from "../utils/doc-comments.jsx";
-import { getHttpVerbAttribute, getRouteTemplate } from "../utils/http-helpers.js";
-import { TypeExpression } from "./type-expression.jsx";
-import type { RequestModelInfo } from "./request-models.jsx";
+import { getDocComment } from "../../utils/doc-comments.jsx";
+import { getHttpVerbAttribute, getRouteTemplate } from "../../utils/http-helpers.js";
+import { TypeExpression } from "../type-expression.jsx";
+import type { RequestModelInfo } from "../request-models.jsx";
+import { getBindingAttribute, getLiteralDefaultValue } from "./parameter-binding.js";
+import { getSuccessStatusCode } from "./response-analysis.js";
+
+// Re-export public API
+export { getBindingAttribute, getLiteralDefaultValue, hasLiteralDefault } from "./parameter-binding.js";
+export { getSuccessStatusCode } from "./response-analysis.js";
 
 export interface ControllerActionProps {
   /** The canonicalized HTTP operation to generate an action method for. */
@@ -21,124 +23,7 @@ export interface ControllerActionProps {
   requestModel?: RequestModelInfo;
 }
 
-/**
- * Maps a canonical HTTP property to an ASP.NET parameter binding attribute.
- */
-function getBindingAttribute(prop: CanonicalHttpProperty): string | undefined {
-  switch (prop.kind) {
-    case "path":
-      return `FromRoute(Name="${prop.options.name}")`;
-    case "query":
-      return `FromQuery(Name="${prop.options.name}")`;
-    case "header":
-      return `FromHeader(Name="${prop.options.name}")`;
-    default:
-      return undefined;
-  }
-}
-
-/**
- * Gets the literal default value string for a parameter type, if applicable.
- * Only returns values for compile-time constant types (string, number, bool).
- * Arrays/tuples are NOT valid C# parameter defaults.
- */
-function getLiteralDefaultValue(type: Type): string | undefined {
-  switch (type.kind) {
-    case "String":
-      return `"${type.value}"`;
-    case "StringTemplate": {
-      if (type.stringValue !== undefined) {
-        return `"${type.stringValue}"`;
-      }
-      // Try to resolve the template by concatenating span values
-      let resolved = "";
-      for (const span of type.spans) {
-        if (span.isInterpolated) {
-          // The interpolated value could be a ModelProperty reference
-          let spanType = span.type;
-          if (spanType.kind === "ModelProperty") {
-            spanType = spanType.type;
-          }
-          const spanDefault = getLiteralDefaultValue(spanType);
-          if (spanDefault === undefined) return undefined;
-          // Strip quotes from the resolved value
-          resolved += spanDefault.replace(/^"|"$/g, "");
-        } else {
-          resolved += span.type.value;
-        }
-      }
-      return `"${resolved}"`;
-    }
-    case "Number":
-      return type.valueAsString;
-    case "Boolean":
-      return type.value ? "true" : "false";
-    default:
-      return undefined;
-  }
-}
-
-/**
- * Checks if a parameter has a literal default value (i.e., its type is a literal).
- */
-function hasLiteralDefault(type: Type): boolean {
-  return getLiteralDefaultValue(type) !== undefined;
-}
-
-/**
- * Determines the success HTTP status code and whether the response has a body.
- * Checks the original return type for @statusCode properties.
- */
-function getSuccessStatusCode(operation: OperationHttpCanonicalization): { statusCode: number | undefined; hasBody: boolean } {
-  const returnType = operation.sourceType.returnType;
-  
-  // Check direct model response
-  if (returnType.kind === "Model") {
-    return analyzeResponseModel(returnType);
-  }
-  
-  // Check union responses - find the first non-error success response
-  if (returnType.kind === "Union") {
-    for (const variant of returnType.variants.values()) {
-      const vt = variant.type;
-      if (isVoidType(vt)) continue;
-      if (vt.kind === "Model") {
-        // Skip models with @error decorator or error-range status codes
-        const result = analyzeResponseModel(vt);
-        if (result.statusCode !== undefined && result.statusCode >= 400) continue;
-        return result;
-      }
-    }
-  }
-
-  const hasReturnValue = !isVoidType(returnType);
-  return { statusCode: hasReturnValue ? 200 : 204, hasBody: hasReturnValue };
-}
-
-function analyzeResponseModel(model: import("@typespec/compiler").Model): { statusCode: number | undefined; hasBody: boolean } {
-  let statusCode: number | undefined;
-  let bodyProps = 0;
-  
-  for (const prop of model.properties.values()) {
-    // Check for @statusCode property
-    if (prop.name === "statusCode") {
-      // The type might be a literal number
-      if (prop.type.kind === "Number") {
-        statusCode = prop.type.value;
-      }
-      continue;
-    }
-    bodyProps++;
-  }
-
-  // Model with only @statusCode and no body props → no body
-  // But if the model has an indexer (Record<T>), it IS a body
-  if (bodyProps === 0 && !model.indexer) {
-    return { statusCode: statusCode ?? 204, hasBody: false };
-  }
-  
-  return { statusCode, hasBody: true };
-}
+type ParamInfo = { name: string; type: Children; attributes?: string[]; optional?: boolean; default?: Children };
 
 /**
  * Renders an ASP.NET controller action method for an HTTP operation.
@@ -152,7 +37,6 @@ export function ControllerAction(props: ControllerActionProps): Children {
   const isGet = props.operation.method === "get";
 
   // Map all HTTP parameters (path, query, header) to C# method parameters
-  type ParamInfo = { name: string; type: Children; attributes?: string[]; optional?: boolean; default?: Children };
   const pathParams: ParamInfo[] = [];
   const queryHeaderParams: ParamInfo[] = [];
   for (const p of props.operation.requestParameters.properties) {

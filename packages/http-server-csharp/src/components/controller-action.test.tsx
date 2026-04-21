@@ -13,7 +13,7 @@ import {
   type OperationHttpCanonicalization,
 } from "@typespec/http-canonicalization";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ControllerAction } from "./controller-action.jsx";
+import { ControllerAction } from "./controller-action/index.jsx";
 
 let runner: TesterInstance;
 
