@@ -10,13 +10,12 @@ import {
 import { TestHost, createTestHost, resolveVirtualPath } from "../../src/testing/index.js";
 
 const fetchMock = vi.fn().mockResolvedValue({
-  json: () => Promise.resolve({ name: "mock-pkg", version: "1.0.0" }),
+  json: () => Promise.resolve({ name: "mock-pkg", version: "latest" }),
 });
-
 
 let testHost: TestHost;
 beforeEach(async () => {
-   vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("fetch", fetchMock);
   testHost = await createTestHost();
 });
 
