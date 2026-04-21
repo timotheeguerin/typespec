@@ -13,17 +13,15 @@ const fetchMock = vi.fn().mockResolvedValue({
   json: () => Promise.resolve({ name: "mock-pkg", version: "1.0.0" }),
 });
 
-beforeEach(() => {
-  vi.stubGlobal("fetch", fetchMock);
+
+let testHost: TestHost;
+beforeEach(async () => {
+   vi.stubGlobal("fetch", fetchMock);
+  testHost = await createTestHost();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-});
-
-let testHost: TestHost;
-beforeEach(async () => {
-  testHost = await createTestHost();
 });
 
 function getOutputFile(path: string): string | undefined {
