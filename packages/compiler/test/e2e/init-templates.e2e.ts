@@ -3,10 +3,14 @@ import { SpawnOptions, spawn } from "child_process";
 import { rm } from "fs/promises";
 import { dirname, resolve } from "pathe";
 import { fileURLToPath } from "url";
-import { beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it, vi } from "vitest";
 import { NodeHost } from "../../src/index.js";
 import { getTypeSpecCoreTemplates } from "../../src/init/core-templates.js";
 import { makeScaffoldingConfig, scaffoldNewProject } from "../../src/init/scaffold.js";
+
+const fetchMock = vi.fn().mockResolvedValue({
+  json: () => Promise.resolve({ name: "mock-pkg", version: "1.0.0" }),
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const testTempRoot = resolve(__dirname, "../../temp/scaffolded-template-tests");
@@ -106,14 +110,22 @@ describe("Init templates e2e tests", () => {
     };
   }
 
-  describe("create templates", () => {
+  describe("create template snapshots", () => {
     beforeAll(async () => {
+      vi.stubGlobal("fetch", fetchMock);
       await rm(snapshotFolder, { recursive: true, force: true });
+    });
+
+    afterAll(() => {
+      vi.unstubAllGlobals();
     });
 
     it("rest", () => scaffoldTemplateSnapshot("rest"));
     it("emitter-ts", () => scaffoldTemplateSnapshot("emitter-ts"));
     it("library-ts", () => scaffoldTemplateSnapshot("library-ts"));
+  });
+
+  describe("validate templates", () => {
     it("validate rest template", async () => {
       const fixture = await scaffoldTemplateForTest("rest");
       await fixture.checkCommand("npm", ["install"]);
