@@ -15,23 +15,37 @@ namespace TypeSpec.Helpers.JsonConverters
     public class NumericConstraintAttribute<T> : JsonConverterAttribute where T: struct, INumber<T>
     {
         T? _minValue = null, _maxValue = null;
+
         public NumericConstraintAttribute() { }
+
         /// <summary>
         /// Provides the minimum value
         /// </summary>
-        public T MinValue { get { return _minValue.HasValue ? _minValue.Value : default(T); } set { _minValue = value; } }
+        public T MinValue
+        {
+            get { return _minValue.HasValue ? _minValue.Value : default(T); }
+            set { _minValue = value; }
+        }
+
         /// <summary>
         /// Provides the maximum allowed value
         /// </summary>
-        public T MaxValue { get { return _maxValue.HasValue ? _maxValue.Value : default(T); } set { _maxValue = value; } }
+        public T MaxValue
+        {
+            get { return _maxValue.HasValue ? _maxValue.Value : default(T); }
+            set { _maxValue = value; }
+        }
+
         /// <summary>
         /// If true, then values greater than but not equal to the minimum value are allowed
         /// </summary>
         public bool MinValueExclusive { get; set; }
+
         /// <summary>
         /// If true, values less than, but not equal to the provided maximum are allowed
         /// </summary>
         public bool MaxValueExclusive { get; set; }
+
         public override JsonConverter? CreateConverter(Type typeToConvert)
         {
             return new NumericJsonConverter<T>(_minValue, _maxValue, MinValueExclusive, MaxValueExclusive);
@@ -41,6 +55,7 @@ namespace TypeSpec.Helpers.JsonConverters
     public class NumericJsonConverter<T> : JsonConverter<T> where T : struct, INumber<T>
     {
         string _rangeString;
+
         public NumericJsonConverter(T? minValue = null, T? maxValue = null, bool? minValueExclusive = false, bool? maxValueExclusive = false, JsonSerializerOptions? options = null)
         {
             MinValue = minValue;
@@ -53,16 +68,25 @@ namespace TypeSpec.Helpers.JsonConverters
                 InnerConverter = options.GetConverter(typeof(T)) as JsonConverter<T>;
             }
         }
+
         protected T? MinValue { get; }
         protected bool MinValueExclusive { get; }
         protected T? MaxValue { get; }
+
         protected bool MaxValueExclusive { get; }
+
         private JsonConverter<T>? InnerConverter { get; set; }
+
         private JsonConverter<T> GetInnerConverter(JsonSerializerOptions options)
         {
-            if (InnerConverter == null) { InnerConverter = (JsonConverter<T>)options.GetConverter(typeof(T)); }
+            if (InnerConverter == null)
+            {
+                InnerConverter = (JsonConverter<T>)options.GetConverter(typeof(T));
+            }
+
             return InnerConverter;
         }
+
         public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var inner = GetInnerConverter(options);
@@ -70,11 +94,13 @@ namespace TypeSpec.Helpers.JsonConverters
             ValidateRange(candidate);
             return candidate;
         }
+
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
         {
             ValidateRange(value);
             GetInnerConverter(options).Write(writer, value, options);
         }
+
         protected virtual void ValidateRange(T value)
         {
             if ((MinValue.HasValue && (value < MinValue.Value || (value == MinValue.Value && MinValueExclusive)))
