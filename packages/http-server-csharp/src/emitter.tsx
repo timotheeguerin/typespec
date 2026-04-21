@@ -202,7 +202,9 @@ function ControllersAndInterfaces(): any {
       </SourceDirectory>
       <SourceDirectory path="operations">
         <For each={interfaceOps}>
-          {({ iface, ops }) => (
+          {({ iface, ops }) => {
+            const hasMultipart = ops.some(op => op.requestParameters.body?.bodyKind === "multipart");
+            return (
             <CSharpFile
               path={`I${iface.name}.cs`}
               using={[
@@ -212,17 +214,21 @@ function ControllersAndInterfaces(): any {
                 "System.Text.Json.Nodes",
                 "System.Text.Json.Serialization",
                 "System.Threading.Tasks",
+                ...(hasMultipart ? ["Microsoft.AspNetCore.WebUtilities"] : []),
               ]}
             >
               <BusinessLogicInterface type={iface} canonicalOps={ops} />
             </CSharpFile>
-          )}
+            );
+          }}
         </For>
       </SourceDirectory>
       <SourceDirectory path="controllers">
         <Namespace name="Controllers">
           <For each={interfaceOps}>
-            {({ iface, ops }) => (
+            {({ iface, ops }) => {
+              const hasMultipart = ops.some(op => op.requestParameters.body?.bodyKind === "multipart");
+              return (
               <CSharpFile
                 path={`${iface.name}Controller.cs`}
                 using={[
@@ -233,12 +239,14 @@ function ControllersAndInterfaces(): any {
                   "System.Text.Json.Nodes",
                   "System.Text.Json.Serialization",
                   "Microsoft.AspNetCore.Mvc",
+                  ...(hasMultipart ? ["Microsoft.AspNetCore.WebUtilities", "Microsoft.AspNetCore.Http.Extensions"] : []),
                   ...(parentNamespace ? [parentNamespace] : []),
                 ]}
               >
                 <Controller type={iface} operations={ops} requestModels={requestModels} />
               </CSharpFile>
-            )}
+              );
+            }}
           </For>
         </Namespace>
       </SourceDirectory>

@@ -546,6 +546,14 @@ function discoverModelsInType(
       if (type.baseModel) {
         discoverModelsInType($, type.baseModel, addModel, visited);
       }
+      // Walk template arguments to discover inner types (e.g., HttpPart<Bar<Foo>> → Bar<Foo>)
+      if (type.templateMapper) {
+        for (const arg of type.templateMapper.args) {
+          if (arg.entityKind === "Type") {
+            discoverModelsInType($, arg, addModel, visited);
+          }
+        }
+      }
     }
   } else if (type.kind === "Union") {
     for (const variant of type.variants.values()) {
@@ -579,6 +587,10 @@ function shouldEmitModel($: ReturnType<typeof useTsp>["$"], model: Model): boole
   if ($.record.is(model)) return false;
   // Skip template declarations (e.g. Foo<T>) — only emit instantiations (e.g. Foo<Toy>)
   if (isTemplateDeclaration(model)) return false;
+  // Skip HttpPart<T> template instantiations — multipart wrapper types, not emitted models
+  if (model.name === "HttpPart" && model.templateMapper) return false;
+  // Skip multipart body container models (all properties are HttpPart<T>)
+  if (isMultipartBodyContainer(model)) return false;
   // Template instantiations are always emittable if they have a name
   if (model.templateMapper) return true;
   // Skip HTTP response-only models (OkResponse, NoContentResponse, etc.)
@@ -587,6 +599,28 @@ function shouldEmitModel($: ReturnType<typeof useTsp>["$"], model: Model): boole
   const nsName = getFullNamespaceName(model.namespace);
   if (nsName.startsWith("TypeSpec.Http") || nsName.startsWith("TypeSpec.Rest")) return false;
   return true;
+}
+
+/** Detects models whose properties are all HttpPart<T> — these are multipart body containers, not emitted as C# types. */
+function isMultipartBodyContainer(model: Model): boolean {
+  if (model.properties.size === 0) return false;
+  for (const prop of model.properties.values()) {
+    if (isHttpPartType(prop.type)) continue;
+    return false;
+  }
+  return true;
+}
+
+/** Checks if a type is HttpPart<T> or an array of HttpPart<T>. */
+function isHttpPartType(type: import("@typespec/compiler").Type): boolean {
+  if (type.kind !== "Model") return false;
+  // Direct HttpPart<T>
+  if (type.name === "HttpPart" && type.templateMapper) return true;
+  // Array of HttpPart<T> — check indexer value
+  if (type.indexer?.value) {
+    return isHttpPartType(type.indexer.value);
+  }
+  return false;
 }
 
 function getFullNamespaceName(ns: TspNamespace | undefined): string {

@@ -473,8 +473,25 @@ function MockMethods(props: MockMethodsProps): Children {
           : code`Task`;
 
         const bodyPropNames = getGetBodyPropNames(name, props.canonicalMap);
+
+        // Check if this is a multipart operation
+        const canonicalOp = props.canonicalMap?.get(name);
+        const isMultipart = canonicalOp?.requestParameters.body?.bodyKind === "multipart";
+        const multipartBodyPropNames = new Set<string>();
+        if (isMultipart && canonicalOp) {
+          for (const p of canonicalOp.requestParameters.properties) {
+            if (p.kind === "body" || p.kind === "bodyRoot" || p.kind === "bodyProperty" || p.kind === "multipartBody") {
+              multipartBodyPropNames.add(p.property.sourceType.name);
+            }
+            if (p.property.isContentTypeProperty) {
+              multipartBodyPropNames.add(p.property.sourceType.name);
+            }
+          }
+        }
+
         const parameters = Array.from(op.parameters.properties.entries())
           .filter(([pName]) => !bodyPropNames.has(pName))
+          .filter(([pName]) => !multipartBodyPropNames.has(pName))
           .map(([pName, prop]) => ({
             name: namePolicy.getName(pName, "parameter"),
             type: (<TypeExpression type={prop.type} />) as Children,
@@ -482,6 +499,15 @@ function MockMethods(props: MockMethodsProps): Children {
           }))
           // Required parameters must come before optional ones in C#
           .sort((a, b) => (a.optional === b.optional ? 0 : a.optional ? 1 : -1));
+
+        // For multipart requests, add MultipartReader parameter
+        if (isMultipart) {
+          parameters.push({
+            name: "reader",
+            type: "MultipartReader" as any as Children,
+            optional: false,
+          });
+        }
 
         const paramList = parameters.map(
           (p, i) => code`${p.type}${p.optional ? "?" : ""} ${p.name}${i < parameters.length - 1 ? ", " : ""}`,

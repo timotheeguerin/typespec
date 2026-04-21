@@ -124,6 +124,9 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
     ? code`Task<${(<TypeExpression type={successType} />)}>`
     : code`Task`;
 
+  // Check if this is a multipart request
+  const isMultipart = props.canonicalOp?.requestParameters.body?.bodyKind === "multipart";
+
   // For GET operations, suppress body parameters entirely
   const isGet = props.canonicalOp?.method === "get";
   const bodyPropNames = new Set<string>();
@@ -144,9 +147,24 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
     }
   }
 
+  // For multipart requests, suppress all body-related params
+  // For all requests, suppress content-type params
+  const filteredPropNames = new Set<string>();
+  if (props.canonicalOp) {
+    for (const p of props.canonicalOp.requestParameters.properties) {
+      if (isMultipart && (p.kind === "body" || p.kind === "bodyRoot" || p.kind === "bodyProperty" || p.kind === "multipartBody")) {
+        filteredPropNames.add(p.property.sourceType.name);
+      }
+      if (p.property.isContentTypeProperty) {
+        filteredPropNames.add(p.property.sourceType.name);
+      }
+    }
+  }
+
   const parameters = Array.from(props.operation.parameters.properties.entries())
     .filter(([name, prop]) => !isVoidType(prop.type))
     .filter(([name]) => !bodyPropNames.has(name))
+    .filter(([name]) => !filteredPropNames.has(name))
     .map(([pName, prop]) => {
       const isUnique = getUniqueItems($.program, prop);
       const isArrayType = prop.type.kind === "Model" && $.array.is(prop.type);
@@ -164,6 +182,15 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
     })
     // Required parameters must come before optional ones in C#
     .sort((a, b) => (a.optional === b.optional ? 0 : a.optional ? 1 : -1));
+
+  // For multipart requests, add MultipartReader parameter
+  if (isMultipart) {
+    parameters.push({
+      name: "reader",
+      type: "MultipartReader" as any as Children,
+      optional: false,
+    });
+  }
 
   return (
     <cs.InterfaceMethod

@@ -1,5 +1,6 @@
 import { code, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
+import type { Type } from "@typespec/compiler";
 import { isErrorModel, isVoidType } from "@typespec/compiler";
 import type {
   CanonicalHttpProperty,
@@ -34,6 +35,54 @@ function getBindingAttribute(prop: CanonicalHttpProperty): string | undefined {
     default:
       return undefined;
   }
+}
+
+/**
+ * Gets the literal default value string for a parameter type, if applicable.
+ * Only returns values for compile-time constant types (string, number, bool).
+ * Arrays/tuples are NOT valid C# parameter defaults.
+ */
+function getLiteralDefaultValue(type: Type): string | undefined {
+  switch (type.kind) {
+    case "String":
+      return `"${type.value}"`;
+    case "StringTemplate": {
+      if (type.stringValue !== undefined) {
+        return `"${type.stringValue}"`;
+      }
+      // Try to resolve the template by concatenating span values
+      let resolved = "";
+      for (const span of type.spans) {
+        if (span.isInterpolated) {
+          // The interpolated value could be a ModelProperty reference
+          let spanType = span.type;
+          if (spanType.kind === "ModelProperty") {
+            spanType = spanType.type;
+          }
+          const spanDefault = getLiteralDefaultValue(spanType);
+          if (spanDefault === undefined) return undefined;
+          // Strip quotes from the resolved value
+          resolved += spanDefault.replace(/^"|"$/g, "");
+        } else {
+          resolved += span.type.value;
+        }
+      }
+      return `"${resolved}"`;
+    }
+    case "Number":
+      return type.valueAsString;
+    case "Boolean":
+      return type.value ? "true" : "false";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Checks if a parameter has a literal default value (i.e., its type is a literal).
+ */
+function hasLiteralDefault(type: Type): boolean {
+  return getLiteralDefaultValue(type) !== undefined;
 }
 
 /**
@@ -103,11 +152,13 @@ export function ControllerAction(props: ControllerActionProps): Children {
   const isGet = props.operation.method === "get";
 
   // Map all HTTP parameters (path, query, header) to C# method parameters
-  const pathParams: { name: string; type: Children; attributes?: string[]; optional?: boolean }[] = [];
-  const queryHeaderParams: { name: string; type: Children; attributes?: string[]; optional?: boolean }[] = [];
+  type ParamInfo = { name: string; type: Children; attributes?: string[]; optional?: boolean; default?: Children };
+  const pathParams: ParamInfo[] = [];
+  const queryHeaderParams: ParamInfo[] = [];
   for (const p of props.operation.requestParameters.properties) {
     if (p.property.isContentTypeProperty) continue;
     const isOptional = p.property.sourceType.optional;
+    const literalDefault = getLiteralDefaultValue(p.property.sourceType.type);
     if (p.kind === "path") {
       const attr = getBindingAttribute(p);
       pathParams.push({
@@ -115,6 +166,7 @@ export function ControllerAction(props: ControllerActionProps): Children {
         type: (<TypeExpression type={p.property.sourceType.type} />) as Children,
         attributes: attr ? [attr] : undefined,
         optional: isOptional,
+        default: literalDefault,
       });
     } else if (p.kind === "query" || p.kind === "header") {
       const attr = getBindingAttribute(p);
@@ -123,18 +175,27 @@ export function ControllerAction(props: ControllerActionProps): Children {
         type: (<TypeExpression type={p.property.sourceType.type} />) as Children,
         attributes: attr ? [attr] : undefined,
         optional: isOptional,
+        default: literalDefault,
       });
     }
   }
-  // Default: path params, then query/header params
-  let parameters: { name: string; type: Children; attributes?: string[]; optional?: boolean }[] = [
+  // Required params (no default) first, then params with defaults
+  const sortByDefault = (a: ParamInfo, b: ParamInfo) => {
+    const aHasDefault = a.default !== undefined || a.optional;
+    const bHasDefault = b.default !== undefined || b.optional;
+    if (aHasDefault === bHasDefault) return 0;
+    return aHasDefault ? 1 : -1;
+  };
+  // Default: path params, then query/header params (sorted by default presence)
+  let parameters: ParamInfo[] = [
     ...pathParams,
-    ...queryHeaderParams,
+    ...queryHeaderParams.sort(sortByDefault),
   ];
 
   // Add body parameter if present (but NOT for GET requests)
   const body = props.operation.requestParameters.body;
   let callArgs: string;
+  const isMultipart = !isGet && body?.bodyKind === "multipart";
   const isBodyRoot = !isGet && body?.bodyKind === "single" && body.bodies.length > 0 &&
     props.operation.requestParameters.properties.some((p) => p.kind === "bodyRoot");
   const hasExplicitBody = !isGet && body?.bodyKind === "single" && body.bodies.length > 0 &&
@@ -143,6 +204,9 @@ export function ControllerAction(props: ControllerActionProps): Children {
   if (isGet) {
     // GET requests suppress body parameters entirely
     callArgs = parameters.map((p) => p.name).join(", ");
+  } else if (isMultipart) {
+    // Multipart body: don't add body as parameter — we'll create a MultipartReader in the method body
+    callArgs = [...parameters.map((p) => p.name), "reader"].join(", ");
   } else if (isBodyRoot) {
     // @bodyRoot — the whole model is the body, no other HTTP params extracted
     parameters = [{ name: "body", type: (<TypeExpression type={body!.bodies[0].type.sourceType} />) as Children }];
@@ -211,24 +275,44 @@ export function ControllerAction(props: ControllerActionProps): Children {
     code`[${verb}]`,
     code`[Route("${route}")]`,
   ];
+  if (isMultipart) {
+    attributes.push(code`[Consumes("multipart/form-data")]`);
+  }
   if (responseTypeExpr) {
     attributes.push(code`[ProducesResponseType((int)HttpStatusCode.${responseStatusCode}, Type = typeof(${responseTypeExpr}))]`);
   } else {
     attributes.push(code`[ProducesResponseType((int)HttpStatusCode.${responseStatusCode}, Type = typeof(void))]`);
   }
 
-  // Generate the return statement based on status code
-  let returnStatement: Children;
-  if (!hasBody && statusCode === 202) {
-    returnStatement = code`await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Accepted();`;
-  } else if (!hasBody) {
-    returnStatement = code`await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return NoContent();`;
-  } else if (statusCode === 202) {
-    returnStatement = code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Accepted(result);`;
-  } else if (statusCode !== undefined && statusCode !== 200) {
-    returnStatement = code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return StatusCode(${statusCode}, result);`;
+  // Generate the method body
+  let methodBody: Children;
+  if (isMultipart) {
+    // Multipart body: parse boundary and create MultipartReader
+    const implCall = hasBody
+      ? code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return ${responseStatusCode === "Accepted" ? "Accepted" : "Ok"}(result);`
+      : code`await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return ${responseStatusCode === "NoContent" ? "NoContent" : "Ok"}();`;
+    methodBody = code`var boundary = Request.GetMultipartBoundary();
+if (boundary == null)
+{
+   return BadRequest("Request missing multipart boundary");
+}
+
+
+var reader = new MultipartReader(boundary, Request.Body);
+${implCall}`;
   } else {
-    returnStatement = code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Ok(result);`;
+    // Non-multipart: generate the return statement based on status code
+    if (!hasBody && statusCode === 202) {
+      methodBody = code`await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Accepted();`;
+    } else if (!hasBody) {
+      methodBody = code`await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return NoContent();`;
+    } else if (statusCode === 202) {
+      methodBody = code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Accepted(result);`;
+    } else if (statusCode !== undefined && statusCode !== 200) {
+      methodBody = code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return StatusCode(${statusCode}, result);`;
+    } else {
+      methodBody = code`var result = await ${props.implFieldName}.${opName}Async(${callArgs});${"\n"}return Ok(result);`;
+    }
   }
 
   return (
@@ -242,7 +326,7 @@ export function ControllerAction(props: ControllerActionProps): Children {
       attributes={attributes}
       doc={getDocComment($, props.operation.sourceType)}
     >
-      {returnStatement}
+      {methodBody}
     </cs.Method>
   );
 }
