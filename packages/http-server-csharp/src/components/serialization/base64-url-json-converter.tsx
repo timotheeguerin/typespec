@@ -15,28 +15,38 @@ export function Base64UrlJsonConverter(): Children {
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
           /// <summary>
-          /// System.Text.Json converter for properties using Base64Url encoding
+          /// System.Text.Json converter for the properties using Base64Url encoding
           /// </summary>
           public class Base64UrlJsonConverter : JsonConverter<byte[]>
           {
-            public override byte[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            /// <summary>
+            /// Adds padding to the input
+            /// </summary>
+            /// <param name="input"> the input string </param>
+            /// <returns> the padded string </returns>
+            private static string Pad(string input)
             {
-              string? base64Url = reader.GetString();
-              if (base64Url == null) return Array.Empty<byte>();
-              string base64 = base64Url.Replace('-', '+').Replace('_', '/');
-              switch (base64.Length % 4)
+              var count = 3 - ((input.Length + 3) % 4);
+              if (count == 0)
               {
-                case 2: base64 += "=="; break;
-                case 3: base64 += "="; break;
+                return input;
               }
-              return Convert.FromBase64String(base64);
+              return $"{input}{new string('=', count)}";
+            }
+
+            public override byte[]? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+              if (typeToConvert != typeof(byte[]))
+                throw new ArgumentException($"Cannot apply converter {this.GetType().FullName} to type {typeToConvert.FullName}");
+              var value = reader.GetString();
+              if (string.IsNullOrWhiteSpace(value))
+                return null;
+              return Convert.FromBase64String(Pad(value.Replace('-', '+').Replace('_', '/')));
             }
 
             public override void Write(Utf8JsonWriter writer, byte[] value, JsonSerializerOptions options)
             {
-              string base64 = Convert.ToBase64String(value);
-              string base64Url = base64.Replace('+', '-').Replace('/', '_').TrimEnd('=');
-              writer.WriteStringValue(base64Url);
+              writer.WriteStringValue(Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_'));
             }
           }
         `}

@@ -3093,8 +3093,12 @@ describe("emit correct code for `@error` models", () => {
       `,
       "Error.cs",
       [
-        `public Error(string code, string message, string optionalMessage = default, string defined = "default message")`,
-        `: base(200, value: new { code = code, message = message, optionalMessage = optionalMessage, defined = defined })`,
+        `public Error(`,
+        `string code,`,
+        `string message,`,
+        `string optionalMessage = default,`,
+        `string defined = "default message"`,
+        `) : base(200, value: new { code = code, message = message, optionalMessage = optionalMessage, defined = defined })`,
       ],
     );
   });
@@ -3111,8 +3115,12 @@ describe("emit correct code for `@error` models", () => {
       `,
       "Error.cs",
       [
-        `public Error(string code, string customHeader)`,
-        `: base(200, headers: new() { {"x-ms-error-code", code}, {"custom-header", customHeader} })`,
+        `public Error(`,
+        `string code,`,
+        `string customHeader`,
+        `) : base(`,
+        `200,`,
+        `headers: new() { {"x-ms-error-code", code}, {"custom-header", customHeader} }`,
       ],
     );
   });
@@ -3177,8 +3185,21 @@ describe("emit correct code for `@error` models", () => {
       `,
       "Error.cs",
       [
-        `public Error(string code, string message, string value, string headers, string stackTrace, string source, string innerException, string hResult, string data, string targetSite, string helpLink)`,
-        `: base(200, value: new { code = code, message = message, value = value, headers = headers, stackTrace = stackTrace, source = source, innerException = innerException, hResult = hResult, data = data, targetSite = targetSite, helpLink = helpLink })`,
+        `public Error(`,
+        `string code,`,
+        `string message,`,
+        `string value,`,
+        `string headers,`,
+        `string stackTrace,`,
+        `string source,`,
+        `string innerException,`,
+        `string hResult,`,
+        `string data,`,
+        `string targetSite,`,
+        `string helpLink`,
+        `) : base(`,
+        `200,`,
+        `value: new { code = code, message = message, value = value, headers = headers, stackTrace = stackTrace, source = source, innerException = innerException, hResult = hResult, data = data, targetSite = targetSite, helpLink = helpLink }`,
         `Code = code;`,
         `MessageProp = message;`,
         `ValueName = value;`,

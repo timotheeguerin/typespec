@@ -5,16 +5,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TypeSpec.Helpers.JsonConverters
-{
+namespace TypeSpec.Helpers.JsonConverters {
     /// <summary>
     /// Constrains the number of elements in an array
     /// </summary>
     /// <typeparam name="T">The element type of the array</typeparam>
     public class ArrayConstraintAttribute<T> : JsonConverterAttribute
     {
-        int? _minItems = null,
-            _maxItems = null;
+        int? _minItems = null, _maxItems = null;
 
         /// <summary>
         /// The smallest number of allowed items
@@ -53,8 +51,7 @@ namespace TypeSpec.Helpers.JsonConverters
         }
     }
 
-    public abstract class ConstrainedCollectionConverter<T, TCollection>
-        : JsonConverter<TCollection>
+    public abstract class ConstrainedCollectionConverter<T, TCollection> : JsonConverter<TCollection>
     {
         protected ConstrainedCollectionConverter(int? min, int? max)
         {
@@ -62,15 +59,10 @@ namespace TypeSpec.Helpers.JsonConverters
             _maxItems = max;
         }
 
-        protected int? _minItems,
-            _maxItems;
+        protected int? _minItems, _maxItems;
         public JsonConverter<T>? InnerConverter { get; set; }
 
-        public virtual Func<
-            ConstrainedCollectionConverter<T, TCollection>,
-            JsonSerializerOptions,
-            JsonConverter<T>
-        > InnerConverterFactory { get; set; } =
+        public virtual Func<ConstrainedCollectionConverter<T, TCollection>, JsonSerializerOptions, JsonConverter<T>> InnerConverterFactory { get; set; } =
             ConverterHelpers.GetStandardInnerConverter<T, TCollection>;
 
         protected bool ValidateMin(int count)
@@ -87,17 +79,11 @@ namespace TypeSpec.Helpers.JsonConverters
         {
             if (!ValidateMax(count) || !ValidateMin(count))
             {
-                throw new JsonException(
-                    $"Number of array elements not in range [{(_minItems.HasValue ? _minItems.Value : 0)}, {(_maxItems.HasValue ? _maxItems.Value : Array.MaxLength)}]"
-                );
+                throw new JsonException($"Number of array elements not in range [{(_minItems.HasValue ? _minItems.Value : 0)}, {(_maxItems.HasValue ? _maxItems.Value : Array.MaxLength)}]");
             }
         }
 
-        public override TCollection? Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
+        public override TCollection? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var _innerConverter = InnerConverterFactory(this, options);
             if (reader.TokenType != JsonTokenType.StartArray)
@@ -126,11 +112,7 @@ namespace TypeSpec.Helpers.JsonConverters
             return ConvertToCollection(list);
         }
 
-        public override void Write(
-            Utf8JsonWriter writer,
-            TCollection value,
-            JsonSerializerOptions options
-        )
+        public override void Write(Utf8JsonWriter writer, TCollection value, JsonSerializerOptions options)
         {
             var _innerConverter = InnerConverterFactory(this, options);
             writer.WriteStartArray();
@@ -143,11 +125,9 @@ namespace TypeSpec.Helpers.JsonConverters
         protected abstract IEnumerable<T> GetEnumerable(TCollection collection);
     }
 
-    public class ConstrainedEnumerableConverter<T>
-        : ConstrainedCollectionConverter<T, IEnumerable<T>>
+    public class ConstrainedEnumerableConverter<T> : ConstrainedCollectionConverter<T, IEnumerable<T>>
     {
-        public ConstrainedEnumerableConverter(int? min, int? max)
-            : base(min, max) { }
+        public ConstrainedEnumerableConverter(int? min, int? max) : base(min, max) { }
 
         protected override IEnumerable<T> ConvertToCollection(List<T> list) => list;
 
@@ -156,8 +136,7 @@ namespace TypeSpec.Helpers.JsonConverters
 
     public class ConstrainedSetConverter<T> : ConstrainedCollectionConverter<T, ISet<T>>
     {
-        public ConstrainedSetConverter(int? min, int? max)
-            : base(min, max) { }
+        public ConstrainedSetConverter(int? min, int? max) : base(min, max) { }
 
         protected override ISet<T> ConvertToCollection(List<T> list) => new HashSet<T>(list);
 
@@ -166,8 +145,7 @@ namespace TypeSpec.Helpers.JsonConverters
 
     public class ConstrainedStandardArrayConverter<T> : ConstrainedCollectionConverter<T, T[]>
     {
-        public ConstrainedStandardArrayConverter(int? min, int? max)
-            : base(min, max) { }
+        public ConstrainedStandardArrayConverter(int? min, int? max) : base(min, max) { }
 
         protected override T[] ConvertToCollection(List<T> list) => list.ToArray();
 
@@ -176,10 +154,7 @@ namespace TypeSpec.Helpers.JsonConverters
 
     internal static class ConverterHelpers
     {
-        internal static JsonConverter<T> GetStandardInnerConverter<T, TCollection>(
-            this ConstrainedCollectionConverter<T, TCollection> converter,
-            JsonSerializerOptions options
-        )
+        internal static JsonConverter<T> GetStandardInnerConverter<T, TCollection>(this ConstrainedCollectionConverter<T, TCollection> converter, JsonSerializerOptions options)
         {
             if (converter.InnerConverter == null)
             {

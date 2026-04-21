@@ -1,5 +1,6 @@
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
+import type { ParameterProps } from "@alloy-js/csharp";
 import { getDoc, getFriendlyName, getMinValue, isErrorModel, isStdNamespace, isTemplateDeclaration, isVoidType, type Model, type ModelProperty, type Namespace as TspNamespace, type Program, type Union } from "@typespec/compiler";
 import { isStatusCode, isHeader, getHeaderFieldName } from "@typespec/http";
 import { getUniqueItems } from "@typespec/json-schema";
@@ -174,12 +175,17 @@ function ServerClassDeclaration(props: { type: Model; emitName?: string }): Chil
     >
       {errorConstructor}
       {errorConstructor ? <hbr /> : undefined}
-      {hasChildConstructor ? code`
-        public ${className}(int statusCode, object? value = null, Dictionary<string, string>? headers = default)
-            : base(statusCode, value, headers)
-        {
-        }
-      ` : undefined}
+      {hasChildConstructor ? (
+        <cs.Constructor
+          public
+          parameters={[
+            { name: "statusCode", type: "int" },
+            { name: "value", type: "object?", default: "null" },
+            { name: "headers", type: "Dictionary<string, string>?", default: "default" },
+          ]}
+          baseConstructor={["statusCode", "value", "headers"]}
+        />
+      ) : undefined}
       {hasChildConstructor ? <hbr /> : undefined}
       <For each={properties} doubleHardline>
         {([_, property]) => {
@@ -634,7 +640,7 @@ function getErrorStatusCode(program: Program, model: Model): { value: string | n
   return { value: minVal ?? "default" };
 }
 
-/** Generates the constructor string for an error model. */
+/** Generates the constructor for an error model. */
 function getErrorConstructor(program: Program, model: Model, className: string): Children {
   const statusCode = getErrorStatusCode(program, model);
   const isChild = model.baseModel && isErrorModel(program, model.baseModel);
@@ -662,13 +668,13 @@ function getErrorConstructor(program: Program, model: Model, className: string):
       return 0;
     });
 
-  const paramParts: string[] = [];
+  const parameters: ParameterProps[] = [];
   const bodyParts: string[] = [];
   const headerParts: string[] = [];
   const valueParts: string[] = [];
 
   if (statusCode?.requiresConstructorArgument) {
-    paramParts.push(`int ${statusCode.value}`);
+    parameters.push({ name: String(statusCode.value), type: "int" });
   }
 
   for (const { prop, defaultValue } of sortedProps) {
@@ -679,9 +685,9 @@ function getErrorConstructor(program: Program, model: Model, className: string):
 
     const csharpType = getCSharpTypeString(program, prop.type);
     const defaultStr = defaultValue
-      ? ` = ${defaultValue}`
-      : prop.optional ? " = default" : "";
-    paramParts.push(`${csharpType} ${prop.name}${defaultStr}`);
+      ? defaultValue
+      : prop.optional ? "default" : undefined;
+    parameters.push({ name: prop.name, type: csharpType, default: defaultStr });
     bodyParts.push(`${propName} = ${prop.name};`);
 
     if (isHeader(program, prop)) {
@@ -703,20 +709,21 @@ function getErrorConstructor(program: Program, model: Model, className: string):
     baseArgs.push(`value: new { ${valueParts.join(", ")} }`);
   }
 
-  const baseCall = isChild
-    ? `base(${statusCodeStr})`
-    : `base(${baseArgs.join(", ")})`;
+  const baseConstructorArgs = isChild
+    ? [String(statusCodeStr)]
+    : baseArgs;
 
-  const params = paramParts.join(", ");
   const body = bodyParts.join("\n");
 
-  return code`
-    public ${className}(${params})
-        : ${baseCall}
-    {
-        ${body}
-    }
-  `;
+  return (
+    <cs.Constructor
+      public
+      parameters={parameters}
+      baseConstructor={baseConstructorArgs}
+    >
+      {body}
+    </cs.Constructor>
+  );
 }
 
 /** Gets a simple C# type name string for a TypeSpec type. */

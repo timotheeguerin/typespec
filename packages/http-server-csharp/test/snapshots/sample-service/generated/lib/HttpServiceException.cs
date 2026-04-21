@@ -5,8 +5,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
-namespace TypeSpec.Helpers
-{
+namespace TypeSpec.Helpers {
     /// <summary>
     /// Represents an HTTP response exception with a status code and optional value.
     /// </summary>
@@ -17,16 +16,8 @@ namespace TypeSpec.Helpers
         /// </summary>
         /// <param name="statusCode">The HTTP status code.</param>
         /// <param name="value">The optional value to include in the response.</param>
-        public HttpServiceException(
-            int statusCode,
-            object? value = null,
-            Dictionary<string, string>? headers = null
-        ) =>
-            (StatusCode, Value, Headers) = (
-                statusCode,
-                value,
-                headers ?? new Dictionary<string, string>()
-            );
+        public HttpServiceException(int statusCode, object? value = null, Dictionary<string, string>? headers = null) =>
+            (StatusCode, Value, Headers) = (statusCode, value, headers ?? new Dictionary<string, string>());
 
         public int StatusCode { get; }
 
@@ -50,10 +41,7 @@ namespace TypeSpec.Helpers
             {
                 foreach (var header in httpServiceException.Headers)
                 {
-                    context.HttpContext.Response.Headers.Append(
-                        header.Key,
-                        header.Value.ToString()
-                    );
+                    context.HttpContext.Response.Headers.Append(header.Key, header.Value.ToString());
                 }
 
                 context.Result = new ObjectResult(httpServiceException.Value)

@@ -27,37 +27,39 @@ export function HttpServiceExceptionFilter(): Children {
             /// <param name="value">The optional value to include in the response.</param>
             public HttpServiceException(int statusCode, object? value = null, Dictionary<string, string>? headers = null) =>
               (StatusCode, Value, Headers) = (statusCode, value, headers ?? new Dictionary<string, string>());
+
             public int StatusCode { get; }
+
             public object? Value { get; }
+
             public Dictionary<string, string> Headers { get; }
           }
 
           /// <summary>
           /// An action filter that handles HttpServiceException and converts it to an HTTP response.
           /// </summary>
-          public class HttpServiceExceptionFilter : IExceptionFilter
+          public class HttpServiceExceptionFilter : IActionFilter, IOrderedFilter
           {
-            public void OnException(ExceptionContext context)
+            public int Order => int.MaxValue - 10;
+
+            public void OnActionExecuting(ActionExecutingContext context) { }
+
+            public void OnActionExecuted(ActionExecutedContext context)
             {
-              if (context.Exception is HttpServiceException httpException)
+              if (context.Exception is HttpServiceException httpServiceException)
               {
-                context.Result = new ObjectResult(httpException.Value)
+                foreach (var header in httpServiceException.Headers)
                 {
-                  StatusCode = httpException.StatusCode
-                };
-                foreach (var header in httpException.Headers)
-                {
-                  context.HttpContext.Response.Headers[header.Key] = header.Value;
+                  context.HttpContext.Response.Headers.Append(header.Key, header.Value.ToString());
                 }
-              }
-              else
-              {
-                context.Result = new ObjectResult(new { error = context.Exception.Message })
+
+                context.Result = new ObjectResult(httpServiceException.Value)
                 {
-                  StatusCode = 500
+                  StatusCode = httpServiceException.StatusCode,
                 };
+
+                context.ExceptionHandled = true;
               }
-              context.ExceptionHandled = true;
             }
           }
         `}

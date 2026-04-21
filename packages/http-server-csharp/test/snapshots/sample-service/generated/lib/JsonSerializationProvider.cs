@@ -5,8 +5,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TypeSpec.Helpers
-{
+namespace TypeSpec.Helpers {
     /// <summary>
     /// Standard implementation of IJsonSerializationProvider
     /// </summary>
@@ -15,12 +14,11 @@ namespace TypeSpec.Helpers
         /// <summary>
         /// The options to use for serialization
         /// </summary>
-        public virtual JsonSerializerOptions Options { get; } =
-            new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            };
+        public virtual JsonSerializerOptions Options { get; } = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
 
         /// <summary>
         /// Create an object from a json string

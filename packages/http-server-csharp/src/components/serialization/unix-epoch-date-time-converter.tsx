@@ -16,7 +16,7 @@ export function UnixEpochDateTimeConverter(): Children {
         <Namespace name="TypeSpec.Helpers.JsonConverters">
           {code`
             /// <summary>
-            /// Converts between Unix epoch timestamps and DateTime values
+            /// Converts between an integer timestamp and a .Net DateTime
             /// </summary>
             public sealed class UnixEpochDateTimeConverter : JsonConverter<DateTime>
             {
@@ -44,19 +44,22 @@ export function UnixEpochDateTimeConverter(): Children {
         <Namespace name="TypeSpec.Helpers.JsonConverters">
           {code`
             /// <summary>
-            /// Converts between Unix epoch timestamps and DateTimeOffset values
+            /// Converts between a Unix TimeStamp and a .Net DateTimeOffset
             /// </summary>
-            public class UnixEpochDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
+            public sealed class UnixEpochDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
             {
+              static readonly DateTimeOffset s_epoch = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
               public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
               {
-                long unixTime = reader.GetInt64();
-                return DateTimeOffset.FromUnixTimeSeconds(unixTime);
+                var formatted = reader.GetInt64()!;
+                return s_epoch.AddMilliseconds(formatted);
               }
 
               public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
               {
-                writer.WriteNumberValue(value.ToUnixTimeSeconds());
+                long unixTime = Convert.ToInt64((value - s_epoch).TotalMilliseconds);
+                writer.WriteNumberValue(unixTime);
               }
             }
           `}

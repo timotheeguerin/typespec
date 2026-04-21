@@ -110,55 +110,128 @@ function StringConstraintAttribute(): Children {
   return (
     <CSharpFile
       path="StringConstraintAttribute.cs"
-      using={["System.Text.Json", "System.Text.Json.Serialization", "System.Text.RegularExpressions"]}
+      using={["System.Text.Json", "System.Text.Json.Serialization"]}
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
           /// <summary>
-          /// Provides constraints for string values
+          /// Provides constraints for a string values property
           /// </summary>
-          public class StringConstraintAttribute : JsonConverterAttribute
+          public class StringConstraint : JsonConverterAttribute
           {
-            public int MinLength { get; set; }
-            public int MaxLength { get; set; }
+            int? _minLength = null, _maxLength = null;
+
+            public StringConstraint() { }
+
+            /// <summary>
+            /// The minimum length of the string
+            /// </summary>
+            public int MinLength
+            {
+              get { return _minLength.HasValue ? _minLength.Value : 0; }
+              set { _minLength = value; }
+            }
+
+            /// <summary>
+            /// The maximum length of the string
+            /// </summary>
+            public int MaxLength
+            {
+              get { return _maxLength.HasValue ? _maxLength.Value : 0; }
+              set { _maxLength = value; }
+            }
+
             /// <summary>
             /// The pattern that the string must match
             /// </summary>
             public string? Pattern { get; set; }
+
             public override JsonConverter? CreateConverter(Type typeToConvert)
             {
-              return new ConstrainedStringJsonConverter(MinLength, MaxLength, Pattern);
+              return new StringJsonConverter(_minLength, _maxLength, Pattern);
             }
           }
 
-          public class ConstrainedStringJsonConverter : JsonConverter<string>
+          public class StringJsonConverter : JsonConverter<string>
           {
-            public ConstrainedStringJsonConverter(int minLength = 0, int maxLength = int.MaxValue, string? pattern = null)
+            public StringJsonConverter(int? minLength, int? maxLength, string? pattern, JsonSerializerOptions? options = null)
             {
               MinLength = minLength;
               MaxLength = maxLength;
               Pattern = pattern;
+              if (options != null)
+              {
+                InnerConverter = options.GetConverter(typeof(string)) as JsonConverter<string>;
+              }
             }
-            protected int MinLength { get; }
-            protected int MaxLength { get; }
+
+            protected int? MinLength { get; }
+            protected int? MaxLength { get; }
             protected string? Pattern { get; }
+
+            private JsonConverter<string>? InnerConverter { get; set; }
+
+            private JsonConverter<string> GetInnerConverter(JsonSerializerOptions options)
+            {
+              if (InnerConverter == null)
+              {
+                InnerConverter = (JsonConverter<string>)options.GetConverter(typeof(string));
+              }
+
+              return InnerConverter;
+            }
+
+            public override bool CanConvert(Type typeToConvert)
+            {
+              return base.CanConvert(typeToConvert);
+            }
+
             public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
-              string? candidate = reader.GetString();
-              ValidateConstraints(candidate);
+              var innerConverter = GetInnerConverter(options);
+              string? candidate = innerConverter.Read(ref reader, typeToConvert, options);
+              if (MinLength.HasValue && (candidate == null || candidate.Length < MinLength.Value))
+              {
+                throw new JsonException($"String length less than minimum length {MinLength.Value}");
+              }
+
+              if (candidate != null)
+              {
+                if (MaxLength.HasValue && candidate.Length > MaxLength.Value)
+                {
+                  throw new JsonException($"String length greater than maximum length {MaxLength.Value}");
+                }
+
+                if (Pattern != null && !System.Text.RegularExpressions.Regex.IsMatch(candidate, Pattern))
+                {
+                  throw new JsonException($"String does not match pattern {Pattern}");
+                }
+              }
+
               return candidate;
             }
+
             public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
             {
-              ValidateConstraints(value);
-              writer.WriteStringValue(value);
-            }
-            protected virtual void ValidateConstraints(string? value)
-            {
-              if (value == null) return;
-              if (value.Length < MinLength) throw new JsonException($"String length {value.Length} is less than minimum {MinLength}");
-              if (value.Length > MaxLength) throw new JsonException($"String length {value.Length} is greater than maximum {MaxLength}");
-              if (Pattern != null && !Regex.IsMatch(value, Pattern)) throw new JsonException($"String '{value}' does not match pattern '{Pattern}'");
+              if (MinLength.HasValue && (value == null || value.Length < MinLength.Value))
+              {
+                throw new JsonException($"String length less than minimum length {MinLength.Value}");
+              }
+
+              if (value != null)
+              {
+                if (MaxLength.HasValue && value.Length > MaxLength.Value)
+                {
+                  throw new JsonException($"String length greater than maximum length {MaxLength.Value}");
+                }
+
+                if (Pattern != null && !System.Text.RegularExpressions.Regex.IsMatch(value, Pattern))
+                {
+                  throw new JsonException($"String does not match pattern {Pattern}");
+                }
+
+                GetInnerConverter(options).Write(writer, value, options);
+              }
             }
           }
         `}
@@ -181,45 +254,155 @@ function ArrayConstraintAttribute(): Children {
           /// <typeparam name="T">The element type of the array</typeparam>
           public class ArrayConstraintAttribute<T> : JsonConverterAttribute
           {
+            int? _minItems = null, _maxItems = null;
+
             /// <summary>
             /// The smallest number of allowed items
             /// </summary>
-            public int MinItems { get; set; }
+            public int MinItems
+            {
+              get { return _minItems.HasValue ? _minItems.Value : 0; }
+              set { _minItems = value; }
+            }
+
             /// <summary>
             /// The largest number of allowed items
             /// </summary>
-            public int MaxItems { get; set; } = int.MaxValue;
+            public int MaxItems
+            {
+              get { return _maxItems.HasValue ? _maxItems.Value : 0; }
+              set { _maxItems = value; }
+            }
+
+            public ArrayConstraintAttribute() { }
+
             public override JsonConverter? CreateConverter(Type typeToConvert)
             {
-              return new ConstrainedArrayJsonConverter<T>(MinItems, MaxItems);
+              if (typeof(ISet<T>).IsAssignableFrom(typeToConvert))
+              {
+                return new ConstrainedSetConverter<T>(_minItems, _maxItems);
+              }
+              else if (typeToConvert.IsArray && typeToConvert.GetElementType() == typeof(T))
+              {
+                return new ConstrainedStandardArrayConverter<T>(_minItems, _maxItems);
+              }
+              else
+              {
+                return new ConstrainedEnumerableConverter<T>(_minItems, _maxItems);
+              }
             }
           }
 
-          public class ConstrainedArrayJsonConverter<T> : JsonConverter<T[]>
+          public abstract class ConstrainedCollectionConverter<T, TCollection> : JsonConverter<TCollection>
           {
-            public ConstrainedArrayJsonConverter(int minItems = 0, int maxItems = int.MaxValue)
+            protected ConstrainedCollectionConverter(int? min, int? max)
             {
-              MinItems = minItems;
-              MaxItems = maxItems;
+              _minItems = min;
+              _maxItems = max;
             }
-            protected int MinItems { get; }
-            protected int MaxItems { get; }
-            public override T[]? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+
+            protected int? _minItems, _maxItems;
+            public JsonConverter<T>? InnerConverter { get; set; }
+
+            public virtual Func<ConstrainedCollectionConverter<T, TCollection>, JsonSerializerOptions, JsonConverter<T>> InnerConverterFactory { get; set; } =
+              ConverterHelpers.GetStandardInnerConverter<T, TCollection>;
+
+            protected bool ValidateMin(int count)
             {
-              var list = JsonSerializer.Deserialize<T[]>(ref reader, options);
-              ValidateConstraints(list);
-              return list;
+              return !_minItems.HasValue || count >= _minItems.Value;
             }
-            public override void Write(Utf8JsonWriter writer, T[] value, JsonSerializerOptions options)
+
+            protected bool ValidateMax(int count)
             {
-              ValidateConstraints(value);
-              JsonSerializer.Serialize(writer, value, options);
+              return !_maxItems.HasValue || count <= _maxItems.Value;
             }
-            protected virtual void ValidateConstraints(T[]? value)
+
+            protected void ValidateRange(int count)
             {
-              if (value == null) return;
-              if (value.Length < MinItems) throw new JsonException($"Array length {value.Length} is less than minimum {MinItems}");
-              if (value.Length > MaxItems) throw new JsonException($"Array length {value.Length} is greater than maximum {MaxItems}");
+              if (!ValidateMax(count) || !ValidateMin(count))
+              {
+                throw new JsonException($"Number of array elements not in range [{(_minItems.HasValue ? _minItems.Value : 0)}, {(_maxItems.HasValue ? _maxItems.Value : Array.MaxLength)}]");
+              }
+            }
+
+            public override TCollection? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+              var _innerConverter = InnerConverterFactory(this, options);
+              if (reader.TokenType != JsonTokenType.StartArray)
+              {
+                throw new JsonException("Expected start of array");
+              }
+              var list = new List<T>();
+              int count = 0;
+              while (reader.Read())
+              {
+                if (reader.TokenType == JsonTokenType.EndArray)
+                {
+                  ValidateRange(count);
+                  break;
+                }
+                if (!ValidateMax(count))
+                {
+                  ValidateRange(count);
+                  break;
+                }
+                T value = _innerConverter.Read(ref reader, typeof(T), options)!;
+                list.Add(value);
+                count++;
+              }
+
+              return ConvertToCollection(list);
+            }
+
+            public override void Write(Utf8JsonWriter writer, TCollection value, JsonSerializerOptions options)
+            {
+              var _innerConverter = InnerConverterFactory(this, options);
+              writer.WriteStartArray();
+              foreach (var item in GetEnumerable(value))
+                _innerConverter.Write(writer, item, options);
+              writer.WriteEndArray();
+            }
+
+            protected abstract TCollection ConvertToCollection(List<T> list);
+            protected abstract IEnumerable<T> GetEnumerable(TCollection collection);
+          }
+
+          public class ConstrainedEnumerableConverter<T> : ConstrainedCollectionConverter<T, IEnumerable<T>>
+          {
+            public ConstrainedEnumerableConverter(int? min, int? max) : base(min, max) { }
+
+            protected override IEnumerable<T> ConvertToCollection(List<T> list) => list;
+
+            protected override IEnumerable<T> GetEnumerable(IEnumerable<T> collection) => collection;
+          }
+
+          public class ConstrainedSetConverter<T> : ConstrainedCollectionConverter<T, ISet<T>>
+          {
+            public ConstrainedSetConverter(int? min, int? max) : base(min, max) { }
+
+            protected override ISet<T> ConvertToCollection(List<T> list) => new HashSet<T>(list);
+
+            protected override IEnumerable<T> GetEnumerable(ISet<T> collection) => collection;
+          }
+
+          public class ConstrainedStandardArrayConverter<T> : ConstrainedCollectionConverter<T, T[]>
+          {
+            public ConstrainedStandardArrayConverter(int? min, int? max) : base(min, max) { }
+
+            protected override T[] ConvertToCollection(List<T> list) => list.ToArray();
+
+            protected override IEnumerable<T> GetEnumerable(T[] collection) => collection;
+          }
+
+          internal static class ConverterHelpers
+          {
+            internal static JsonConverter<T> GetStandardInnerConverter<T, TCollection>(this ConstrainedCollectionConverter<T, TCollection> converter, JsonSerializerOptions options)
+            {
+              if (converter.InnerConverter == null)
+              {
+                converter.InnerConverter = (JsonConverter<T>)options.GetConverter(typeof(T));
+              }
+              return converter.InnerConverter;
             }
           }
         `}

@@ -32,7 +32,7 @@ export function JsonSerializationProvider(): Children {
               /// Create an object from a json string
               /// </summary>
               /// <typeparam name="T">The type of the object represented in the string</typeparam>
-              /// <param name="value">The string to deserialize</param>
+              /// <param name="value">The strign to deserialize</param>
               /// <returns>The deserialized object, or null</returns>
               T? Deserialize<T>(string value);
             }
@@ -41,11 +41,7 @@ export function JsonSerializationProvider(): Children {
       </CSharpFile>
       <CSharpFile
         path="JsonSerializationProvider.cs"
-        using={[
-          "System.Text.Json",
-          "System.Text.Json.Serialization",
-          "TypeSpec.Helpers.JsonConverters",
-        ]}
+        using={["System.Text.Json", "System.Text.Json.Serialization"]}
       >
         <Namespace name="TypeSpec.Helpers">
           {code`
@@ -57,21 +53,21 @@ export function JsonSerializationProvider(): Children {
               /// <summary>
               /// The options to use for serialization
               /// </summary>
-              public JsonSerializerOptions Options { get; }
-
-              public JsonSerializationProvider()
+              public virtual JsonSerializerOptions Options { get; } = new JsonSerializerOptions
               {
-                Options = new JsonSerializerOptions
-                {
-                  PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                  DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                  Converters = {
-                    new JsonStringEnumConverter(),
-                    new TimeSpanDurationConverter(),
-                    new Base64UrlJsonConverter(),
-                    new UnixEpochDateTimeOffsetConverter()
-                  }
-                };
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+              };
+
+              /// <summary>
+              /// Create an object from a json string
+              /// </summary>
+              /// <typeparam name="T">The type of the object represented in the string</typeparam>
+              /// <param name="value">The strign to deserialize</param>
+              /// <returns>The deserialized object, or null</returns>
+              public virtual T? Deserialize<T>(string value)
+              {
+                return JsonSerializer.Deserialize<T>(value, Options);
               }
 
               /// <summary>
@@ -80,20 +76,9 @@ export function JsonSerializationProvider(): Children {
               /// <typeparam name="T">The type of the object</typeparam>
               /// <param name="value">The object to serialize</param>
               /// <returns>A string representing the serialized object</returns>
-              public string Serialize<T>(T value)
+              public virtual string Serialize<T>(T value)
               {
                 return JsonSerializer.Serialize(value, Options);
-              }
-
-              /// <summary>
-              /// Create an object from a json string
-              /// </summary>
-              /// <typeparam name="T">The type of the object represented in the string</typeparam>
-              /// <param name="value">The string to deserialize</param>
-              /// <returns>The deserialized object, or null</returns>
-              public T? Deserialize<T>(string value)
-              {
-                return JsonSerializer.Deserialize<T>(value, Options);
               }
             }
           `}

@@ -21,7 +21,13 @@ export function TimeSpanDurationConverter(): Children {
           {
             public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
-              return XmlConvert.ToTimeSpan(reader.GetString()!);
+              if (typeToConvert != typeof(TimeSpan))
+                throw new ArgumentException($"Cannot apply converter {this.GetType().FullName} to type {typeToConvert.FullName}");
+
+              var value = reader.GetString();
+              if (string.IsNullOrWhiteSpace(value))
+                return TimeSpan.MinValue;
+              return XmlConvert.ToTimeSpan(value);
             }
 
             public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options)
