@@ -13,16 +13,10 @@ namespace TypeSpec.Helpers.JsonConverters
     /// </summary>
     public class TimeSpanDurationConverter : JsonConverter<TimeSpan>
     {
-        public override TimeSpan Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
+        public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (typeToConvert != typeof(TimeSpan))
-                throw new ArgumentException(
-                    $"Cannot apply converter {this.GetType().FullName} to type {typeToConvert.FullName}"
-                );
+                throw new ArgumentException($"Cannot apply converter {this.GetType().FullName} to type {typeToConvert.FullName}");
 
             var value = reader.GetString();
             if (string.IsNullOrWhiteSpace(value))
@@ -30,11 +24,7 @@ namespace TypeSpec.Helpers.JsonConverters
             return XmlConvert.ToTimeSpan(value);
         }
 
-        public override void Write(
-            Utf8JsonWriter writer,
-            TimeSpan value,
-            JsonSerializerOptions options
-        )
+        public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options)
         {
             writer.WriteStringValue(XmlConvert.ToString(value));
         }

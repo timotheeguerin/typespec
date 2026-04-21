@@ -12,31 +12,15 @@ namespace TypeSpec.Helpers.JsonConverters
     /// </summary>
     public sealed class UnixEpochDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
     {
-        static readonly DateTimeOffset s_epoch = new DateTimeOffset(
-            1970,
-            1,
-            1,
-            0,
-            0,
-            0,
-            TimeSpan.Zero
-        );
+        static readonly DateTimeOffset s_epoch = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-        public override DateTimeOffset Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
+        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var formatted = reader.GetInt64()!;
             return s_epoch.AddMilliseconds(formatted);
         }
 
-        public override void Write(
-            Utf8JsonWriter writer,
-            DateTimeOffset value,
-            JsonSerializerOptions options
-        )
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
         {
             long unixTime = Convert.ToInt64((value - s_epoch).TotalMilliseconds);
             writer.WriteNumberValue(unixTime);

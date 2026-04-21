@@ -12,11 +12,9 @@ namespace TypeSpec.Helpers.JsonConverters
     /// </summary>
     public class StringArrayConstraintAttribute : ArrayConstraintAttribute<string>
     {
-        int? _minItemLength = null,
-            _maxItemLength = null;
+        int? _minItemLength = null, _maxItemLength = null;
 
-        public StringArrayConstraintAttribute()
-            : base() { }
+        public StringArrayConstraintAttribute() : base() { }
 
         public int MinItemLength
         {
@@ -56,9 +54,7 @@ namespace TypeSpec.Helpers.JsonConverters
                     new StringJsonConverter(MinItemLength, MaxItemLength, Pattern, o);
                 return resultStandardArray;
             }
-            throw new InvalidOperationException(
-                $"Cannot create converter for {typeToConvert} with {this}"
-            );
+            throw new InvalidOperationException($"Cannot create converter for {typeToConvert} with {this}");
         }
     }
 }

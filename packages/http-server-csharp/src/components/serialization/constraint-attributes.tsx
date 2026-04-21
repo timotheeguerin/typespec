@@ -415,63 +415,58 @@ function StringArrayConstraintAttribute(): Children {
   return (
     <CSharpFile
       path="StringArrayConstraintAttribute.cs"
-      using={["System.Text.Json", "System.Text.Json.Serialization", "System.Text.RegularExpressions"]}
+      using={["System.Text.Json", "System.Text.Json.Serialization"]}
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
           /// <summary>
-          /// Constrains the elements of a string array
+          /// Constrains an array of strings
           /// </summary>
-          public class StringArrayConstraintAttribute : JsonConverterAttribute
+          public class StringArrayConstraintAttribute : ArrayConstraintAttribute<string>
           {
-            public int MinItems { get; set; }
-            public int MaxItems { get; set; } = int.MaxValue;
-            public int MinLength { get; set; }
-            public int MaxLength { get; set; } = int.MaxValue;
+            int? _minItemLength = null, _maxItemLength = null;
+
+            public StringArrayConstraintAttribute() : base() { }
+
+            public int MinItemLength
+            {
+              get { return _minItemLength.HasValue ? _minItemLength.Value : 0; }
+              set { _minItemLength = value; }
+            }
+            public int MaxItemLength
+            {
+              get { return _maxItemLength.HasValue ? _maxItemLength.Value : 0; }
+              set { _maxItemLength = value; }
+            }
             public string? Pattern { get; set; }
+
             public override JsonConverter? CreateConverter(Type typeToConvert)
             {
-              return new ConstrainedStringArrayJsonConverter(MinItems, MaxItems, MinLength, MaxLength, Pattern);
-            }
-          }
-
-          public class ConstrainedStringArrayJsonConverter : JsonConverter<string[]>
-          {
-            public ConstrainedStringArrayJsonConverter(int minItems = 0, int maxItems = int.MaxValue, int minLength = 0, int maxLength = int.MaxValue, string? pattern = null)
-            {
-              MinItems = minItems;
-              MaxItems = maxItems;
-              MinLength = minLength;
-              MaxLength = maxLength;
-              Pattern = pattern;
-            }
-            protected int MinItems { get; }
-            protected int MaxItems { get; }
-            protected int MinLength { get; }
-            protected int MaxLength { get; }
-            protected string? Pattern { get; }
-            public override string[]? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-            {
-              var list = JsonSerializer.Deserialize<string[]>(ref reader, options);
-              ValidateConstraints(list);
-              return list;
-            }
-            public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
-            {
-              ValidateConstraints(value);
-              JsonSerializer.Serialize(writer, value, options);
-            }
-            protected virtual void ValidateConstraints(string[]? value)
-            {
-              if (value == null) return;
-              if (value.Length < MinItems) throw new JsonException($"Array length {value.Length} is less than minimum {MinItems}");
-              if (value.Length > MaxItems) throw new JsonException($"Array length {value.Length} is greater than maximum {MaxItems}");
-              foreach (var item in value)
+              var result = base.CreateConverter(typeToConvert);
+              var resultSet = result as ConstrainedSetConverter<string>;
+              if (resultSet != null)
               {
-                if (item.Length < MinLength) throw new JsonException($"String length {item.Length} is less than minimum {MinLength}");
-                if (item.Length > MaxLength) throw new JsonException($"String length {item.Length} is greater than maximum {MaxLength}");
-                if (Pattern != null && !Regex.IsMatch(item, Pattern)) throw new JsonException($"String '{item}' does not match pattern '{Pattern}'");
+                resultSet.InnerConverterFactory = (c, o) =>
+                  new StringJsonConverter(MinItemLength, MaxItemLength, Pattern, o);
+                return resultSet;
               }
+
+              var resultEnumerable = result as ConstrainedEnumerableConverter<string>;
+              if (resultEnumerable != null)
+              {
+                resultEnumerable.InnerConverterFactory = (c, o) =>
+                  new StringJsonConverter(MinItemLength, MaxItemLength, Pattern, o);
+                return resultEnumerable;
+              }
+
+              var resultStandardArray = result as ConstrainedStandardArrayConverter<string>;
+              if (resultStandardArray != null)
+              {
+                resultStandardArray.InnerConverterFactory = (c, o) =>
+                  new StringJsonConverter(MinItemLength, MaxItemLength, Pattern, o);
+                return resultStandardArray;
+              }
+              throw new InvalidOperationException($"Cannot create converter for {typeToConvert} with {this}");
             }
           }
         `}
@@ -489,58 +484,54 @@ function NumericArrayConstraintAttribute(): Children {
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
           /// <summary>
-          /// Constrains the elements of a numeric array
+          /// Constrains an array and the item types within it
           /// </summary>
-          public class NumericArrayConstraintAttribute<T> : JsonConverterAttribute where T : struct, INumber<T>
+          /// <typeparam name="T">The item type</typeparam>
+          public class NumericArrayConstraintAttribute<T> : ArrayConstraintAttribute<T>
+            where T : struct, INumber<T>
           {
             T? _minValue = null, _maxValue = null;
-            public int MinItems { get; set; }
-            public int MaxItems { get; set; } = int.MaxValue;
-            public T MinValue { get { return _minValue.HasValue ? _minValue.Value : default(T); } set { _minValue = value; } }
-            public T MaxValue { get { return _maxValue.HasValue ? _maxValue.Value : default(T); } set { _maxValue = value; } }
-            public bool MinValueExclusive { get; set; }
-            public bool MaxValueExclusive { get; set; }
+
+            public NumericArrayConstraintAttribute() : base() { }
+
+            public T MinValue
+            {
+              get { return _minValue.HasValue ? _minValue.Value : default(T); }
+              set { _minValue = value; }
+            }
+            public T MaxValue
+            {
+              get { return _maxValue.HasValue ? _maxValue.Value : default(T); }
+              set { _maxValue = value; }
+            }
+            bool MinValueExclusive { get; set; }
+            bool MaxValueExclusive { get; set; }
+
             public override JsonConverter? CreateConverter(Type typeToConvert)
             {
-              return new ConstrainedNumericArrayJsonConverter<T>(MinItems, MaxItems, _minValue, _maxValue, MinValueExclusive, MaxValueExclusive);
-            }
-          }
-
-          public class ConstrainedNumericArrayJsonConverter<T> : JsonConverter<T[]> where T : struct, INumber<T>
-          {
-            private NumericJsonConverter<T> _innerConverter;
-            public ConstrainedNumericArrayJsonConverter(int minItems = 0, int maxItems = int.MaxValue, T? minValue = null, T? maxValue = null, bool minExclusive = false, bool maxExclusive = false)
-            {
-              MinItems = minItems;
-              MaxItems = maxItems;
-              _innerConverter = new NumericJsonConverter<T>(minValue, maxValue, minExclusive, maxExclusive);
-            }
-            protected int MinItems { get; }
-            protected int MaxItems { get; }
-            public override T[]? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-            {
-              var list = new System.Collections.Generic.List<T>();
-              if (reader.TokenType != JsonTokenType.StartArray) throw new JsonException("Expected start of array");
-              while (reader.Read())
+              var result = base.CreateConverter(typeToConvert);
+              var resultSet = result as ConstrainedSetConverter<T>;
+              if (resultSet != null)
               {
-                if (reader.TokenType == JsonTokenType.EndArray) break;
-                list.Add(_innerConverter.Read(ref reader, typeof(T), options));
+                resultSet.InnerConverterFactory = (c, o) =>
+                  new NumericJsonConverter<T>(MinValue, MaxValue, MinValueExclusive, MaxValueExclusive, o);
+                return resultSet;
               }
-              var result = list.ToArray();
-              if (result.Length < MinItems) throw new JsonException($"Array length {result.Length} is less than minimum {MinItems}");
-              if (result.Length > MaxItems) throw new JsonException($"Array length {result.Length} is greater than maximum {MaxItems}");
-              return result;
-            }
-            public override void Write(Utf8JsonWriter writer, T[] value, JsonSerializerOptions options)
-            {
-              if (value.Length < MinItems) throw new JsonException($"Array length {value.Length} is less than minimum {MinItems}");
-              if (value.Length > MaxItems) throw new JsonException($"Array length {value.Length} is greater than maximum {MaxItems}");
-              writer.WriteStartArray();
-              foreach (var item in value)
+              var resultEnumerable = result as ConstrainedEnumerableConverter<T>;
+              if (resultEnumerable != null)
               {
-                _innerConverter.Write(writer, item, options);
+                resultEnumerable.InnerConverterFactory = (c, o) =>
+                  new NumericJsonConverter<T>(MinValue, MaxValue, MinValueExclusive, MaxValueExclusive, o);
+                return resultEnumerable;
               }
-              writer.WriteEndArray();
+              var resultStandardArray = result as ConstrainedStandardArrayConverter<T>;
+              if (resultStandardArray != null)
+              {
+                resultStandardArray.InnerConverterFactory = (c, o) =>
+                  new NumericJsonConverter<T>(MinValue, MaxValue, MinValueExclusive, MaxValueExclusive, o);
+                return resultStandardArray;
+              }
+              throw new InvalidOperationException($"Cannot create converter for {typeToConvert} with {this}");
             }
           }
         `}

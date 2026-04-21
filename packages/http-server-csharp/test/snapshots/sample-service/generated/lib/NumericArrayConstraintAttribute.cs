@@ -15,11 +15,9 @@ namespace TypeSpec.Helpers.JsonConverters
     public class NumericArrayConstraintAttribute<T> : ArrayConstraintAttribute<T>
         where T : struct, INumber<T>
     {
-        T? _minValue = null,
-            _maxValue = null;
+        T? _minValue = null, _maxValue = null;
 
-        public NumericArrayConstraintAttribute()
-            : base() { }
+        public NumericArrayConstraintAttribute() : base() { }
 
         public T MinValue
         {
@@ -41,44 +39,24 @@ namespace TypeSpec.Helpers.JsonConverters
             if (resultSet != null)
             {
                 resultSet.InnerConverterFactory = (c, o) =>
-                    new NumericJsonConverter<T>(
-                        MinValue,
-                        MaxValue,
-                        MinValueExclusive,
-                        MaxValueExclusive,
-                        o
-                    );
+                    new NumericJsonConverter<T>(MinValue, MaxValue, MinValueExclusive, MaxValueExclusive, o);
                 return resultSet;
             }
             var resultEnumerable = result as ConstrainedEnumerableConverter<T>;
             if (resultEnumerable != null)
             {
                 resultEnumerable.InnerConverterFactory = (c, o) =>
-                    new NumericJsonConverter<T>(
-                        MinValue,
-                        MaxValue,
-                        MinValueExclusive,
-                        MaxValueExclusive,
-                        o
-                    );
+                    new NumericJsonConverter<T>(MinValue, MaxValue, MinValueExclusive, MaxValueExclusive, o);
                 return resultEnumerable;
             }
             var resultStandardArray = result as ConstrainedStandardArrayConverter<T>;
             if (resultStandardArray != null)
             {
                 resultStandardArray.InnerConverterFactory = (c, o) =>
-                    new NumericJsonConverter<T>(
-                        MinValue,
-                        MaxValue,
-                        MinValueExclusive,
-                        MaxValueExclusive,
-                        o
-                    );
+                    new NumericJsonConverter<T>(MinValue, MaxValue, MinValueExclusive, MaxValueExclusive, o);
                 return resultStandardArray;
             }
-            throw new InvalidOperationException(
-                $"Cannot create converter for {typeToConvert} with {this}"
-            );
+            throw new InvalidOperationException($"Cannot create converter for {typeToConvert} with {this}");
         }
     }
 }
