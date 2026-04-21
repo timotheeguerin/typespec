@@ -143,13 +143,13 @@ describe("nullable union", () => {
     ).toRenderTo("int?");
   });
 
-  it("maps string | null to string?", async () => {
+  it("maps string | null to string", async () => {
     const type = await compileType("string | null");
     expect(
       <Wrapper>
         <TypeExpression type={type} />
       </Wrapper>,
-    ).toRenderTo("string?");
+    ).toRenderTo("string");
   });
 });
 

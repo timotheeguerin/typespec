@@ -5,12 +5,15 @@ import type { Interface } from "@typespec/compiler";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { ControllerAction } from "./controller-action.jsx";
 import { businessLogicInterfaceRefkey } from "./interfaces.jsx";
+import type { RequestModelInfo } from "./request-models.jsx";
 
 export interface ControllerProps {
   /** The TypeSpec interface this controller represents. */
   type: Interface;
   /** The canonicalized HTTP operations belonging to this controller. */
   operations: OperationHttpCanonicalization[];
+  /** Request models generated for unnamed body types. */
+  requestModels?: RequestModelInfo[];
 }
 
 /**
@@ -44,7 +47,10 @@ export function Controller(props: ControllerProps): Children {
       </cs.Constructor>
       {"\n"}
       <For each={props.operations} doubleHardline>
-        {(op) => <ControllerAction operation={op} implFieldName={implPropName} />}
+        {(op) => {
+          const rm = props.requestModels?.find(r => r.op === op);
+          return <ControllerAction operation={op} implFieldName={implPropName} requestModel={rm} />;
+        }}
       </For>
     </cs.ClassDeclaration>
   );

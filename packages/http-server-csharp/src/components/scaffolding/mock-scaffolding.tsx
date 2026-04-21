@@ -2,6 +2,7 @@ import { code, For, SourceDirectory, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import type { Interface, Operation, Program, Type } from "@typespec/compiler";
 import { isErrorModel, isVoidType } from "@typespec/compiler";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { useTsp } from "@typespec/emitter-framework";
 import { CSharpFile } from "../csharp-file.jsx";
 import { TypeExpression } from "../type-expression.jsx";
@@ -9,6 +10,8 @@ import { TypeExpression } from "../type-expression.jsx";
 export interface MockScaffoldingProps {
   interfaceRegistrations: string[];
   interfaces: Interface[];
+  /** Map from interface name to its canonicalized HTTP operations. */
+  canonicalOpsMap?: Map<string, OperationHttpCanonicalization[]>;
 }
 
 /**
@@ -25,7 +28,12 @@ export function MockScaffolding(props: MockScaffoldingProps): Children {
           <MockRegistration interfaceRegistrations={props.interfaceRegistrations} />
         )}
         <For each={props.interfaces}>
-          {(iface) => <MockImplementation type={iface} />}
+          {(iface) => (
+            <MockImplementation
+              type={iface}
+              canonicalOps={props.canonicalOpsMap?.get(iface.name)}
+            />
+          )}
         </For>
       </SourceDirectory>
     </cs.Namespace>
@@ -204,6 +212,7 @@ function getMockReturnStatement(
 
 interface MockImplementationProps {
   type: Interface;
+  canonicalOps?: OperationHttpCanonicalization[];
 }
 
 /**
@@ -215,6 +224,14 @@ function MockImplementation(props: MockImplementationProps): Children {
   const interfaceName = `I${namePolicy.getName(props.type.name, "class")}`;
   const className = namePolicy.getName(props.type.name, "class");
   const operations = Array.from(props.type.operations.entries());
+
+  // Build canonical ops map by name
+  const canonicalMap = new Map<string, OperationHttpCanonicalization>();
+  if (props.canonicalOps) {
+    for (const cop of props.canonicalOps) {
+      canonicalMap.set(cop.name, cop);
+    }
+  }
 
   return (
     <CSharpFile
@@ -241,7 +258,7 @@ function MockImplementation(props: MockImplementationProps): Children {
 
           public IHttpContextAccessor HttpContextAccessor { get; }
 
-          ${(<MockMethods operations={operations} program={$.program} />)}
+          ${(<MockMethods operations={operations} program={$.program} canonicalMap={canonicalMap} />)}
         }
       `}
     </CSharpFile>
@@ -251,6 +268,33 @@ function MockImplementation(props: MockImplementationProps): Children {
 interface MockMethodsProps {
   operations: [string, Operation][];
   program: Program;
+  canonicalMap?: Map<string, OperationHttpCanonicalization>;
+}
+
+/** Get body property names to filter for GET operations. */
+function getGetBodyPropNames(
+  opName: string,
+  canonicalMap?: Map<string, OperationHttpCanonicalization>,
+): Set<string> {
+  const bodyPropNames = new Set<string>();
+  const canonicalOp = canonicalMap?.get(opName);
+  if (!canonicalOp || canonicalOp.method !== "get") return bodyPropNames;
+
+  const body = canonicalOp.requestParameters.body;
+  if (body?.bodyKind === "single" && body.bodies.length > 0) {
+    const bodyType = body.bodies[0].type.sourceType;
+    if (bodyType.kind === "Model") {
+      for (const [name] of bodyType.properties) {
+        bodyPropNames.add(name);
+      }
+    }
+  }
+  for (const p of canonicalOp.requestParameters.properties) {
+    if (p.kind === "body" || p.kind === "bodyRoot" || p.kind === "bodyProperty") {
+      bodyPropNames.add(p.property.sourceType.name);
+    }
+  }
+  return bodyPropNames;
 }
 
 function MockMethods(props: MockMethodsProps): Children {
@@ -265,15 +309,19 @@ function MockMethods(props: MockMethodsProps): Children {
           ? code`Task<${(<TypeExpression type={successType} />)}>`
           : code`Task`;
 
-        const parameters = Array.from(op.parameters.properties.entries()).map(
-          ([pName, prop]) => ({
-            name: namePolicy.getName(pName, "type-parameter"),
+        const bodyPropNames = getGetBodyPropNames(name, props.canonicalMap);
+        const parameters = Array.from(op.parameters.properties.entries())
+          .filter(([pName]) => !bodyPropNames.has(pName))
+          .map(([pName, prop]) => ({
+            name: namePolicy.getName(pName, "parameter"),
             type: (<TypeExpression type={prop.type} />) as Children,
-          }),
-        );
+            optional: prop.optional,
+          }))
+          // Required parameters must come before optional ones in C#
+          .sort((a, b) => (a.optional === b.optional ? 0 : a.optional ? 1 : -1));
 
         const paramList = parameters.map(
-          (p, i) => code`${p.type} ${p.name}${i < parameters.length - 1 ? ", " : ""}`,
+          (p, i) => code`${p.type}${p.optional ? "?" : ""} ${p.name}${i < parameters.length - 1 ? ", " : ""}`,
         );
 
         const returnStatement = getMockReturnStatement(props.program, op.returnType);

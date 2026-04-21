@@ -61,7 +61,7 @@ ${
     ? `
 app.MapGet("/openapi.yaml", async (HttpContext context) =>
 {
-    var externalFilePath = "${openApiPath}";
+    var externalFilePath = "${openApiPath}"; // Full path to the file outside the project
     if (!File.Exists(externalFilePath))
     {
         context.Response.StatusCode = StatusCodes.Status404NotFound;
