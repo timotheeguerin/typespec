@@ -4,6 +4,7 @@ import type { Typekit } from "@typespec/compiler/typekit";
 import { getUniqueItems } from "@typespec/json-schema";
 import { useTsp, Experimental_ComponentOverridesConfig } from "@typespec/emitter-framework";
 import { TypeExpression as EfTypeExpression } from "@typespec/emitter-framework/csharp";
+import { isUnionEnum } from "./enums.jsx";
 import { useEmitterOptions } from "../context/emitter-options-context.js";
 import { getAnonymousModelName } from "./models.jsx";
 
@@ -19,6 +20,10 @@ export function TypeExpression(props: { type: Type }): Children {
     case "Union":
       return resolveUnionType($, type);
     case "UnionVariant":
+      // If this variant belongs to a union-as-enum, resolve to the parent enum type
+      if (type.union && isUnionEnum(type.union)) {
+        return code`${serverRefkey(type.union)}`;
+      }
       return <TypeExpression type={type.type} />;
     case "Enum":
       try {
@@ -107,6 +112,11 @@ export function TypeExpression(props: { type: Type }): Children {
 }
 
 function resolveUnionType($: Typekit, union: import("@typespec/compiler").Union): Children {
+  // Named unions that qualify as enums should reference the enum type
+  if (isUnionEnum(union)) {
+    return code`${serverRefkey(union)}`;
+  }
+
   const allVariants = Array.from(union.variants.values());
   // Check if null is present in the union
   const hasNull = allVariants.some(

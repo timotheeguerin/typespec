@@ -185,8 +185,8 @@ minimumReleaseAgeExclude:
   - "@alloy-js/*"
 
 overrides:
-  "@alloy-js/core": https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
-  "@alloy-js/csharp": 0.23.0-dev.6
+  "@alloy-js/core": 0.23.0-dev.16
+  "@alloy-js/csharp": 0.23.0-dev.7
   "@alloy-js/cli": 0.23.0-dev.5
   "@alloy-js/msbuild": 0.23.0-dev.2
   "@alloy-js/markdown": 0.23.0-dev.2

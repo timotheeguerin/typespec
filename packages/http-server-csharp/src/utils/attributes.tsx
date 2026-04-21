@@ -17,6 +17,7 @@ import {
   type Scalar,
   type Type,
 } from "@typespec/compiler";
+import { isUnionEnum } from "../components/enums.jsx";
 
 /**
  * Maps a TypeSpec scalar name to the C# type name used in attributes.
@@ -85,6 +86,11 @@ export function getPropertyAttributes(program: Program, property: ModelProperty)
   // Encoding attributes (JsonConverter)
   const encodingAttrs = getEncodingAttributes(program, property);
   attrs.push(...encodingAttrs);
+
+  // JsonStringEnumConverter for enum and union-as-enum properties
+  if (property.type.kind === "Enum" || (property.type.kind === "Union" && isUnionEnum(property.type))) {
+    attrs.push(code`[JsonConverter(typeof(JsonStringEnumConverter))]`);
+  }
 
   // Constraint attributes
   const numericAttr = getNumericConstraintAttribute(program, property);

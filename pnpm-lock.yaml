@@ -500,8 +500,8 @@ catalogs:
       version: 18.0.0
 
 overrides:
-  '@alloy-js/core': https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
-  '@alloy-js/csharp': 0.23.0-dev.6
+  '@alloy-js/core': 0.23.0-dev.16
+  '@alloy-js/csharp': 0.23.0-dev.7
   '@alloy-js/cli': 0.23.0-dev.5
   '@alloy-js/msbuild': 0.23.0-dev.2
   '@alloy-js/markdown': 0.23.0-dev.2
@@ -879,16 +879,16 @@ importers:
 
   packages/emitter-framework:
     dependencies:
-      '@alloy-js/core':
-        specifier: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
-        version: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
       '@alloy-js/csharp':
-        specifier: 0.23.0-dev.6
-        version: 0.23.0-dev.6
+        specifier: 0.23.0-dev.7
+        version: 0.23.0-dev.7
     devDependencies:
       '@alloy-js/cli':
         specifier: 0.23.0-dev.5
         version: 0.23.0-dev.5
+      '@alloy-js/core':
+        specifier: 0.23.0-dev.16
+        version: 0.23.0-dev.16
       '@alloy-js/python':
         specifier: 'catalog:'
         version: 0.3.0
@@ -1140,14 +1140,13 @@ importers:
         version: 3.8.1
 
   packages/http-client:
-    dependencies:
-      '@alloy-js/core':
-        specifier: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
-        version: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
     devDependencies:
       '@alloy-js/cli':
         specifier: 0.23.0-dev.5
         version: 0.23.0-dev.5
+      '@alloy-js/core':
+        specifier: 0.23.0-dev.16
+        version: 0.23.0-dev.16
       '@alloy-js/rollup-plugin':
         specifier: 0.1.1-dev.2
         version: 0.1.1-dev.2(@babel/core@7.29.0)(@types/babel__core@7.20.5)(rollup@4.60.1)
@@ -1182,8 +1181,8 @@ importers:
   packages/http-client-js:
     dependencies:
       '@alloy-js/core':
-        specifier: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
-        version: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
+        specifier: 0.23.0-dev.16
+        version: 0.23.0-dev.16
       '@alloy-js/typescript':
         specifier: 0.23.0-dev.9
         version: 0.23.0-dev.9
@@ -1273,11 +1272,11 @@ importers:
   packages/http-server-csharp:
     dependencies:
       '@alloy-js/core':
-        specifier: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
-        version: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
+        specifier: 0.23.0-dev.16
+        version: 0.23.0-dev.16
       '@alloy-js/csharp':
-        specifier: 0.23.0-dev.6
-        version: 0.23.0-dev.6
+        specifier: 0.23.0-dev.7
+        version: 0.23.0-dev.7
       '@alloy-js/msbuild':
         specifier: 0.23.0-dev.2
         version: 0.23.0-dev.2
@@ -2688,8 +2687,8 @@ importers:
   packages/tspd:
     dependencies:
       '@alloy-js/core':
-        specifier: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
-        version: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
+        specifier: 0.23.0-dev.16
+        version: 0.23.0-dev.16
       '@alloy-js/markdown':
         specifier: 0.23.0-dev.2
         version: 0.23.0-dev.2
@@ -3121,12 +3120,11 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  '@alloy-js/core@https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387':
-    resolution: {integrity: sha512-H3f59Lj95N5dxf/8esFykIGp0J5WK7UQg3Jn8tTFDwhjUKeMhqFCf6EKjUVx6TC1p5E+70nidC1Iw1M79686zg==, tarball: https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387}
-    version: 0.23.0-pr.387.1390
+  '@alloy-js/core@0.23.0-dev.16':
+    resolution: {integrity: sha512-4cgip7SZuVIbdp9tYWiD638vetT9mxNyRHbIUY92bGL2h0rZVTe9EM9XAHichS0n3jj0Bjj5zwv2Rm79OALoMA==}
 
-  '@alloy-js/csharp@0.23.0-dev.6':
-    resolution: {integrity: sha512-z1mRmZPck1Y/8KJ+P+HdX5qkjozUCNAjW+sjdye2kWOHnMpEQZ0D8fPhUQPtsU07eSJBPn5pIluLUPLRF0QvTg==}
+  '@alloy-js/csharp@0.23.0-dev.7':
+    resolution: {integrity: sha512-XOVFzk6VUJVHa751hwdynCOmODxibFS9Gdr8swWyOXTeORA48gWIDt0umKqnNnNEKOpAP7/KzMwUGAUxPykQnQ==}
 
   '@alloy-js/markdown@0.23.0-dev.2':
     resolution: {integrity: sha512-mh2FjrZf4k8k9DLgWRHj6iYuzYWVCPzpjbEUaZlwky4mTV3Q4ygpAd0oo5JGFoh6wAtTglKErEoaw7OTCLJ9hg==}
@@ -13692,7 +13690,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@alloy-js/core@https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387':
+  '@alloy-js/core@0.23.0-dev.16':
     dependencies:
       '@types/ws': 8.18.1
       '@vue/reactivity': 3.5.30
@@ -13706,9 +13704,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@alloy-js/csharp@0.23.0-dev.6':
+  '@alloy-js/csharp@0.23.0-dev.7':
     dependencies:
-      '@alloy-js/core': https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
+      '@alloy-js/core': 0.23.0-dev.16
       '@alloy-js/msbuild': 0.23.0-dev.2
       change-case: 5.4.4
       marked: 16.4.2
@@ -13719,7 +13717,7 @@ snapshots:
 
   '@alloy-js/markdown@0.23.0-dev.2':
     dependencies:
-      '@alloy-js/core': https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
+      '@alloy-js/core': 0.23.0-dev.16
       yaml: 2.8.3
     transitivePeerDependencies:
       - bufferutil
@@ -13727,7 +13725,7 @@ snapshots:
 
   '@alloy-js/msbuild@0.23.0-dev.2':
     dependencies:
-      '@alloy-js/core': https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
+      '@alloy-js/core': 0.23.0-dev.16
       change-case: 5.4.4
       marked: 16.4.2
       pathe: 2.0.3
@@ -13737,7 +13735,7 @@ snapshots:
 
   '@alloy-js/python@0.3.0':
     dependencies:
-      '@alloy-js/core': https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
+      '@alloy-js/core': 0.23.0-dev.16
       change-case: 5.4.4
       pathe: 2.0.3
     transitivePeerDependencies:
@@ -13757,7 +13755,7 @@ snapshots:
 
   '@alloy-js/typescript@0.23.0-dev.9':
     dependencies:
-      '@alloy-js/core': https://pkg.pr.new/alloy-framework/alloy/@alloy-js/core@387
+      '@alloy-js/core': 0.23.0-dev.16
       change-case: 5.4.4
       pathe: 2.0.3
     transitivePeerDependencies:

@@ -6,6 +6,7 @@ import { getUniqueItems } from "@typespec/json-schema";
 import { useTsp } from "@typespec/emitter-framework";
 import { useEmitterOptions } from "../context/emitter-options-context.js";
 import { CSharpFile } from "./csharp-file.jsx";
+import { isUnionEnum, getUnionEnumMembers } from "./enums.jsx";
 import { serverRefkey, TypeExpression } from "./type-expression.jsx";
 import { getDocComment } from "../utils/doc-comments.jsx";
 import { getPropertyAttributes } from "../utils/attributes.jsx";
@@ -171,13 +172,20 @@ function ServerClassDeclaration(props: { type: Model; emitName?: string }): Chil
       baseType={baseType}
       doc={getDocComment($, props.type)}
     >
-      {errorConstructor ? code`${errorConstructor}\n` : undefined}
-      {hasChildConstructor ? code`public ${className}(int statusCode, object? value = null, Dictionary<string, string>? headers = default): base(statusCode, value, headers) {}\n` : undefined}
+      {errorConstructor}
+      {errorConstructor ? <hbr /> : undefined}
+      {hasChildConstructor ? code`
+        public ${className}(int statusCode, object? value = null, Dictionary<string, string>? headers = default)
+            : base(statusCode, value, headers)
+        {
+        }
+      ` : undefined}
+      {hasChildConstructor ? <hbr /> : undefined}
       <For each={properties} doubleHardline>
         {([_, property]) => {
           // Skip statusCode properties for error models
           if (isError && isStatusCode($.program, property)) return undefined;
-          return <ServerProperty type={property} errorClassName={isError ? className : undefined} />;
+          return <ServerProperty type={property} errorClassName={isError ? className : undefined} baseModel={props.type.baseModel} />;
         }}
       </For>
     </cs.ClassDeclaration>
@@ -188,7 +196,7 @@ function ServerClassDeclaration(props: { type: Model; emitName?: string }): Chil
  * Server-specific property that matches old emitter output.
  * No `required`, no `[JsonPropertyName]`, no nullable `?` for reference types.
  */
-function ServerProperty(props: { type: ModelProperty; errorClassName?: string }): Children {
+function ServerProperty(props: { type: ModelProperty; errorClassName?: string; baseModel?: Model }): Children {
   const { $ } = useTsp();
   const namePolicy = cs.useCSharpNamePolicy();
   const propType = props.type.type;
@@ -209,14 +217,23 @@ function ServerProperty(props: { type: ModelProperty; errorClassName?: string })
     attrs.unshift(code`[JsonPropertyName("${props.type.name}")]`);
   }
 
+  // Check if this property overrides a base model property (discriminator pattern)
+  const isOverride = props.baseModel ? hasPropertyInChain(props.baseModel, props.type.name) : false;
+
+  // Check for union variant type (e.g., kind: PetType.Dog) — used as enum member initializer
+  const unionVariantInit = getUnionVariantInitializer(propType, namePolicy);
+
+  // Check for enum default value (e.g., variety: WolfBreed = WolfBreed.dire)
+  const enumDefaultInit = getEnumDefaultInitializer(props.type, namePolicy);
+
   // For error models, properties get values from constructor, not as literals
   const isErrorProp = !!props.errorClassName;
 
   // Check for literal values (the type itself is a literal)
   const { collectionType } = useEmitterOptions();
-  const literalInfo = isErrorProp ? undefined : getLiteralValue(propType, collectionType);
+  const literalInfo = isErrorProp ? undefined : (unionVariantInit ?? getLiteralValue(propType, collectionType));
   // Check for default values
-  const defaultValue = isErrorProp ? undefined : (props.type.defaultValue ? getDefaultValueString(props.type.defaultValue) : undefined);
+  const defaultValue = isErrorProp ? undefined : (enumDefaultInit ?? (props.type.defaultValue ? getDefaultValueString(props.type.defaultValue) : undefined));
   
   const initializer = literalInfo ?? defaultValue;
   const isLiteralOnly = literalInfo !== undefined && defaultValue === undefined;
@@ -225,7 +242,8 @@ function ServerProperty(props: { type: ModelProperty; errorClassName?: string })
   const isFloatEnum = $.enum.is(propType) && hasNonIntegerValues(propType as import("@typespec/compiler").Enum);
 
   // For error model properties with literal types, use the scalar base type
-  const resolveToScalar = isLiteralOnly || isErrorProp;
+  // But not for union variant types — those should resolve to the enum type
+  const resolveToScalar = (isLiteralOnly && !unionVariantInit) || isErrorProp;
   const resolvedType = resolveToScalar ? getScalarForLiteral(propType) : propType;
   const needsNullable = props.type.optional && (isFloatEnum || isValueType($, resolvedType));
 
@@ -247,6 +265,7 @@ function ServerProperty(props: { type: ModelProperty; errorClassName?: string })
       name={propName}
       type={typeExpr}
       public
+      new={isOverride}
       nullable={needsNullable}
       doc={getDocComment($, props.type)}
       attributes={attrs.length > 0 ? attrs : undefined}
@@ -292,6 +311,68 @@ function getDefaultValueString(value: import("@typespec/compiler").Value): strin
   return undefined;
 }
 
+/**
+ * For a union variant type (e.g., kind: PetType.Dog), returns a C# enum member
+ * initializer like "PetType.Dog". Returns undefined if not a union-enum variant.
+ */
+function getUnionVariantInitializer(
+  type: import("@typespec/compiler").Type,
+  namePolicy: ReturnType<typeof cs.createCSharpNamePolicy>,
+): string | undefined {
+  if (type.kind !== "UnionVariant") return undefined;
+  const union = type.union;
+  if (!union || !isUnionEnum(union)) return undefined;
+  
+  const enumName = namePolicy.getName(union.name!, "enum");
+  const memberName = namePolicy.getName(String(type.name), "enum-member");
+  return `${enumName}.${memberName}`;
+}
+
+/**
+ * For a property with a default value that references an enum or union-enum member,
+ * returns the C# enum member string like "WolfBreed.Dire".
+ */
+function getEnumDefaultInitializer(
+  property: ModelProperty,
+  namePolicy: ReturnType<typeof cs.createCSharpNamePolicy>,
+): string | undefined {
+  if (!property.defaultValue) return undefined;
+  const dv = property.defaultValue;
+  
+  // Handle TypeSpec enum default values
+  if (dv.valueKind === "EnumValue") {
+    const enumType = dv.value.enum;
+    if (enumType) {
+      const enumName = namePolicy.getName(enumType.name, "enum");
+      const memberName = namePolicy.getName(dv.value.name, "enum-member");
+      return `${enumName}.${memberName}`;
+    }
+  }
+  
+  // Handle union-enum default values (StringValue matching a union variant)
+  if (dv.valueKind === "StringValue" && property.type.kind === "Union" && isUnionEnum(property.type)) {
+    const members = getUnionEnumMembers(property.type);
+    const match = members.find(m => m.value === dv.value);
+    if (match) {
+      const enumName = namePolicy.getName(property.type.name!, "enum");
+      const memberName = namePolicy.getName(match.name, "enum-member");
+      return `${enumName}.${memberName}`;
+    }
+  }
+  
+  return undefined;
+}
+
+/** Checks if a property name exists anywhere in the model's base chain. */
+function hasPropertyInChain(model: Model | undefined, propName: string): boolean {
+  let current = model;
+  while (current) {
+    if (current.properties.has(propName)) return true;
+    current = current.baseModel;
+  }
+  return false;
+}
+
 /** For literal types, get the underlying scalar type for the property declaration. */
 function getScalarForLiteral(type: import("@typespec/compiler").Type): import("@typespec/compiler").Type {
   // Literal types don't have a .scalar reference in the compiler types
@@ -329,6 +410,7 @@ function isValueType($: ReturnType<typeof useTsp>["$"], type: import("@typespec/
     return valueTypes.has(baseName);
   }
   if ($.enum.is(type)) return true;
+  if (type.kind === "Union" && isUnionEnum(type as import("@typespec/compiler").Union)) return true;
   return false;
 }
 
@@ -553,7 +635,7 @@ function getErrorStatusCode(program: Program, model: Model): { value: string | n
 }
 
 /** Generates the constructor string for an error model. */
-function getErrorConstructor(program: Program, model: Model, className: string): string {
+function getErrorConstructor(program: Program, model: Model, className: string): Children {
   const statusCode = getErrorStatusCode(program, model);
   const isChild = model.baseModel && isErrorModel(program, model.baseModel);
   const namePolicy = cs.createCSharpNamePolicy();
@@ -611,14 +693,30 @@ function getErrorConstructor(program: Program, model: Model, className: string):
   }
 
   const statusCodeStr = statusCode?.value ?? 400;
-  const headerStr = headerParts.length > 0 ? `, \n\t\t headers: new(){${headerParts.join(", ")}}` : "";
-  const valueStr = valueParts.length > 0 ? `, \n\t\t value: new{${valueParts.join(",")}}` : "";
+
+  // Build base call arguments
+  const baseArgs: string[] = [String(statusCodeStr)];
+  if (headerParts.length > 0) {
+    baseArgs.push(`headers: new() { ${headerParts.join(", ")} }`);
+  }
+  if (valueParts.length > 0) {
+    baseArgs.push(`value: new { ${valueParts.join(", ")} }`);
+  }
 
   const baseCall = isChild
     ? `base(${statusCodeStr})`
-    : `base(${statusCodeStr}${headerStr}${valueStr})`;
+    : `base(${baseArgs.join(", ")})`;
 
-  return `public ${className}(${paramParts.join(", ")}) : ${baseCall} \n\t\t{ ${bodyParts.length > 0 ? `\n${bodyParts.join("\n")}` : ""}\n\t}`;
+  const params = paramParts.join(", ");
+  const body = bodyParts.join("\n");
+
+  return code`
+    public ${className}(${params})
+        : ${baseCall}
+    {
+        ${body}
+    }
+  `;
 }
 
 /** Gets a simple C# type name string for a TypeSpec type. */

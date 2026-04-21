@@ -823,7 +823,7 @@ it("handles extensible enums and discriminators for inheritance", async () => {
       [
         "Dog.cs",
         [
-          "public partial class Dog : Pet {",
+          "public partial class Dog : Pet",
           `public new PetType Kind { get; } = PetType.Dog;`,
           `public string Tail { get; set; }`,
         ],
@@ -831,7 +831,7 @@ it("handles extensible enums and discriminators for inheritance", async () => {
       [
         "Cat.cs",
         [
-          "public partial class Cat : Pet {",
+          "public partial class Cat : Pet",
           `public new PetType Kind { get; } = PetType.Cat;`,
           `public string Hair { get; set; }`,
         ],
@@ -839,7 +839,7 @@ it("handles extensible enums and discriminators for inheritance", async () => {
       [
         "Bear.cs",
         [
-          "public partial class Bear : Animal {",
+          "public partial class Bear : Animal",
           `public new AnimalType Kind { get; } = AnimalType.Bear;`,
           `public string Color { get; set; }`,
         ],
@@ -847,7 +847,7 @@ it("handles extensible enums and discriminators for inheritance", async () => {
       [
         "Wolf.cs",
         [
-          "public partial class Wolf : Animal {",
+          "public partial class Wolf : Animal",
           `public new AnimalType Kind { get; } = AnimalType.Wolf;`,
           `public WolfBreed Variety { get; set; } = WolfBreed.Dire`,
         ],
@@ -2964,8 +2964,8 @@ describe("emit correct code for `@error` models", () => {
       "NotFoundError.cs",
       [
         "public partial class NotFoundError : HttpServiceException",
-        `public NotFoundError(string code = "not-found") : base(404,`,
-        "value: new{code = code})",
+        `public NotFoundError(string code = "not-found")`,
+        `: base(404, value: new { code = code })`,
       ],
     );
   });
@@ -2981,7 +2981,8 @@ describe("emit correct code for `@error` models", () => {
       "NotFoundError.cs",
       [
         "public partial class NotFoundError : HttpServiceException",
-        "public NotFoundError() : base(404)",
+        "public NotFoundError()",
+        ": base(404)",
       ],
     );
   });
@@ -3000,7 +3001,8 @@ describe("emit correct code for `@error` models", () => {
       "ErrorInRange.cs",
       [
         "public partial class ErrorInRange : HttpServiceException",
-        "public ErrorInRange() : base(500)",
+        "public ErrorInRange()",
+        ": base(500)",
       ],
     );
   });
@@ -3022,7 +3024,8 @@ describe("emit correct code for `@error` models", () => {
       "Error.cs",
       [
         "public partial class Error : HttpServiceException",
-        "public Error(int statusCode) : base(statusCode)",
+        "public Error(int statusCode)",
+        ": base(statusCode)",
       ],
     );
   });
@@ -3039,7 +3042,8 @@ describe("emit correct code for `@error` models", () => {
       "Error.cs",
       [
         "public partial class Error : HttpServiceException",
-        "public Error(int statusCode) : base(statusCode)",
+        "public Error(int statusCode)",
+        ": base(statusCode)",
       ],
     );
   });
@@ -3063,12 +3067,13 @@ describe("emit correct code for `@error` models", () => {
           "ApiError.cs",
           [
             "public partial class ApiError : HttpServiceException",
-            "public ApiError(string code, string message) : base(400,",
+            "public ApiError(string code, string message)",
+            `: base(400, value: new { code = code, message = message })`,
             "public string Code { get; set; }",
             "public string MessageProp { get; set; }",
           ],
         ],
-        ["Error.cs", ["public partial class Error : ApiError", "public Error() : base(500)"]],
+        ["Error.cs", ["public partial class Error : ApiError", "public Error()", ": base(500)"]],
       ],
     );
   });
@@ -3088,7 +3093,8 @@ describe("emit correct code for `@error` models", () => {
       `,
       "Error.cs",
       [
-        `public Error(string code, string message, string optionalMessage = default, string defined = "default message") : base(200,`,
+        `public Error(string code, string message, string optionalMessage = default, string defined = "default message")`,
+        `: base(200, value: new { code = code, message = message, optionalMessage = optionalMessage, defined = defined })`,
       ],
     );
   });
@@ -3105,8 +3111,8 @@ describe("emit correct code for `@error` models", () => {
       `,
       "Error.cs",
       [
-        `public Error(string code, string customHeader) : base(200,`,
-        ` headers: new(){{"x-ms-error-code", code}, {"custom-header", customHeader}})`,
+        `public Error(string code, string customHeader)`,
+        `: base(200, headers: new() { {"x-ms-error-code", code}, {"custom-header", customHeader} })`,
       ],
     );
   });
@@ -3122,8 +3128,8 @@ describe("emit correct code for `@error` models", () => {
       `,
       "Error.cs",
       [
-        `public Error(string code, string message) : base(400,`,
-        `value: new{code = code,message = message})`,
+        `public Error(string code, string message)`,
+        `: base(400, value: new { code = code, message = message })`,
       ],
     );
   });
@@ -3141,7 +3147,8 @@ describe("emit correct code for `@error` models", () => {
       `,
       "Error.cs",
       [
-        `public Error(string code, string message) : base(200,`,
+        `public Error(string code, string message)`,
+        `: base(200, value: new { code = code, message = message })`,
         `Code = code;`,
         `MessageProp = message;`,
       ],
@@ -3170,7 +3177,8 @@ describe("emit correct code for `@error` models", () => {
       `,
       "Error.cs",
       [
-        `public Error(string code, string message, string value, string headers, string stackTrace, string source, string innerException, string hResult, string data, string targetSite, string helpLink) : base(200,`,
+        `public Error(string code, string message, string value, string headers, string stackTrace, string source, string innerException, string hResult, string data, string targetSite, string helpLink)`,
+        `: base(200, value: new { code = code, message = message, value = value, headers = headers, stackTrace = stackTrace, source = source, innerException = innerException, hResult = hResult, data = data, targetSite = targetSite, helpLink = helpLink })`,
         `Code = code;`,
         `MessageProp = message;`,
         `ValueName = value;`,

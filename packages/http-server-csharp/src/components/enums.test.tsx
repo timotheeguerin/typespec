@@ -69,4 +69,31 @@ describe("EnumDeclaration", () => {
       }
     `);
   });
+
+  it("renders an enum with a type-level doc comment", async () => {
+    const { Color } = await runner.compile(t.code`
+      /** Represents available colors */
+      enum ${t.enum("Color")} {
+        Red,
+        Green,
+        Blue,
+      }
+    `);
+
+    expect(
+      <Wrapper>
+        <EnumDeclaration type={Color} />
+      </Wrapper>,
+    ).toRenderTo(`
+      /// <summary>
+      /// Represents available colors
+      /// </summary>
+      enum Color
+      {
+          Red,
+          Green,
+          Blue
+      }
+    `);
+  });
 });
