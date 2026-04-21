@@ -1,4 +1,10 @@
-import { isStdNamespace, isTemplateDeclaration, type Model, type Namespace as TspNamespace, type Type } from "@typespec/compiler";
+import {
+  isStdNamespace,
+  isTemplateDeclaration,
+  type Model,
+  type Namespace as TspNamespace,
+  type Type,
+} from "@typespec/compiler";
 import type { useTsp } from "@typespec/emitter-framework";
 import { assignAnonymousName } from "./anonymous-models.js";
 

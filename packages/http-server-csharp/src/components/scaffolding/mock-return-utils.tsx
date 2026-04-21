@@ -1,10 +1,9 @@
-import type { Program, Type } from "@typespec/compiler";
-import { isVoidType } from "@typespec/compiler";
-import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import type { Children } from "@alloy-js/core";
 import { code } from "@alloy-js/core";
-import { TypeExpression } from "../type-expression.jsx";
+import type { Program, Type } from "@typespec/compiler";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { getSuccessReturnType } from "../../utils/return-type-helpers.js";
+import { TypeExpression } from "../type-expression.jsx";
 
 // Re-export for convenience
 export { getSuccessReturnType } from "../../utils/return-type-helpers.js";
@@ -12,10 +11,7 @@ export { getSuccessReturnType } from "../../utils/return-type-helpers.js";
 /**
  * Returns a mock return statement for a method based on its return type.
  */
-export function getMockReturnStatement(
-  program: Program,
-  returnType: Type,
-): Children {
+export function getMockReturnStatement(program: Program, returnType: Type): Children {
   const successType = getSuccessReturnType(program, returnType);
   if (!successType) {
     return "return Task.CompletedTask;";

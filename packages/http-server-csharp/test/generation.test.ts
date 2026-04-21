@@ -560,10 +560,7 @@ it("generates standard array properties", async () => {
           "public string[] ArrColors { get; set; }",
         ],
       ],
-      [
-        "IContosoOperations.cs",
-        ["Task<Foo[]> UpdateAsync(string[] arrNames, string[] arrColors)"],
-      ],
+      ["IContosoOperations.cs", ["Task<Foo[]> UpdateAsync(string[] arrNames, string[] arrColors)"]],
     ],
   );
 });
@@ -1315,11 +1312,7 @@ interface Widgets {
     [
       [
         "WidgetMergePatchUpdate.cs",
-        [
-          "namespace Microsoft.Contoso;",
-          "public string Id { get; set; }",
-          "Color { get; set; }",
-        ],
+        ["namespace Microsoft.Contoso;", "public string Id { get; set; }", "Color { get; set; }"],
       ],
     ],
   );
@@ -1727,16 +1720,8 @@ it("generates appropriate types for inherited instantiated models", async () => 
       @route("/foo") @get op bar(): BarResponse;
       `,
     [
-      [
-        "FileStringBytes.cs",
-        ["public partial class FileStringBytes"],
-      ],
-      [
-        "BarResponse.cs",
-        [
-          "public partial class BarResponse : FileStringBytes",
-        ],
-      ],
+      ["FileStringBytes.cs", ["public partial class FileStringBytes"]],
+      ["BarResponse.cs", ["public partial class BarResponse : FileStringBytes"]],
       [
         "ContosoOperationsFooRequest.cs",
         [

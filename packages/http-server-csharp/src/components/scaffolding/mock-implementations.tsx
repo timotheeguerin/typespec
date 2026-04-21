@@ -1,11 +1,15 @@
 import { code, For, SourceDirectory, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import type { Interface, Operation, Program } from "@typespec/compiler";
-import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { useTsp } from "@typespec/emitter-framework";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { CSharpFile } from "../csharp-file.jsx";
 import { TypeExpression } from "../type-expression.jsx";
-import { getSuccessReturnType, getMockReturnStatement, getGetBodyPropNames } from "./mock-return-utils.jsx";
+import {
+  getGetBodyPropNames,
+  getMockReturnStatement,
+  getSuccessReturnType,
+} from "./mock-return-utils.jsx";
 
 export interface MockImplementationsProps {
   interfaces: Interface[];
@@ -22,10 +26,7 @@ export function MockImplementations(props: MockImplementationsProps): Children {
     <SourceDirectory path="mocks">
       <For each={props.interfaces}>
         {(iface) => (
-          <MockImplementation
-            type={iface}
-            canonicalOps={props.canonicalOpsMap?.get(iface.name)}
-          />
+          <MockImplementation type={iface} canonicalOps={props.canonicalOpsMap?.get(iface.name)} />
         )}
       </For>
     </SourceDirectory>
@@ -129,7 +130,12 @@ function MockMethods(props: MockMethodsProps): Children {
         const multipartBodyPropNames = new Set<string>();
         if (isMultipart && canonicalOp) {
           for (const p of canonicalOp.requestParameters.properties) {
-            if (p.kind === "body" || p.kind === "bodyRoot" || p.kind === "bodyProperty" || p.kind === "multipartBody") {
+            if (
+              p.kind === "body" ||
+              p.kind === "bodyRoot" ||
+              p.kind === "bodyProperty" ||
+              p.kind === "multipartBody"
+            ) {
               multipartBodyPropNames.add(p.property.sourceType.name);
             }
             if (p.property.isContentTypeProperty) {
@@ -159,7 +165,8 @@ function MockMethods(props: MockMethodsProps): Children {
         }
 
         const paramList = parameters.map(
-          (p, i) => code`${p.type}${p.optional ? "?" : ""} ${p.name}${i < parameters.length - 1 ? ", " : ""}`,
+          (p, i) =>
+            code`${p.type}${p.optional ? "?" : ""} ${p.name}${i < parameters.length - 1 ? ", " : ""}`,
         );
 
         const returnStatement = getMockReturnStatement(props.program, op.returnType);

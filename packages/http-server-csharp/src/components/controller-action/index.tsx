@@ -1,18 +1,14 @@
 import { code, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import { isErrorModel, isVoidType } from "@typespec/compiler";
-import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { useTsp } from "@typespec/emitter-framework";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { getDocComment } from "../../utils/doc-comments.jsx";
 import { getHttpVerbAttribute, getRouteTemplate } from "../../utils/http-helpers.js";
-import { TypeExpression } from "../type-expression.jsx";
 import type { RequestModelInfo } from "../request-models.jsx";
+import { TypeExpression } from "../type-expression.jsx";
 import { getBindingAttribute, getLiteralDefaultValue } from "./parameter-binding.js";
 import { getSuccessStatusCode } from "./response-analysis.js";
-
-// Re-export public API
-export { getBindingAttribute, getLiteralDefaultValue, hasLiteralDefault } from "./parameter-binding.js";
-export { getSuccessStatusCode } from "./response-analysis.js";
 
 export interface ControllerActionProps {
   /** The canonicalized HTTP operation to generate an action method for. */
@@ -23,7 +19,13 @@ export interface ControllerActionProps {
   requestModel?: RequestModelInfo;
 }
 
-type ParamInfo = { name: string; type: Children; attributes?: string[]; optional?: boolean; default?: Children };
+type ParamInfo = {
+  name: string;
+  type: Children;
+  attributes?: string[];
+  optional?: boolean;
+  default?: Children;
+};
 
 /**
  * Renders an ASP.NET controller action method for an HTTP operation.
@@ -71,19 +73,23 @@ export function ControllerAction(props: ControllerActionProps): Children {
     return aHasDefault ? 1 : -1;
   };
   // Default: path params, then query/header params (sorted by default presence)
-  let parameters: ParamInfo[] = [
-    ...pathParams,
-    ...queryHeaderParams.sort(sortByDefault),
-  ];
+  let parameters: ParamInfo[] = [...pathParams, ...queryHeaderParams.sort(sortByDefault)];
 
   // Add body parameter if present (but NOT for GET requests)
   const body = props.operation.requestParameters.body;
   let callArgs: string;
   const isMultipart = !isGet && body?.bodyKind === "multipart";
-  const isBodyRoot = !isGet && body?.bodyKind === "single" && body.bodies.length > 0 &&
+  const isBodyRoot =
+    !isGet &&
+    body?.bodyKind === "single" &&
+    body.bodies.length > 0 &&
     props.operation.requestParameters.properties.some((p) => p.kind === "bodyRoot");
-  const hasExplicitBody = !isGet && body?.bodyKind === "single" && body.bodies.length > 0 &&
-    body.bodies[0].property !== undefined && !isBodyRoot;
+  const hasExplicitBody =
+    !isGet &&
+    body?.bodyKind === "single" &&
+    body.bodies.length > 0 &&
+    body.bodies[0].property !== undefined &&
+    !isBodyRoot;
 
   if (isGet) {
     // GET requests suppress body parameters entirely
@@ -93,7 +99,9 @@ export function ControllerAction(props: ControllerActionProps): Children {
     callArgs = [...parameters.map((p) => p.name), "reader"].join(", ");
   } else if (isBodyRoot) {
     // @bodyRoot — the whole model is the body, no other HTTP params extracted
-    parameters = [{ name: "body", type: <TypeExpression type={body!.bodies[0].type.sourceType} /> }];
+    parameters = [
+      { name: "body", type: <TypeExpression type={body!.bodies[0].type.sourceType} /> },
+    ];
     callArgs = "body";
   } else if (props.requestModel && body?.bodyKind === "single" && body.bodies.length > 0) {
     // Request model for spread body: path, body, query/header
@@ -102,12 +110,12 @@ export function ControllerAction(props: ControllerActionProps): Children {
     // Call args: path params, then body property accesses, then query/header params
     const bodyType = body.bodies[0].type.sourceType;
     if (bodyType.kind === "Model") {
-      const bodyArgs = Array.from(bodyType.properties.values()).map(p => {
+      const bodyArgs = Array.from(bodyType.properties.values()).map((p) => {
         const propName = namePolicy.getName(p.name, "class-property");
         return `body.${propName}`;
       });
-      const pathArgNames = pathParams.map(p => p.name);
-      const queryArgNames = queryHeaderParams.map(p => p.name);
+      const pathArgNames = pathParams.map((p) => p.name);
+      const queryArgNames = queryHeaderParams.map((p) => p.name);
       callArgs = [...pathArgNames, ...bodyArgs, ...queryArgNames].join(", ");
     } else {
       callArgs = parameters.map((p) => p.name).join(", ");
@@ -144,7 +152,9 @@ export function ControllerAction(props: ControllerActionProps): Children {
         const vt = variant.type;
         if (isVoidType(vt)) continue;
         if (vt.kind === "Model") {
-          try { if (isErrorModel($.program, vt)) continue; } catch {}
+          try {
+            if (isErrorModel($.program, vt)) continue;
+          } catch {}
           if (vt.name?.toLowerCase() === "error") continue;
         }
         responseTypeExpr = <TypeExpression type={vt} />;
@@ -155,17 +165,18 @@ export function ControllerAction(props: ControllerActionProps): Children {
     }
   }
 
-  const attributes: Children[] = [
-    code`[${verb}]`,
-    code`[Route("${route}")]`,
-  ];
+  const attributes: Children[] = [code`[${verb}]`, code`[Route("${route}")]`];
   if (isMultipart) {
     attributes.push(code`[Consumes("multipart/form-data")]`);
   }
   if (responseTypeExpr) {
-    attributes.push(code`[ProducesResponseType((int)HttpStatusCode.${responseStatusCode}, Type = typeof(${responseTypeExpr}))]`);
+    attributes.push(
+      code`[ProducesResponseType((int)HttpStatusCode.${responseStatusCode}, Type = typeof(${responseTypeExpr}))]`,
+    );
   } else {
-    attributes.push(code`[ProducesResponseType((int)HttpStatusCode.${responseStatusCode}, Type = typeof(void))]`);
+    attributes.push(
+      code`[ProducesResponseType((int)HttpStatusCode.${responseStatusCode}, Type = typeof(void))]`,
+    );
   }
 
   // Generate the method body

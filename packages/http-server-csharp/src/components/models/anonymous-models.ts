@@ -25,9 +25,7 @@ export function assignAnonymousName(model: Model, contextualName?: string): stri
 }
 
 /** Pre-assigns contextual names to anonymous response models before the diagnostic pre-pass. */
-export function preAssignAnonymousResponseNames(
-  interfaces: Interface[],
-): void {
+export function preAssignAnonymousResponseNames(interfaces: Interface[]): void {
   for (const iface of interfaces) {
     for (const [, op] of iface.operations) {
       const returnType = op.returnType;

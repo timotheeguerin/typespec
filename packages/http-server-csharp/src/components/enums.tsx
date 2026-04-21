@@ -7,14 +7,12 @@ import { findServiceNamespace, getSubNamespaceParts } from "../utils/namespace-u
 import { CSharpFile } from "./csharp-file.jsx";
 import { serverRefkey } from "./type-expression.jsx";
 
-export interface EnumsProps {}
-
 /**
  * Iterates all enums in the TypeSpec program and emits C# enum declarations.
  * Each enum is emitted in its own source file with JSON serialization attributes.
  * Also emits named string unions as C# enums.
  */
-export function Enums(_props: EnumsProps): Children {
+export function Enums(): Children {
   const { $ } = useTsp();
   const enums = getServiceEnums($);
   const unionEnums = getServiceUnionEnums($);
@@ -33,7 +31,12 @@ export function Enums(_props: EnumsProps): Children {
             <>
               {code`[JsonConverter(typeof(JsonStringEnumConverter))]`}
               <hbr />
-              <cs.EnumDeclaration name={namePolicy.getName(en.name, "enum")} public refkey={serverRefkey(en)} doc={getDocComment($, en)}>
+              <cs.EnumDeclaration
+                name={namePolicy.getName(en.name, "enum")}
+                public
+                refkey={serverRefkey(en)}
+                doc={getDocComment($, en)}
+              >
                 <For each={members} comma hardline>
                   {([key, value]) => {
                     const memberName = namePolicy.getName(key, "enum-member");
@@ -78,7 +81,12 @@ export function Enums(_props: EnumsProps): Children {
             <>
               {code`[JsonConverter(typeof(JsonStringEnumConverter))]`}
               <hbr />
-              <cs.EnumDeclaration name={enumName} public refkey={serverRefkey(union)} doc={getDocComment($, union)}>
+              <cs.EnumDeclaration
+                name={enumName}
+                public
+                refkey={serverRefkey(union)}
+                doc={getDocComment($, union)}
+              >
                 <For each={members} comma hardline>
                   {({ name, value, variant }) => {
                     const memberName = namePolicy.getName(name, "enum-member");
@@ -171,8 +179,14 @@ export function isUnionEnum(union: Union): boolean {
 }
 
 /** Gets the named string variants of a union-as-enum (skipping the open `string` variant). */
-export function getUnionEnumMembers(union: Union): { name: string; value: string; variant: import("@typespec/compiler").UnionVariant }[] {
-  const members: { name: string; value: string; variant: import("@typespec/compiler").UnionVariant }[] = [];
+export function getUnionEnumMembers(
+  union: Union,
+): { name: string; value: string; variant: import("@typespec/compiler").UnionVariant }[] {
+  const members: {
+    name: string;
+    value: string;
+    variant: import("@typespec/compiler").UnionVariant;
+  }[] = [];
   for (const variant of union.variants.values()) {
     if (variant.type.kind === "String" && variant.name && typeof variant.name === "string") {
       members.push({ name: variant.name, value: variant.type.value, variant });

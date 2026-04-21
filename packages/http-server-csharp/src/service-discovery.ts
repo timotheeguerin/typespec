@@ -13,7 +13,9 @@ import { getCSharpIdentifier, NameCasingType } from "./utils/naming.js";
  * Also creates synthetic interfaces for namespace-level operations
  * (following the old emitter pattern: `${namespaceName}Operations`).
  */
-export function getServiceInterfaces(program: ReturnType<typeof useTsp>["$"]["program"]): Interface[] {
+export function getServiceInterfaces(
+  program: ReturnType<typeof useTsp>["$"]["program"],
+): Interface[] {
   const interfaces: Interface[] = [];
   const globalNs = program.getGlobalNamespaceType();
 

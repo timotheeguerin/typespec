@@ -64,7 +64,10 @@ function getStdBase(program: Program, scalar: Scalar): Scalar | undefined {
 
 type WireEncoding = { encoding: string; type: Type };
 
-function getScalarEncoding(program: Program, type: Scalar | ModelProperty): WireEncoding | undefined {
+function getScalarEncoding(
+  program: Program,
+  type: Scalar | ModelProperty,
+): WireEncoding | undefined {
   const encode = getEncode(program, type);
   if (encode) return { encoding: encode.encoding ?? "string", type: encode.type };
   if (type.kind === "ModelProperty" && type.type.kind === "Scalar") {
@@ -88,7 +91,10 @@ export function getPropertyAttributes(program: Program, property: ModelProperty)
   attrs.push(...encodingAttrs);
 
   // JsonStringEnumConverter for enum and union-as-enum properties
-  if (property.type.kind === "Enum" || (property.type.kind === "Union" && isUnionEnum(property.type))) {
+  if (
+    property.type.kind === "Enum" ||
+    (property.type.kind === "Union" && isUnionEnum(property.type))
+  ) {
     attrs.push(code`[JsonConverter(typeof(JsonStringEnumConverter))]`);
   }
 
@@ -147,7 +153,10 @@ function getEncodingAttributes(program: Program, property: ModelProperty): Child
   return result;
 }
 
-function getNumericConstraintAttribute(program: Program, property: ModelProperty): Children | undefined {
+function getNumericConstraintAttribute(
+  program: Program,
+  property: ModelProperty,
+): Children | undefined {
   if (property.type.kind !== "Scalar") return undefined;
 
   const minVal = getMinValue(program, property);
@@ -155,7 +164,12 @@ function getNumericConstraintAttribute(program: Program, property: ModelProperty
   const minExcl = getMinValueExclusive(program, property);
   const maxExcl = getMaxValueExclusive(program, property);
 
-  if (minVal === undefined && maxVal === undefined && minExcl === undefined && maxExcl === undefined) {
+  if (
+    minVal === undefined &&
+    maxVal === undefined &&
+    minExcl === undefined &&
+    maxExcl === undefined
+  ) {
     return undefined;
   }
 
@@ -174,7 +188,10 @@ function getNumericConstraintAttribute(program: Program, property: ModelProperty
   return code`[NumericConstraint<${csharpType}>(${params.join(", ")})]`;
 }
 
-function getStringConstraintAttribute(program: Program, property: ModelProperty): Children | undefined {
+function getStringConstraintAttribute(
+  program: Program,
+  property: ModelProperty,
+): Children | undefined {
   const minLen = getMinLength(program, property);
   const maxLen = getMaxLength(program, property);
   const pattern = getPattern(program, property);
@@ -189,7 +206,10 @@ function getStringConstraintAttribute(program: Program, property: ModelProperty)
   return code`[StringConstraint(${params.join(", ")})]`;
 }
 
-function getArrayConstraintAttribute(program: Program, property: ModelProperty): Children | undefined {
+function getArrayConstraintAttribute(
+  program: Program,
+  property: ModelProperty,
+): Children | undefined {
   const minItems = getMinItems(program, property);
   const maxItems = getMaxItems(program, property);
 

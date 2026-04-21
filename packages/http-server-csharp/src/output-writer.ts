@@ -1,3 +1,4 @@
+import { renderAsync, type Children } from "@alloy-js/core";
 import {
   emitFile,
   joinPaths,
@@ -6,7 +7,6 @@ import {
   resolvePath,
   type EmitContext,
 } from "@typespec/compiler";
-import { renderAsync, type Children } from "@alloy-js/core";
 import type { CSharpServiceEmitterOptions } from "./lib.js";
 
 /**

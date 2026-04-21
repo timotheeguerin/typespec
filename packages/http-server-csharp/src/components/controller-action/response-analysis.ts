@@ -5,14 +5,17 @@ import type { OperationHttpCanonicalization } from "@typespec/http-canonicalizat
  * Determines the success HTTP status code and whether the response has a body.
  * Checks the original return type for @statusCode properties.
  */
-export function getSuccessStatusCode(operation: OperationHttpCanonicalization): { statusCode: number | undefined; hasBody: boolean } {
+export function getSuccessStatusCode(operation: OperationHttpCanonicalization): {
+  statusCode: number | undefined;
+  hasBody: boolean;
+} {
   const returnType = operation.sourceType.returnType;
-  
+
   // Check direct model response
   if (returnType.kind === "Model") {
     return analyzeResponseModel(returnType);
   }
-  
+
   // Check union responses - find the first non-error success response
   if (returnType.kind === "Union") {
     for (const variant of returnType.variants.values()) {
@@ -31,10 +34,13 @@ export function getSuccessStatusCode(operation: OperationHttpCanonicalization): 
   return { statusCode: hasReturnValue ? 200 : 204, hasBody: hasReturnValue };
 }
 
-function analyzeResponseModel(model: import("@typespec/compiler").Model): { statusCode: number | undefined; hasBody: boolean } {
+function analyzeResponseModel(model: import("@typespec/compiler").Model): {
+  statusCode: number | undefined;
+  hasBody: boolean;
+} {
   let statusCode: number | undefined;
   let bodyProps = 0;
-  
+
   for (const prop of model.properties.values()) {
     // Check for @statusCode property
     if (prop.name === "statusCode") {
@@ -52,6 +58,6 @@ function analyzeResponseModel(model: import("@typespec/compiler").Model): { stat
   if (bodyProps === 0 && !model.indexer) {
     return { statusCode: statusCode ?? 204, hasBody: false };
   }
-  
+
   return { statusCode, hasBody: true };
 }

@@ -1,11 +1,11 @@
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import { isVoidType } from "@typespec/compiler";
-import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { useTsp } from "@typespec/emitter-framework";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
+import { getDocComment } from "../utils/doc-comments.jsx";
 import { CSharpFile } from "./csharp-file.jsx";
 import { TypeExpression } from "./type-expression.jsx";
-import { getDocComment } from "../utils/doc-comments.jsx";
 
 export interface RequestModelInfo {
   name: string;

@@ -42,9 +42,7 @@ export function getSubNamespaceParts(
 /**
  * Finds the service namespace (the first namespace with content).
  */
-export function findServiceNamespace(
-  globalNs: TspNamespace,
-): TspNamespace | undefined {
+export function findServiceNamespace(globalNs: TspNamespace): TspNamespace | undefined {
   function findServiceNs(ns: TspNamespace): TspNamespace | undefined {
     for (const child of ns.namespaces.values()) {
       if (isStdNamespace(child)) continue;

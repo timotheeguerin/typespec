@@ -1,8 +1,8 @@
-import { code, type Children } from "@alloy-js/core";
-import * as cs from "@alloy-js/csharp";
+import { type Children } from "@alloy-js/core";
 import type { ParameterProps } from "@alloy-js/csharp";
+import * as cs from "@alloy-js/csharp";
 import { isErrorModel, type Model, type Program } from "@typespec/compiler";
-import { isStatusCode, isHeader, getHeaderFieldName } from "@typespec/http";
+import { getHeaderFieldName, isHeader, isStatusCode } from "@typespec/http";
 import {
   getAllProperties,
   getCSharpTypeString,
@@ -20,14 +20,12 @@ export function getErrorConstructor(program: Program, model: Model, className: s
 
   // For child error models, only use own properties (not inherited)
   // For root error models, use all properties including inherited
-  const props = isChild
-    ? Array.from(model.properties.values())
-    : getAllProperties(program, model);
+  const props = isChild ? Array.from(model.properties.values()) : getAllProperties(program, model);
 
   // Separate properties into required and optional/default
   const sortedProps = props
-    .filter(p => !isStatusCode(program, p))
-    .map(prop => {
+    .filter((p) => !isStatusCode(program, p))
+    .map((prop) => {
       const defaultValue = prop.defaultValue ? getDefaultValueString(prop.defaultValue) : undefined;
       const literalValue = getLiteralValue(prop.type);
       return { prop, defaultValue: defaultValue ?? literalValue };
@@ -56,9 +54,7 @@ export function getErrorConstructor(program: Program, model: Model, className: s
     }
 
     const csharpType = getCSharpTypeString(program, prop.type);
-    const defaultStr = defaultValue
-      ? defaultValue
-      : prop.optional ? "default" : undefined;
+    const defaultStr = defaultValue ? defaultValue : prop.optional ? "default" : undefined;
     parameters.push({ name: prop.name, type: csharpType, default: defaultStr });
     bodyParts.push(`${propName} = ${prop.name};`);
 
@@ -81,18 +77,12 @@ export function getErrorConstructor(program: Program, model: Model, className: s
     baseArgs.push(`value: new { ${valueParts.join(", ")} }`);
   }
 
-  const baseConstructorArgs = isChild
-    ? [String(statusCodeStr)]
-    : baseArgs;
+  const baseConstructorArgs = isChild ? [String(statusCodeStr)] : baseArgs;
 
   const body = bodyParts.join("\n");
 
   return (
-    <cs.Constructor
-      public
-      parameters={parameters}
-      baseConstructor={baseConstructorArgs}
-    >
+    <cs.Constructor public parameters={parameters} baseConstructor={baseConstructorArgs}>
       {body}
     </cs.Constructor>
   );

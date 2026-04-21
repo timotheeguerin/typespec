@@ -1,10 +1,10 @@
 import { refkey as ayRefkey, code, For, type Children, type Refkey } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import type { Interface, Operation, Type } from "@typespec/compiler";
+import type { Interface, Operation } from "@typespec/compiler";
 import { isTemplateDeclaration, isVoidType } from "@typespec/compiler";
+import { useTsp } from "@typespec/emitter-framework";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { getUniqueItems } from "@typespec/json-schema";
-import { useTsp } from "@typespec/emitter-framework";
 import { getDocComment } from "../utils/doc-comments.jsx";
 import { getSuccessReturnType } from "../utils/return-type-helpers.js";
 import { TypeExpression } from "./type-expression.jsx";
@@ -31,8 +31,9 @@ export function BusinessLogicInterface(props: BusinessLogicInterfaceProps): Chil
   const { $ } = useTsp();
   const namePolicy = cs.useCSharpNamePolicy();
   const interfaceName = `I${namePolicy.getName(props.type.name, "class")}`;
-  const operations = Array.from(props.type.operations.entries())
-    .filter(([_, op]) => !isTemplateDeclaration(op));
+  const operations = Array.from(props.type.operations.entries()).filter(
+    ([_, op]) => !isTemplateDeclaration(op),
+  );
 
   // Build a map from operation name to its canonicalized HTTP info
   const canonicalMap = new Map<string, OperationHttpCanonicalization>();
@@ -106,7 +107,13 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
   const filteredPropNames = new Set<string>();
   if (props.canonicalOp) {
     for (const p of props.canonicalOp.requestParameters.properties) {
-      if (isMultipart && (p.kind === "body" || p.kind === "bodyRoot" || p.kind === "bodyProperty" || p.kind === "multipartBody")) {
+      if (
+        isMultipart &&
+        (p.kind === "body" ||
+          p.kind === "bodyRoot" ||
+          p.kind === "bodyProperty" ||
+          p.kind === "multipartBody")
+      ) {
         filteredPropNames.add(p.property.sourceType.name);
       }
       if (p.property.isContentTypeProperty) {
@@ -124,7 +131,13 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
       const isArrayType = prop.type.kind === "Model" && $.array.is(prop.type);
       let typeExpr: Children;
       if (isUnique && isArrayType && prop.type.kind === "Model" && prop.type.indexer?.value) {
-        typeExpr = <>ISet&lt;<TypeExpression type={prop.type.indexer.value} />&gt;</>;
+        typeExpr = (
+          <>
+            ISet&lt;
+            <TypeExpression type={prop.type.indexer.value} />
+            &gt;
+          </>
+        );
       } else {
         typeExpr = <TypeExpression type={prop.type} />;
       }

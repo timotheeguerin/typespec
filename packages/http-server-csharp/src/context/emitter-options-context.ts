@@ -7,9 +7,7 @@ export interface EmitterOptionsContext {
   serviceNamespace: string;
 }
 
-export const EmitterOptions = createNamedContext<EmitterOptionsContext>(
-  "EmitterOptions",
-);
+export const EmitterOptions = createNamedContext<EmitterOptionsContext>("EmitterOptions");
 
 /**
  * Returns emitter options from context.

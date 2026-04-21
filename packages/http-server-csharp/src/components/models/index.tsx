@@ -1,54 +1,38 @@
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import { getDoc, isErrorModel, isVoidType, type Model, type ModelProperty } from "@typespec/compiler";
+import { isErrorModel, isVoidType, type Model, type ModelProperty } from "@typespec/compiler";
+import { useTsp } from "@typespec/emitter-framework";
 import { isStatusCode } from "@typespec/http";
 import { getUniqueItems } from "@typespec/json-schema";
-import { useTsp } from "@typespec/emitter-framework";
 import { useEmitterOptions } from "../../context/emitter-options-context.js";
-import { CSharpFile } from "../csharp-file.jsx";
-import { isUnionEnum } from "../enums.jsx";
-import { serverRefkey, TypeExpression } from "../type-expression.jsx";
-import { getDocComment } from "../../utils/doc-comments.jsx";
 import { getPropertyAttributes } from "../../utils/attributes.jsx";
+import { getDocComment } from "../../utils/doc-comments.jsx";
 import { findServiceNamespace, getSubNamespaceParts } from "../../utils/namespace-utils.js";
+import { CSharpFile } from "../csharp-file.jsx";
+import { serverRefkey, TypeExpression } from "../type-expression.jsx";
 import { getErrorConstructor } from "./error-models.jsx";
 import { getServiceModels } from "./model-discovery.js";
 import {
-  getLiteralValue,
   getDefaultValueString,
-  getUnionVariantInitializer,
   getEnumDefaultInitializer,
-  hasPropertyInChain,
+  getLiteralValue,
+  getModelEmitName,
   getScalarForLiteral,
+  getUnionVariantInitializer,
   hasNonIntegerValues,
+  hasPropertyInChain,
+  isDuplicateExceptionName,
   isValueType,
   modelNeedsJsonNodes,
-  isDuplicateExceptionName,
-  getModelEmitName,
 } from "./model-helpers.js";
 
-// Re-export public API
-export { resetAnonymousModels, getAnonymousModelName, assignAnonymousName, preAssignAnonymousResponseNames } from "./anonymous-models.js";
-export { getServiceModels, getFullNamespaceName } from "./model-discovery.js";
+// Re-export public API used by other modules
 export {
-  getLiteralValue,
-  getDefaultValueString,
-  getUnionVariantInitializer,
-  getEnumDefaultInitializer,
-  hasPropertyInChain,
-  getScalarForLiteral,
-  hasNonIntegerValues,
-  isValueType,
-  modelNeedsJsonNodes,
-  isDuplicateExceptionName,
-  getAllProperties,
-  getErrorStatusCode,
-  getCSharpTypeString,
-  getModelEmitName,
-} from "./model-helpers.js";
-export { getErrorConstructor } from "./error-models.jsx";
-
-export interface ModelsProps {}
+  assignAnonymousName,
+  getAnonymousModelName,
+  preAssignAnonymousResponseNames,
+  resetAnonymousModels,
+} from "./anonymous-models.js";
 
 const modelUsings = [
   "System",
@@ -63,7 +47,7 @@ const modelUsings = [
  * Iterates all models in the TypeSpec program and emits C# class declarations.
  * Each model is emitted in its own source file under the models directory.
  */
-export function Models(_props: ModelsProps): Children {
+export function Models(): Children {
   const { $ } = useTsp();
   const models = getServiceModels($);
   const globalNs = $.program.getGlobalNamespaceType();
@@ -76,15 +60,15 @@ export function Models(_props: ModelsProps): Children {
         const usings = needsJsonNodes ? [...modelUsings, "System.Text.Json.Nodes"] : modelUsings;
         const modelName = getModelEmitName($.program, model);
         const subNsParts = getSubNamespaceParts(model.namespace, serviceNs);
-        
+
         const modelContent = <ServerClassDeclaration type={model} emitName={modelName} />;
-        
+
         // Wrap in sub-namespace if the model is in a sub-namespace of the service
         const wrappedContent = subNsParts.reduceRight<Children>(
           (content, nsPart) => <cs.Namespace name={nsPart}>{content}</cs.Namespace>,
           modelContent,
         );
-        
+
         return (
           <CSharpFile path={`${modelName}.cs`} using={usings}>
             {wrappedContent}
@@ -132,8 +116,10 @@ function ServerClassDeclaration(props: ServerClassDeclarationProps): Children {
     : undefined;
 
   // For error models with base model, check if base is also an error (child constructor)
-  const isChildError = isError && props.type.baseModel && isErrorModel($.program, props.type.baseModel);
-  const hasChildConstructor = isError && props.type.derivedModels && props.type.derivedModels.length > 0;
+  const isChildError =
+    isError && props.type.baseModel && isErrorModel($.program, props.type.baseModel);
+  const hasChildConstructor =
+    isError && props.type.derivedModels && props.type.derivedModels.length > 0;
 
   return (
     <cs.ClassDeclaration
@@ -162,7 +148,13 @@ function ServerClassDeclaration(props: ServerClassDeclarationProps): Children {
         {([_, property]) => {
           // Skip statusCode properties for error models
           if (isError && isStatusCode($.program, property)) return undefined;
-          return <ServerProperty type={property} errorClassName={isError ? className : undefined} baseModel={props.type.baseModel} />;
+          return (
+            <ServerProperty
+              type={property}
+              errorClassName={isError ? className : undefined}
+              baseModel={props.type.baseModel}
+            />
+          );
         }}
       </For>
     </cs.ClassDeclaration>
@@ -214,15 +206,21 @@ function ServerProperty(props: ServerPropertyProps): Children {
 
   // Check for literal values (the type itself is a literal)
   const { collectionType } = useEmitterOptions();
-  const literalInfo = isErrorProp ? undefined : (unionVariantInit ?? getLiteralValue(propType, collectionType));
+  const literalInfo = isErrorProp
+    ? undefined
+    : (unionVariantInit ?? getLiteralValue(propType, collectionType));
   // Check for default values
-  const defaultValue = isErrorProp ? undefined : (enumDefaultInit ?? (props.type.defaultValue ? getDefaultValueString(props.type.defaultValue) : undefined));
-  
+  const defaultValue = isErrorProp
+    ? undefined
+    : (enumDefaultInit ??
+      (props.type.defaultValue ? getDefaultValueString(props.type.defaultValue) : undefined));
+
   const initializer = literalInfo ?? defaultValue;
   const isLiteralOnly = literalInfo !== undefined && defaultValue === undefined;
 
   // Check if the property type is a non-integer enum (C# enums can only be integers)
-  const isFloatEnum = $.enum.is(propType) && hasNonIntegerValues(propType as import("@typespec/compiler").Enum);
+  const isFloatEnum =
+    $.enum.is(propType) && hasNonIntegerValues(propType as import("@typespec/compiler").Enum);
 
   // For error model properties with literal types, use the scalar base type
   // But not for union variant types — those should resolve to the enum type
@@ -238,7 +236,13 @@ function ServerProperty(props: ServerPropertyProps): Children {
   if (isFloatEnum) {
     typeExpr = code`double`;
   } else if (isUniqueItems && isArrayType && propType.indexer?.value) {
-    typeExpr = <>ISet&lt;<TypeExpression type={propType.indexer.value} />&gt;</>;
+    typeExpr = (
+      <>
+        ISet&lt;
+        <TypeExpression type={propType.indexer.value} />
+        &gt;
+      </>
+    );
   } else {
     typeExpr = <TypeExpression type={resolveToScalar ? getScalarForLiteral(propType) : propType} />;
   }

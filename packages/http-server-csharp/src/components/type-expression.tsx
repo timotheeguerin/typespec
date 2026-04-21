@@ -1,12 +1,13 @@
 import { refkey as ayRefkey, code, type Children, type Refkey } from "@alloy-js/core";
 import type { Scalar, Type } from "@typespec/compiler";
 import type { Typekit } from "@typespec/compiler/typekit";
-import { getUniqueItems } from "@typespec/json-schema";
-import { useTsp, Experimental_ComponentOverridesConfig } from "@typespec/emitter-framework";
+import { Experimental_ComponentOverridesConfig, useTsp } from "@typespec/emitter-framework";
 import { TypeExpression as EfTypeExpression } from "@typespec/emitter-framework/csharp";
-import { isUnionEnum } from "./enums.jsx";
+import { getUniqueItems } from "@typespec/json-schema";
 import { useEmitterOptions } from "../context/emitter-options-context.js";
+import { isUnionEnum } from "./enums.jsx";
 import { getAnonymousModelName } from "./models/index.jsx";
+import { isValueType } from "./models/model-helpers.js";
 
 export interface TypeExpressionProps {
   type: Type;
@@ -40,9 +41,20 @@ export function TypeExpression(props: TypeExpressionProps): Children {
       if (type.values.length > 0) {
         const { collectionType } = useEmitterOptions();
         if (collectionType === "enumerable") {
-          return <>IEnumerable&lt;<TypeExpression type={type.values[0]} />&gt;</>;
+          return (
+            <>
+              IEnumerable&lt;
+              <TypeExpression type={type.values[0]} />
+              &gt;
+            </>
+          );
         }
-        return <><TypeExpression type={type.values[0]} />[]</>;
+        return (
+          <>
+            <TypeExpression type={type.values[0]} />
+            []
+          </>
+        );
       }
       return code`object[]`;
     case "StringTemplate":
@@ -70,24 +82,48 @@ export function TypeExpression(props: TypeExpressionProps): Children {
         if (valueType.kind === "Intrinsic" && valueType.name === "unknown") {
           return code`JsonObject`;
         }
-        return <>IDictionary&lt;string, <TypeExpression type={valueType} />&gt;</>;
+        return (
+          <>
+            IDictionary&lt;string, <TypeExpression type={valueType} />
+            &gt;
+          </>
+        );
       }
       // Handle Array<T> → T[] or ISet<T> if @uniqueItems, or IEnumerable<T> if collection-type is enumerable
       if ($.array.is(type)) {
         const elementType = type.indexer!.value;
         if (getUniqueItems($.program, type)) {
-          return <>ISet&lt;<TypeExpression type={elementType} />&gt;</>;
+          return (
+            <>
+              ISet&lt;
+              <TypeExpression type={elementType} />
+              &gt;
+            </>
+          );
         }
         const { collectionType } = useEmitterOptions();
         // Byte arrays always stay as T[] regardless of collection type
-        const isByteArray = elementType.kind === "Scalar" && 
-          (elementType.name === "uint8" || elementType.name === "int8" ||
-           ($.scalar.getStdBase(elementType)?.name === "uint8") ||
-           ($.scalar.getStdBase(elementType)?.name === "int8"));
+        const isByteArray =
+          elementType.kind === "Scalar" &&
+          (elementType.name === "uint8" ||
+            elementType.name === "int8" ||
+            $.scalar.getStdBase(elementType)?.name === "uint8" ||
+            $.scalar.getStdBase(elementType)?.name === "int8");
         if (collectionType === "enumerable" && !isByteArray) {
-          return <>IEnumerable&lt;<TypeExpression type={elementType} />&gt;</>;
+          return (
+            <>
+              IEnumerable&lt;
+              <TypeExpression type={elementType} />
+              &gt;
+            </>
+          );
         }
-        return <><TypeExpression type={elementType} />[]</>;
+        return (
+          <>
+            <TypeExpression type={elementType} />
+            []
+          </>
+        );
       }
       // Handle anonymous models — use refkey to link to their generated class
       if (type.name === "" && getAnonymousModelName(type)) {
@@ -123,9 +159,7 @@ function resolveUnionType($: Typekit, union: import("@typespec/compiler").Union)
 
   const allVariants = Array.from(union.variants.values());
   // Check if null is present in the union
-  const hasNull = allVariants.some(
-    (v) => v.type.kind === "Intrinsic" && v.type.name === "null",
-  );
+  const hasNull = allVariants.some((v) => v.type.kind === "Intrinsic" && v.type.name === "null");
   // Filter out null/void variants
   const variants = allVariants.filter(
     (v) => !(v.type.kind === "Intrinsic" && (v.type.name === "null" || v.type.name === "void")),
@@ -134,7 +168,11 @@ function resolveUnionType($: Typekit, union: import("@typespec/compiler").Union)
   if (variants.length === 0) return code`object`;
   if (variants.length === 1) {
     if (hasNull && isValueType($, variants[0].type)) {
-      return <><TypeExpression type={variants[0].type} />?</>;
+      return (
+        <>
+          <TypeExpression type={variants[0].type} />?
+        </>
+      );
     }
     return <TypeExpression type={variants[0].type} />;
   }
@@ -159,24 +197,6 @@ function resolveUnionType($: Typekit, union: import("@typespec/compiler").Union)
 
   // For mixed types, use object
   return code`object`;
-}
-
-/** Returns true if the type maps to a C# value type (needs ? for nullable). */
-function isValueType($: Typekit, type: import("@typespec/compiler").Type): boolean {
-  if (type.kind === "Scalar") {
-    const base = $.scalar.getStdBase(type) ?? type;
-    const valueTypes = [
-      "int8", "int16", "int32", "int64",
-      "uint8", "uint16", "uint32", "uint64",
-      "safeint", "integer",
-      "float16", "float32", "float64", "numeric", "decimal", "decimal128",
-      "boolean",
-    ];
-    return valueTypes.includes(base.name);
-  }
-  if (type.kind === "Boolean" || type.kind === "Number") return true;
-  if (type.kind === "Enum") return true;
-  return false;
 }
 
 // --- Refkey helpers ---

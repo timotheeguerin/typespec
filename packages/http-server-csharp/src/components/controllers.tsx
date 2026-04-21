@@ -46,7 +46,7 @@ export function Controller(props: ControllerProps): Children {
       <hbr />
       <For each={props.operations} doubleHardline>
         {(op) => {
-          const rm = props.requestModels?.find(r => r.op === op);
+          const rm = props.requestModels?.find((r) => r.op === op);
           return <ControllerAction operation={op} implFieldName={implPropName} requestModel={rm} />;
         }}
       </For>

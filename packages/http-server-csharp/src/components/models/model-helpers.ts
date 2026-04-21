@@ -1,13 +1,25 @@
 import * as cs from "@alloy-js/csharp";
-import { getMinValue, isErrorModel, type Enum, type Model, type ModelProperty, type Program, type Type, type Union, type Value } from "@typespec/compiler";
-import { isStatusCode } from "@typespec/http";
+import {
+  getFriendlyName,
+  getMinValue,
+  type Enum,
+  type Model,
+  type ModelProperty,
+  type Program,
+  type Type,
+  type Union,
+  type Value,
+} from "@typespec/compiler";
 import type { useTsp } from "@typespec/emitter-framework";
-import { isUnionEnum, getUnionEnumMembers } from "../enums.jsx";
+import { isStatusCode } from "@typespec/http";
+import { getUnionEnumMembers, isUnionEnum } from "../enums.jsx";
 import { assignAnonymousName } from "./anonymous-models.js";
-import { getFriendlyName } from "@typespec/compiler";
 
 /** Gets the string representation of a literal or default value. */
-export function getLiteralValue(type: Type, collectionType?: "array" | "enumerable"): string | undefined {
+export function getLiteralValue(
+  type: Type,
+  collectionType?: "array" | "enumerable",
+): string | undefined {
   if (type.kind === "String") return `"${type.value}"`;
   if (type.kind === "Boolean") return type.value ? "true" : "false";
   if (type.kind === "Number") return String(type.value);
@@ -20,10 +32,16 @@ export function getLiteralValue(type: Type, collectionType?: "array" | "enumerab
       if (collectionType === "enumerable") {
         // Determine the C# element type from the first value
         const firstType = type.values[0];
-        const csElementType = firstType.kind === "Number"
-          ? (Number.isInteger(firstType.value) ? "int" : "double")
-          : firstType.kind === "String" ? "string"
-          : firstType.kind === "Boolean" ? "bool" : "object";
+        const csElementType =
+          firstType.kind === "Number"
+            ? Number.isInteger(firstType.value)
+              ? "int"
+              : "double"
+            : firstType.kind === "String"
+              ? "string"
+              : firstType.kind === "Boolean"
+                ? "bool"
+                : "object";
         return `new List<${csElementType}> {${elements.join(", ")}}`;
       }
       // Array mode: use C# 12 collection expression
@@ -52,7 +70,7 @@ export function getUnionVariantInitializer(
   if (type.kind !== "UnionVariant") return undefined;
   const union = type.union;
   if (!union || !isUnionEnum(union)) return undefined;
-  
+
   const enumName = namePolicy.getName(union.name!, "enum");
   const memberName = namePolicy.getName(String(type.name), "enum-member");
   return `${enumName}.${memberName}`;
@@ -68,7 +86,7 @@ export function getEnumDefaultInitializer(
 ): string | undefined {
   if (!property.defaultValue) return undefined;
   const dv = property.defaultValue;
-  
+
   // Handle TypeSpec enum default values
   if (dv.valueKind === "EnumValue") {
     const enumType = dv.value.enum;
@@ -78,18 +96,22 @@ export function getEnumDefaultInitializer(
       return `${enumName}.${memberName}`;
     }
   }
-  
+
   // Handle union-enum default values (StringValue matching a union variant)
-  if (dv.valueKind === "StringValue" && property.type.kind === "Union" && isUnionEnum(property.type)) {
+  if (
+    dv.valueKind === "StringValue" &&
+    property.type.kind === "Union" &&
+    isUnionEnum(property.type)
+  ) {
     const members = getUnionEnumMembers(property.type);
-    const match = members.find(m => m.value === dv.value);
+    const match = members.find((m) => m.value === dv.value);
     if (match) {
       const enumName = namePolicy.getName(property.type.name!, "enum");
       const memberName = namePolicy.getName(match.name, "enum-member");
       return `${enumName}.${memberName}`;
     }
   }
-  
+
   return undefined;
 }
 
@@ -125,17 +147,33 @@ export function isValueType($: ReturnType<typeof useTsp>["$"], type: Type): bool
   // Handle literal types
   if (type.kind === "Boolean" || type.kind === "Number") return true;
   if (type.kind === "String") return false;
-  
+
   if ($.scalar.is(type)) {
     const baseName = $.scalar.getStdBase(type)?.name ?? type.name;
     const valueTypes = new Set([
-      "int8", "int16", "int32", "int64",
-      "uint8", "uint16", "uint32", "uint64",
-      "safeint", "float32", "float64",
-      "decimal", "decimal128",
-      "boolean", "numeric", "integer", "float",
-      "plainDate", "plainTime", "utcDateTime", "offsetDateTime",
-      "duration", "unixTimestamp32",
+      "int8",
+      "int16",
+      "int32",
+      "int64",
+      "uint8",
+      "uint16",
+      "uint32",
+      "uint64",
+      "safeint",
+      "float32",
+      "float64",
+      "decimal",
+      "decimal128",
+      "boolean",
+      "numeric",
+      "integer",
+      "float",
+      "plainDate",
+      "plainTime",
+      "utcDateTime",
+      "offsetDateTime",
+      "duration",
+      "unixTimestamp32",
     ]);
     return valueTypes.has(baseName);
   }
@@ -158,8 +196,16 @@ export function modelNeedsJsonNodes($: ReturnType<typeof useTsp>["$"], model: Mo
 
 // Exception property names that conflict with C# Exception class
 const exceptionPropertyNames = [
-  "value", "headers", "stacktrace", "source", "message",
-  "innerexception", "hresult", "data", "targetsite", "helplink",
+  "value",
+  "headers",
+  "stacktrace",
+  "source",
+  "message",
+  "innerexception",
+  "hresult",
+  "data",
+  "targetsite",
+  "helplink",
 ];
 
 export function isDuplicateExceptionName(name: string): boolean {
@@ -180,9 +226,12 @@ export function getAllProperties(program: Program, model: Model): ModelProperty[
 }
 
 /** Gets the status code for an error model. */
-export function getErrorStatusCode(program: Program, model: Model): { value: string | number; requiresConstructorArgument?: boolean } | undefined {
+export function getErrorStatusCode(
+  program: Program,
+  model: Model,
+): { value: string | number; requiresConstructorArgument?: boolean } | undefined {
   const allProps = getAllProperties(program, model);
-  const statusCodeProp = allProps.find(p => isStatusCode(program, p));
+  const statusCodeProp = allProps.find((p) => isStatusCode(program, p));
   if (!statusCodeProp) return undefined;
 
   const type = statusCodeProp.type;
@@ -201,12 +250,28 @@ export function getErrorStatusCode(program: Program, model: Model): { value: str
 export function getCSharpTypeString(program: Program, type: Type): string {
   if (type.kind === "Scalar") {
     const scalarMap: Record<string, string> = {
-      string: "string", int8: "sbyte", int16: "short", int32: "int", int64: "long",
-      uint8: "byte", uint16: "ushort", uint32: "uint", uint64: "ulong",
-      float32: "float", float64: "double", boolean: "bool",
-      plainDate: "DateOnly", plainTime: "TimeOnly", utcDateTime: "DateTimeOffset",
-      offsetDateTime: "DateTimeOffset", duration: "TimeSpan", bytes: "byte[]",
-      decimal: "decimal", decimal128: "decimal", url: "Uri", safeint: "long",
+      string: "string",
+      int8: "sbyte",
+      int16: "short",
+      int32: "int",
+      int64: "long",
+      uint8: "byte",
+      uint16: "ushort",
+      uint32: "uint",
+      uint64: "ulong",
+      float32: "float",
+      float64: "double",
+      boolean: "bool",
+      plainDate: "DateOnly",
+      plainTime: "TimeOnly",
+      utcDateTime: "DateTimeOffset",
+      offsetDateTime: "DateTimeOffset",
+      duration: "TimeSpan",
+      bytes: "byte[]",
+      decimal: "decimal",
+      decimal128: "decimal",
+      url: "Uri",
+      safeint: "long",
     };
     return scalarMap[type.name] ?? type.name;
   }

@@ -1,9 +1,12 @@
 import { Show, SourceDirectory } from "@alloy-js/core";
 import { createCSharpNamePolicy, Namespace } from "@alloy-js/csharp";
-import { EmitContext } from "@typespec/compiler";
+import type { EmitContext, Interface } from "@typespec/compiler";
 import { $ } from "@typespec/compiler/typekit";
 import { Experimental_ComponentOverrides, Output } from "@typespec/emitter-framework";
-import { HttpCanonicalizer, type OperationHttpCanonicalization } from "@typespec/http-canonicalization";
+import {
+  HttpCanonicalizer,
+  type OperationHttpCanonicalization,
+} from "@typespec/http-canonicalization";
 import { Enums } from "./components/enums.jsx";
 import {
   Models,
@@ -20,9 +23,9 @@ import { JsonConverters } from "./components/serialization/json-converters.jsx";
 import { createServerScalarOverrides } from "./components/type-expression.jsx";
 import { EmitterOptions } from "./context/emitter-options-context.js";
 import { HttpCanonicalizerContext } from "./context/http-canonicalizer-context.js";
-import { CSharpServiceEmitterOptions } from "./lib.js";
 import { reportEmitterDiagnostics } from "./diagnostics.js";
-import { writeOutputWithOverwrite, resolveOpenApiPath } from "./output-writer.js";
+import { CSharpServiceEmitterOptions } from "./lib.js";
+import { resolveOpenApiPath, writeOutputWithOverwrite } from "./output-writer.js";
 import { getServiceInterfaces, getServiceNamespaceName } from "./service-discovery.js";
 import { getFreePort } from "./utils/port.js";
 
@@ -56,20 +59,8 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
   const interfaceNames = interfaces.map((iface) => iface.name);
   const interfaceRegistrations = interfaces.map((iface) => `I${iface.name}, ${iface.name}`);
 
-  // Pre-compute canonical ops for all interfaces (used by mock scaffolding)
-  const canonicalOpsMap = new Map<string, OperationHttpCanonicalization[]>();
-  for (const iface of interfaces) {
-    const ops: OperationHttpCanonicalization[] = [];
-    for (const [, op] of iface.operations) {
-      try {
-        const canonical = canonicalizer.canonicalize(op) as OperationHttpCanonicalization;
-        ops.push(canonical);
-      } catch {
-        // Skip operations that can't be canonicalized
-      }
-    }
-    canonicalOpsMap.set(iface.name, ops);
-  }
+  // Pre-compute canonical ops for all interfaces (used by mock scaffolding and diagnostics)
+  const canonicalOpsMap = canonicalizeAllInterfaces(canonicalizer, interfaces);
 
   // Pre-assign contextual names to anonymous response models before diagnostic pre-pass
   preAssignAnonymousResponseNames(interfaces);
@@ -109,10 +100,7 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
                   openApiPath={openApiPath}
                 />
                 <Show when={emitMocks}>
-                  <MockImplementations
-                    interfaces={interfaces}
-                    canonicalOpsMap={canonicalOpsMap}
-                  />
+                  <MockImplementations interfaces={interfaces} canonicalOpsMap={canonicalOpsMap} />
                 </Show>
                 <Show when={emitProjectFiles}>
                   <Csproj projectName={projectName} useSwaggerUI={useSwaggerUI} />
@@ -128,9 +116,7 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
                 <JsonConverters />
               </SourceDirectory>
               <Show when={emitMocks}>
-                <MockHelpers
-                  interfaceRegistrations={interfaceRegistrations}
-                />
+                <MockHelpers interfaceRegistrations={interfaceRegistrations} />
               </Show>
             </SourceDirectory>
           </HttpCanonicalizerContext.Provider>
@@ -141,4 +127,26 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
 
   const overwrite = options.overwrite ?? false;
   await writeOutputWithOverwrite(context.program, output, context.emitterOutputDir, overwrite);
+}
+
+/**
+ * Canonicalize all operations for each interface, skipping any that fail.
+ */
+export function canonicalizeAllInterfaces(
+  canonicalizer: HttpCanonicalizer,
+  interfaces: Interface[],
+): Map<string, OperationHttpCanonicalization[]> {
+  const result = new Map<string, OperationHttpCanonicalization[]>();
+  for (const iface of interfaces) {
+    const ops: OperationHttpCanonicalization[] = [];
+    for (const [, op] of iface.operations) {
+      try {
+        ops.push(canonicalizer.canonicalize(op) as OperationHttpCanonicalization);
+      } catch {
+        // Skip operations that can't be canonicalized
+      }
+    }
+    result.set(iface.name, ops);
+  }
+  return result;
 }
