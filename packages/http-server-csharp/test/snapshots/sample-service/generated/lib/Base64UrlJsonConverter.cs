@@ -5,7 +5,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TypeSpec.Helpers.JsonConverters {
+namespace TypeSpec.Helpers.JsonConverters
+{
     /// <summary>
     /// System.Text.Json converter for the properties using Base64Url encoding
     /// </summary>

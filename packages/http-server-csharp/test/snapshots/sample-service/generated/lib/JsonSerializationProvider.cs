@@ -5,7 +5,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TypeSpec.Helpers {
+namespace TypeSpec.Helpers
+{
     /// <summary>
     /// Standard implementation of IJsonSerializationProvider
     /// </summary>

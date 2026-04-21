@@ -5,7 +5,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
-namespace TypeSpec.Helpers {
+namespace TypeSpec.Helpers
+{
     /// <summary>
     /// Represents an HTTP response exception with a status code and optional value.
     /// </summary>

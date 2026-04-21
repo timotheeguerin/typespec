@@ -5,7 +5,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TypeSpec.Helpers.JsonConverters {
+namespace TypeSpec.Helpers.JsonConverters
+{
     /// <summary>
     /// Constrains the number of elements in an array
     /// </summary>
