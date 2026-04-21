@@ -3,29 +3,26 @@
 #nullable enable
 
 using System;
-using System.Net;
+using System.Collections.Generic;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using TypeSpec.Helpers;
-using TypeSpec.Helpers.JsonConverters;
 
-namespace PetStore
+namespace PetStore;
+
+/// <summary>
+/// Dog-specific operations
+/// </summary>
+public interface IDogs
 {
-    ///<summary>
-    /// Dog-specific operations
-    ///</summary>
-    public interface IDogs
-    {
-        ///<summary>
-        /// List all dogs
-        ///</summary>
-        Task<Dog[]> ListAsync();
+    /// <summary>
+    /// List all dogs
+    /// </summary>
+    Task<Dog[]> ListAsync();
 
-        ///<summary>
-        /// Get a dog by ID
-        ///</summary>
-        Task<Dog> ReadAsync(long id);
-    }
+    /// <summary>
+    /// Get a dog by ID
+    /// </summary>
+    Task<Dog> ReadAsync(long id);
 }

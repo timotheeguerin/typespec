@@ -3,44 +3,41 @@
 #nullable enable
 
 using System;
-using System.Net;
+using System.Collections.Generic;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using TypeSpec.Helpers;
-using TypeSpec.Helpers.JsonConverters;
 
-namespace PetStore
+namespace PetStore;
+
+/// <summary>
+/// Pet store operations
+/// </summary>
+public interface IPets
 {
-    ///<summary>
-    /// Pet store operations
-    ///</summary>
-    public interface IPets
-    {
-        ///<summary>
-        /// List all pets
-        ///</summary>
-        Task<PetListResult> ListAsync(int? skip, int? top);
+    /// <summary>
+    /// List all pets
+    /// </summary>
+    Task<PetListResult> ListAsync(int? skip, int? top);
 
-        ///<summary>
-        /// Get a pet by ID
-        ///</summary>
-        Task<Pet> ReadAsync(long id);
+    /// <summary>
+    /// Get a pet by ID
+    /// </summary>
+    Task<Pet> ReadAsync(long id);
 
-        ///<summary>
-        /// Create a new pet
-        ///</summary>
-        Task<Pet> CreateAsync(Pet body);
+    /// <summary>
+    /// Create a new pet
+    /// </summary>
+    Task<Pet> CreateAsync(Pet body);
 
-        ///<summary>
-        /// Update an existing pet
-        ///</summary>
-        Task<Pet> UpdateAsync(long id, Pet body);
+    /// <summary>
+    /// Update an existing pet
+    /// </summary>
+    Task<Pet> UpdateAsync(long id, Pet body);
 
-        ///<summary>
-        /// Delete a pet
-        ///</summary>
-        Task DeleteAsync(long id);
-    }
+    /// <summary>
+    /// Delete a pet
+    /// </summary>
+    Task DeleteAsync(long id);
 }
