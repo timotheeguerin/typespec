@@ -14,6 +14,9 @@ export function Base64UrlJsonConverter(): Children {
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
+          /// <summary>
+          /// System.Text.Json converter for properties using Base64Url encoding
+          /// </summary>
           public class Base64UrlJsonConverter : JsonConverter<byte[]>
           {
             public override byte[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

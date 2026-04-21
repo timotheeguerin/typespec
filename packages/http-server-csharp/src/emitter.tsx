@@ -36,7 +36,7 @@ import { AppSettings, LaunchSettings } from "./components/project/launch-setting
 import { ProgramCs } from "./components/project/program.jsx";
 import { RequestModels, type RequestModelInfo } from "./components/request-models.jsx";
 import { Documentation } from "./components/scaffolding/documentation.jsx";
-import { MockScaffolding } from "./components/scaffolding/mock-scaffolding.jsx";
+import { MockHelpers, MockImplementations } from "./components/scaffolding/mock-scaffolding.jsx";
 import { JsonConverters } from "./components/serialization/json-converters.jsx";
 import { createServerScalarOverrides } from "./components/type-expression.jsx";
 import { EmitterOptions, useEmitterOptions } from "./context/emitter-options-context.js";
@@ -481,15 +481,14 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
       <Experimental_ComponentOverrides overrides={scalarOverrides}>
         <EmitterOptions.Provider value={{ collectionType, serviceNamespace: serviceName }}>
           <HttpCanonicalizerContext.Provider value={canonicalizer}>
-            <Namespace name={serviceName}>
-              <SourceDirectory path=".">
+            <SourceDirectory path=".">
+              <Namespace name={serviceName}>
                 <SourceDirectory path="generated">
                   <SourceDirectory path="models">
                     <Models />
                     <Enums />
                   </SourceDirectory>
                   <ControllersAndInterfaces />
-                  <JsonConverters />
                 </SourceDirectory>
                 <ProgramCs
                   hasMocks={emitMocks}
@@ -497,8 +496,7 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
                   openApiPath={openApiPath}
                 />
                 {emitMocks && (
-                  <MockScaffolding
-                    interfaceRegistrations={interfaceRegistrations}
+                  <MockImplementations
                     interfaces={interfaces}
                     canonicalOpsMap={canonicalOpsMap}
                   />
@@ -514,8 +512,16 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
                   interfaceNames={emitMocks ? interfaceNames : []}
                   useSwaggerUI={useSwaggerUI}
                 />
+              </Namespace>
+              <SourceDirectory path="generated">
+                <JsonConverters />
               </SourceDirectory>
-            </Namespace>
+              {emitMocks && (
+                <MockHelpers
+                  interfaceRegistrations={interfaceRegistrations}
+                />
+              )}
+            </SourceDirectory>
           </HttpCanonicalizerContext.Provider>
         </EmitterOptions.Provider>
       </Experimental_ComponentOverrides>

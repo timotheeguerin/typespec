@@ -7,18 +7,15 @@ import { useTsp } from "@typespec/emitter-framework";
 import { CSharpFile } from "../csharp-file.jsx";
 import { TypeExpression } from "../type-expression.jsx";
 
-export interface MockScaffoldingProps {
+export interface MockHelpersProps {
   interfaceRegistrations: string[];
-  interfaces: Interface[];
-  /** Map from interface name to its canonicalized HTTP operations. */
-  canonicalOpsMap?: Map<string, OperationHttpCanonicalization[]>;
 }
 
 /**
- * Renders the mock scaffolding files: IInitializer, Initializer, MockRegistration,
- * and per-interface mock implementation classes.
+ * Renders the mock helper files: IInitializer, Initializer, MockRegistration.
+ * These go under the TypeSpec.Helpers namespace.
  */
-export function MockScaffolding(props: MockScaffoldingProps): Children {
+export function MockHelpers(props: MockHelpersProps): Children {
   return (
     <cs.Namespace name="TypeSpec.Helpers">
       <SourceDirectory path="mocks">
@@ -27,16 +24,33 @@ export function MockScaffolding(props: MockScaffoldingProps): Children {
         {props.interfaceRegistrations.length > 0 && (
           <MockRegistration interfaceRegistrations={props.interfaceRegistrations} />
         )}
-        <For each={props.interfaces}>
-          {(iface) => (
-            <MockImplementation
-              type={iface}
-              canonicalOps={props.canonicalOpsMap?.get(iface.name)}
-            />
-          )}
-        </For>
       </SourceDirectory>
     </cs.Namespace>
+  );
+}
+
+export interface MockImplementationsProps {
+  interfaces: Interface[];
+  /** Map from interface name to its canonicalized HTTP operations. */
+  canonicalOpsMap?: Map<string, OperationHttpCanonicalization[]>;
+}
+
+/**
+ * Renders per-interface mock implementation classes.
+ * These go under the service namespace.
+ */
+export function MockImplementations(props: MockImplementationsProps): Children {
+  return (
+    <SourceDirectory path="mocks">
+      <For each={props.interfaces}>
+        {(iface) => (
+          <MockImplementation
+            type={iface}
+            canonicalOps={props.canonicalOpsMap?.get(iface.name)}
+          />
+        )}
+      </For>
+    </SourceDirectory>
   );
 }
 
@@ -44,9 +58,22 @@ function InitializerInterface(): Children {
   return (
     <CSharpFile path="IInitializer.cs">
       {code`
+        /// <summary>
+        /// Interface for object initialization in mocks
+        /// </summary>
         public interface IInitializer
         {
+          /// <summary>
+          /// Initialize an object of the given type
+          /// </summary>
+          /// <param name="type"> The type to initialize</param>
+          /// <returns>An instance of the given type. Or null if initialization was impossible.</returns>
           object? Initialize(System.Type type);
+          /// <summary>
+          /// Initialize an object of the given type
+          /// </summary>
+          /// <typeparam name="T">The type to initialize</typeparam>
+          /// <returns>An instance of the given type</returns>
           T Initialize<T>() where T : class, new();
         }
       `}
@@ -58,8 +85,15 @@ function InitializerImplementation(): Children {
   return (
     <CSharpFile path="Initializer.cs">
       {code`
+        /// <summary>
+        /// Default initializer for mock implementations of business logic interfaces
+        /// </summary>
         public class Initializer : IInitializer
         {
+          /// <summary>
+          /// Instantiate the initializer. The cache should be instantiated using ASP.Net Core's dependency injection
+          /// </summary>
+          /// <param name="cache"></param>
           public Initializer(IDictionary<Type, object?> cache)
           {
             Cache = cache;
@@ -73,6 +107,11 @@ function InitializerImplementation(): Children {
             return instance;
           }
 
+          /// <summary>
+          /// Initialize an object of the given type
+          /// </summary>
+          /// <param name="type"> The type to initialize</param>
+          /// <returns>An instance of the given type. Or null if initialization was impossible.</returns>
           public object? Initialize(Type type)
           {
             if (Cache.ContainsKey(type)) return Cache[type];
@@ -95,6 +134,11 @@ function InitializerImplementation(): Children {
             return new object();
           }
 
+          /// <summary>
+          /// Initialize an object of the given type
+          /// </summary>
+          /// <typeparam name="T">The type to initialize</typeparam>
+          /// <returns>An instance of the given type</returns>
           public T Initialize<T>() where T : class, new()
           {
             var result = new T();
@@ -129,6 +173,9 @@ function MockRegistration(props: { interfaceRegistrations: string[] }): Children
   return (
     <CSharpFile path="MockRegistration.cs" using={["Microsoft.AspNetCore.Http.Features"]}>
       {code`
+        /// <summary>
+        /// Register Business Logic implementations. Replace with actual implementations when available.
+        /// </summary>
         public static class MockRegistration
         {
           public static void Register(WebApplicationBuilder builder)
@@ -246,8 +293,20 @@ function MockImplementation(props: MockImplementationProps): Children {
       ]}
     >
       {code`
+        /// <summary>
+        /// This is a mock implementation of the business logic interface for
+        /// demonstration and early development.  Feel free to overwrite this file.
+        /// Or replace it with another implementation, and register that implementation
+        /// in the dependency injection container
+        /// </summary>
         public class ${className} : ${interfaceName}
         {
+          /// <summary>
+          /// The controller constructor, using the dependency injection container to satisfy the parameters.
+          /// </summary>
+          /// <param name="initializer">The initializer class, registered with dependency injection</param>
+          /// <param name="accessor">The accessor for the HttpContext, allows your implementation to
+          /// get properties of the incoming request and to set properties of the outgoing response.</param>
           public ${className}(IInitializer initializer, IHttpContextAccessor accessor)
           {
             _initializer = initializer;
@@ -256,6 +315,10 @@ function MockImplementation(props: MockImplementationProps): Children {
 
           private IInitializer _initializer;
 
+          /// <summary>
+          /// Use this property in your implementation to access properties of the incoming HttpRequest
+          /// and to set properties of the outgoing HttpResponse
+          /// </summary>
           public IHttpContextAccessor HttpContextAccessor { get; }
 
           ${(<MockMethods operations={operations} program={$.program} canonicalMap={canonicalMap} />)}

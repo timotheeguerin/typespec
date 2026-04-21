@@ -15,6 +15,9 @@ export function UnixEpochDateTimeConverter(): Children {
       >
         <Namespace name="TypeSpec.Helpers.JsonConverters">
           {code`
+            /// <summary>
+            /// Converts between Unix epoch timestamps and DateTime values
+            /// </summary>
             public sealed class UnixEpochDateTimeConverter : JsonConverter<DateTime>
             {
               static readonly DateTime s_epoch = new DateTime(1970, 1, 1, 0, 0, 0);
@@ -40,6 +43,9 @@ export function UnixEpochDateTimeConverter(): Children {
       >
         <Namespace name="TypeSpec.Helpers.JsonConverters">
           {code`
+            /// <summary>
+            /// Converts between Unix epoch timestamps and DateTimeOffset values
+            /// </summary>
             public class UnixEpochDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
             {
               public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

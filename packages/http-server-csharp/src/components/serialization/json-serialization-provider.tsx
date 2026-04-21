@@ -15,9 +15,25 @@ export function JsonSerializationProvider(): Children {
       >
         <Namespace name="TypeSpec.Helpers">
           {code`
+            /// <summary>
+            /// Interface for Json serialization, suitable for providing a service in ASP.Net dependency injection
+            /// </summary>
             public interface IJsonSerializationProvider
             {
+              /// <summary>
+              /// Serialize an object to a JSON string
+              /// </summary>
+              /// <typeparam name="T">The type of the object</typeparam>
+              /// <param name="value">The object to serialize</param>
+              /// <returns>A string representing the serialized object</returns>
               string Serialize<T>(T value);
+
+              /// <summary>
+              /// Create an object from a json string
+              /// </summary>
+              /// <typeparam name="T">The type of the object represented in the string</typeparam>
+              /// <param name="value">The string to deserialize</param>
+              /// <returns>The deserialized object, or null</returns>
               T? Deserialize<T>(string value);
             }
           `}
@@ -33,8 +49,14 @@ export function JsonSerializationProvider(): Children {
       >
         <Namespace name="TypeSpec.Helpers">
           {code`
+            /// <summary>
+            /// Standard implementation of IJsonSerializationProvider
+            /// </summary>
             public class JsonSerializationProvider : IJsonSerializationProvider
             {
+              /// <summary>
+              /// The options to use for serialization
+              /// </summary>
               public JsonSerializerOptions Options { get; }
 
               public JsonSerializationProvider()
@@ -52,11 +74,23 @@ export function JsonSerializationProvider(): Children {
                 };
               }
 
+              /// <summary>
+              /// Serialize an object to a JSON string
+              /// </summary>
+              /// <typeparam name="T">The type of the object</typeparam>
+              /// <param name="value">The object to serialize</param>
+              /// <returns>A string representing the serialized object</returns>
               public string Serialize<T>(T value)
               {
                 return JsonSerializer.Serialize(value, Options);
               }
 
+              /// <summary>
+              /// Create an object from a json string
+              /// </summary>
+              /// <typeparam name="T">The type of the object represented in the string</typeparam>
+              /// <param name="value">The string to deserialize</param>
+              /// <returns>The deserialized object, or null</returns>
               public T? Deserialize<T>(string value)
               {
                 return JsonSerializer.Deserialize<T>(value, Options);

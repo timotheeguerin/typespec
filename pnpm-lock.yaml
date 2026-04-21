@@ -501,7 +501,7 @@ catalogs:
 
 overrides:
   '@alloy-js/core': 0.23.0-dev.16
-  '@alloy-js/csharp': 0.23.0-dev.7
+  '@alloy-js/csharp': 0.23.0-dev.8
   '@alloy-js/cli': 0.23.0-dev.5
   '@alloy-js/msbuild': 0.23.0-dev.2
   '@alloy-js/markdown': 0.23.0-dev.2
@@ -880,8 +880,8 @@ importers:
   packages/emitter-framework:
     dependencies:
       '@alloy-js/csharp':
-        specifier: 0.23.0-dev.7
-        version: 0.23.0-dev.7
+        specifier: 0.23.0-dev.8
+        version: 0.23.0-dev.8
     devDependencies:
       '@alloy-js/cli':
         specifier: 0.23.0-dev.5
@@ -1275,8 +1275,8 @@ importers:
         specifier: 0.23.0-dev.16
         version: 0.23.0-dev.16
       '@alloy-js/csharp':
-        specifier: 0.23.0-dev.7
-        version: 0.23.0-dev.7
+        specifier: 0.23.0-dev.8
+        version: 0.23.0-dev.8
       '@alloy-js/msbuild':
         specifier: 0.23.0-dev.2
         version: 0.23.0-dev.2
@@ -3123,8 +3123,8 @@ packages:
   '@alloy-js/core@0.23.0-dev.16':
     resolution: {integrity: sha512-4cgip7SZuVIbdp9tYWiD638vetT9mxNyRHbIUY92bGL2h0rZVTe9EM9XAHichS0n3jj0Bjj5zwv2Rm79OALoMA==}
 
-  '@alloy-js/csharp@0.23.0-dev.7':
-    resolution: {integrity: sha512-XOVFzk6VUJVHa751hwdynCOmODxibFS9Gdr8swWyOXTeORA48gWIDt0umKqnNnNEKOpAP7/KzMwUGAUxPykQnQ==}
+  '@alloy-js/csharp@0.23.0-dev.8':
+    resolution: {integrity: sha512-dTlzYLM67Rj16ZTm+6pQ7YkVnxrAHUmymLR4dTVIsZk4PHb4C1uTZ1jM2Qj+WvQn5Z4xyv2PbbQ3eq4ZVmn9Rg==}
 
   '@alloy-js/markdown@0.23.0-dev.2':
     resolution: {integrity: sha512-mh2FjrZf4k8k9DLgWRHj6iYuzYWVCPzpjbEUaZlwky4mTV3Q4ygpAd0oo5JGFoh6wAtTglKErEoaw7OTCLJ9hg==}
@@ -13704,7 +13704,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@alloy-js/csharp@0.23.0-dev.7':
+  '@alloy-js/csharp@0.23.0-dev.8':
     dependencies:
       '@alloy-js/core': 0.23.0-dev.16
       '@alloy-js/msbuild': 0.23.0-dev.2

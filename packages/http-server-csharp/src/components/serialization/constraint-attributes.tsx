@@ -26,13 +26,29 @@ function NumericConstraintAttribute(): Children {
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
+          /// <summary>
+          /// Provides numeric constraint validation at serialization time
+          /// </summary>
+          /// <typeparam name="T"></typeparam>
           public class NumericConstraintAttribute<T> : JsonConverterAttribute where T: struct, INumber<T>
           {
             T? _minValue = null, _maxValue = null;
             public NumericConstraintAttribute() { }
+            /// <summary>
+            /// Provides the minimum value
+            /// </summary>
             public T MinValue { get { return _minValue.HasValue ? _minValue.Value : default(T); } set { _minValue = value; } }
+            /// <summary>
+            /// Provides the maximum allowed value
+            /// </summary>
             public T MaxValue { get { return _maxValue.HasValue ? _maxValue.Value : default(T); } set { _maxValue = value; } }
+            /// <summary>
+            /// If true, then values greater than but not equal to the minimum value are allowed
+            /// </summary>
             public bool MinValueExclusive { get; set; }
+            /// <summary>
+            /// If true, values less than, but not equal to the provided maximum are allowed
+            /// </summary>
             public bool MaxValueExclusive { get; set; }
             public override JsonConverter? CreateConverter(Type typeToConvert)
             {
@@ -98,10 +114,16 @@ function StringConstraintAttribute(): Children {
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
+          /// <summary>
+          /// Provides constraints for string values
+          /// </summary>
           public class StringConstraintAttribute : JsonConverterAttribute
           {
             public int MinLength { get; set; }
             public int MaxLength { get; set; }
+            /// <summary>
+            /// The pattern that the string must match
+            /// </summary>
             public string? Pattern { get; set; }
             public override JsonConverter? CreateConverter(Type typeToConvert)
             {
@@ -153,9 +175,19 @@ function ArrayConstraintAttribute(): Children {
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
+          /// <summary>
+          /// Constrains the number of elements in an array
+          /// </summary>
+          /// <typeparam name="T">The element type of the array</typeparam>
           public class ArrayConstraintAttribute<T> : JsonConverterAttribute
           {
+            /// <summary>
+            /// The smallest number of allowed items
+            /// </summary>
             public int MinItems { get; set; }
+            /// <summary>
+            /// The largest number of allowed items
+            /// </summary>
             public int MaxItems { get; set; } = int.MaxValue;
             public override JsonConverter? CreateConverter(Type typeToConvert)
             {
@@ -204,6 +236,9 @@ function StringArrayConstraintAttribute(): Children {
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
+          /// <summary>
+          /// Constrains the elements of a string array
+          /// </summary>
           public class StringArrayConstraintAttribute : JsonConverterAttribute
           {
             public int MinItems { get; set; }
@@ -270,6 +305,9 @@ function NumericArrayConstraintAttribute(): Children {
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
+          /// <summary>
+          /// Constrains the elements of a numeric array
+          /// </summary>
           public class NumericArrayConstraintAttribute<T> : JsonConverterAttribute where T : struct, INumber<T>
           {
             T? _minValue = null, _maxValue = null;

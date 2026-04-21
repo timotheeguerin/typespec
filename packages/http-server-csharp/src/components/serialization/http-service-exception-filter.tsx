@@ -15,8 +15,16 @@ export function HttpServiceExceptionFilter(): Children {
     >
       <Namespace name="TypeSpec.Helpers">
         {code`
+          /// <summary>
+          /// Represents an HTTP response exception with a status code and optional value.
+          /// </summary>
           public class HttpServiceException : Exception
           {
+            /// <summary>
+            /// Initializes a new instance of the HttpServiceException class.
+            /// </summary>
+            /// <param name="statusCode">The HTTP status code.</param>
+            /// <param name="value">The optional value to include in the response.</param>
             public HttpServiceException(int statusCode, object? value = null, Dictionary<string, string>? headers = null) =>
               (StatusCode, Value, Headers) = (statusCode, value, headers ?? new Dictionary<string, string>());
             public int StatusCode { get; }
@@ -24,6 +32,9 @@ export function HttpServiceExceptionFilter(): Children {
             public Dictionary<string, string> Headers { get; }
           }
 
+          /// <summary>
+          /// An action filter that handles HttpServiceException and converts it to an HTTP response.
+          /// </summary>
           public class HttpServiceExceptionFilter : IExceptionFilter
           {
             public void OnException(ExceptionContext context)

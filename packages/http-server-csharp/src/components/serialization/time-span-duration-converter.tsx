@@ -14,6 +14,9 @@ export function TimeSpanDurationConverter(): Children {
     >
       <Namespace name="TypeSpec.Helpers.JsonConverters">
         {code`
+          /// <summary>
+          /// Converts between Json duration and .Net TimeSpan
+          /// </summary>
           public class TimeSpanDurationConverter : JsonConverter<TimeSpan>
           {
             public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

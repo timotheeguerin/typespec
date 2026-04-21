@@ -1,6 +1,6 @@
 import { Output, render } from "@alloy-js/core";
 import { describe, expect, it } from "vitest";
-import { MockScaffolding } from "./mock-scaffolding.jsx";
+import { MockHelpers } from "./mock-scaffolding.jsx";
 
 function findFileContent(output: any, pathSuffix: string): string | undefined {
   function search(dir: any): string | undefined {
@@ -22,11 +22,11 @@ function findFileContent(output: any, pathSuffix: string): string | undefined {
   return search(output);
 }
 
-describe("MockScaffolding", () => {
+describe("MockHelpers", () => {
   it("renders initializer interface", () => {
     const output = render(
       <Output>
-        <MockScaffolding interfaceRegistrations={[]} interfaces={[]} />
+        <MockHelpers interfaceRegistrations={[]} />
       </Output>,
     );
     const content = findFileContent(output, "IInitializer.cs");
@@ -37,7 +37,7 @@ describe("MockScaffolding", () => {
   it("renders initializer implementation", () => {
     const output = render(
       <Output>
-        <MockScaffolding interfaceRegistrations={[]} interfaces={[]} />
+        <MockHelpers interfaceRegistrations={[]} />
       </Output>,
     );
     const content = findFileContent(output, "Initializer.cs");
@@ -48,7 +48,7 @@ describe("MockScaffolding", () => {
   it("renders mock registration with interface registrations", () => {
     const output = render(
       <Output>
-        <MockScaffolding interfaceRegistrations={["IPetStore, MockPetStore"]} interfaces={[]} />
+        <MockHelpers interfaceRegistrations={["IPetStore, MockPetStore"]} />
       </Output>,
     );
     const content = findFileContent(output, "MockRegistration.cs");
