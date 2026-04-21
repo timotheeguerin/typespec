@@ -5,7 +5,7 @@ import { useTsp } from "@typespec/emitter-framework";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { getDocComment } from "../utils/doc-comments.jsx";
 import { CSharpFile } from "./csharp-file.jsx";
-import { TypeExpression } from "./type-expression.jsx";
+import { TypeExpression } from "./type-expression/type-expression.jsx";
 
 export interface RequestModelInfo {
   name: string;

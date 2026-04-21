@@ -6,7 +6,7 @@ import type { OperationHttpCanonicalization } from "@typespec/http-canonicalizat
 import { getDocComment } from "../../utils/doc-comments.jsx";
 import { getHttpVerbAttribute, getRouteTemplate } from "../../utils/http-helpers.js";
 import type { RequestModelInfo } from "../request-models.jsx";
-import { TypeExpression } from "../type-expression.jsx";
+import { TypeExpression } from "../type-expression/type-expression.jsx";
 import { getBindingAttribute, getLiteralDefaultValue } from "./parameter-binding.js";
 import { getSuccessStatusCode } from "./response-analysis.js";
 

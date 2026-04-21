@@ -6,9 +6,9 @@ import { useEmitterOptions } from "../context/emitter-options-context.js";
 import { useHttpCanonicalizer } from "../context/http-canonicalizer-context.js";
 import { canonicalizeAllInterfaces } from "../emitter.jsx";
 import { getServiceInterfaces } from "../service-discovery.js";
-import { Controller } from "./controllers.jsx";
+import { Controller } from "./controllers/controllers.jsx";
 import { CSharpFile } from "./csharp-file.jsx";
-import { BusinessLogicInterface } from "./interfaces.jsx";
+import { BusinessLogicInterface } from "./interfaces/interfaces.jsx";
 import { RequestModels, type RequestModelInfo } from "./request-models.jsx";
 
 /**

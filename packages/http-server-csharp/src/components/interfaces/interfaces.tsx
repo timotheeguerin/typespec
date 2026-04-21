@@ -5,9 +5,9 @@ import { isTemplateDeclaration, isVoidType } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { getUniqueItems } from "@typespec/json-schema";
-import { getDocComment } from "../utils/doc-comments.jsx";
-import { getSuccessReturnType } from "../utils/return-type-helpers.js";
-import { TypeExpression } from "./type-expression.jsx";
+import { getDocComment } from "../../utils/doc-comments.jsx";
+import { getSuccessReturnType } from "../../utils/return-type-helpers.js";
+import { TypeExpression } from "../type-expression/type-expression.jsx";
 
 const interfaceRefKeyPrefix = Symbol.for("http-server-csharp:interface");
 

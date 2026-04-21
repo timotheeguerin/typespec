@@ -12,7 +12,7 @@ import {
 } from "@typespec/compiler";
 import type { useTsp } from "@typespec/emitter-framework";
 import { isStatusCode } from "@typespec/http";
-import { getUnionEnumMembers, isUnionEnum } from "../enums.jsx";
+import { getUnionEnumMembers, isUnionEnum } from "../enums/enums.jsx";
 import { assignAnonymousName } from "./anonymous-models.js";
 
 /** Gets the string representation of a literal or default value. */

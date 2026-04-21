@@ -4,10 +4,10 @@ import type { Typekit } from "@typespec/compiler/typekit";
 import { Experimental_ComponentOverridesConfig, useTsp } from "@typespec/emitter-framework";
 import { TypeExpression as EfTypeExpression } from "@typespec/emitter-framework/csharp";
 import { getUniqueItems } from "@typespec/json-schema";
-import { useEmitterOptions } from "../context/emitter-options-context.js";
-import { isUnionEnum } from "./enums.jsx";
-import { getAnonymousModelName } from "./models/index.jsx";
-import { isValueType } from "./models/model-helpers.js";
+import { useEmitterOptions } from "../../context/emitter-options-context.js";
+import { isUnionEnum } from "../enums/enums.jsx";
+import { getAnonymousModelName } from "../models/models.jsx";
+import { isValueType } from "../models/model-helpers.js";
 
 export interface TypeExpressionProps {
   type: Type;

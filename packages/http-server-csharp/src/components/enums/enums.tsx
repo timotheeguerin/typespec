@@ -9,10 +9,10 @@ import {
 } from "@typespec/compiler";
 import type { Refkey } from "@alloy-js/core";
 import { useTsp } from "@typespec/emitter-framework";
-import { getDocComment } from "../utils/doc-comments.jsx";
-import { findServiceNamespace, getSubNamespaceParts } from "../utils/namespace-utils.js";
-import { CSharpFile } from "./csharp-file.jsx";
-import { serverRefkey } from "./type-expression.jsx";
+import { getDocComment } from "../../utils/doc-comments.jsx";
+import { findServiceNamespace, getSubNamespaceParts } from "../../utils/namespace-utils.js";
+import { CSharpFile } from "../csharp-file.jsx";
+import { serverRefkey } from "../type-expression/type-expression.jsx";
 
 /** Normalized member info shared by both enums and union-enums. */
 interface EnumMemberInfo {

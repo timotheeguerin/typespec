@@ -4,7 +4,7 @@ import type { Interface, Operation, Program } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { CSharpFile } from "../csharp-file.jsx";
-import { TypeExpression } from "../type-expression.jsx";
+import { TypeExpression } from "../type-expression/type-expression.jsx";
 import {
   getGetBodyPropNames,
   getMockReturnStatement,

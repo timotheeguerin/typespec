@@ -9,7 +9,7 @@ import { getPropertyAttributes } from "../../utils/attributes.jsx";
 import { getDocComment } from "../../utils/doc-comments.jsx";
 import { findServiceNamespace, getSubNamespaceParts } from "../../utils/namespace-utils.js";
 import { CSharpFile } from "../csharp-file.jsx";
-import { serverRefkey, TypeExpression } from "../type-expression.jsx";
+import { serverRefkey, TypeExpression } from "../type-expression/type-expression.jsx";
 import { getErrorConstructor } from "./error-models.jsx";
 import { getServiceModels } from "./model-discovery.js";
 import {

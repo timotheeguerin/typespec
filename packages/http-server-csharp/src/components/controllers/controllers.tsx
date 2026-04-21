@@ -3,9 +3,9 @@ import * as cs from "@alloy-js/csharp";
 import { Reference } from "@alloy-js/csharp";
 import type { Interface } from "@typespec/compiler";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
-import { ControllerAction } from "./controller-action/index.jsx";
-import { businessLogicInterfaceRefkey } from "./interfaces.jsx";
-import type { RequestModelInfo } from "./request-models.jsx";
+import { ControllerAction } from "../controller-action/controller-action.jsx";
+import { businessLogicInterfaceRefkey } from "../interfaces/interfaces.jsx";
+import type { RequestModelInfo } from "../request-models.jsx";
 
 export interface ControllerProps {
   /** The TypeSpec interface this controller represents. */

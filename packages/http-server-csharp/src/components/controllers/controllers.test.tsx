@@ -10,7 +10,7 @@ import {
 } from "@typespec/http-canonicalization";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Controller } from "./controllers.jsx";
-import { BusinessLogicInterface } from "./interfaces.jsx";
+import { BusinessLogicInterface } from "../interfaces/interfaces.jsx";
 
 let runner: TesterInstance;
 

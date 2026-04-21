@@ -7,12 +7,12 @@ import {
   HttpCanonicalizer,
   type OperationHttpCanonicalization,
 } from "@typespec/http-canonicalization";
-import { Enums } from "./components/enums.jsx";
+import { Enums } from "./components/enums/enums.jsx";
 import {
   Models,
   preAssignAnonymousResponseNames,
   resetAnonymousModels,
-} from "./components/models/index.jsx";
+} from "./components/models/models.jsx";
 import { Csproj } from "./components/project/csproj.jsx";
 import { AppSettings, LaunchSettings } from "./components/project/launch-settings.jsx";
 import { ProgramCs } from "./components/project/program.jsx";
@@ -20,7 +20,7 @@ import { ControllersAndInterfaces } from "./components/render-root.jsx";
 import { Documentation } from "./components/scaffolding/documentation.jsx";
 import { MockHelpers, MockImplementations } from "./components/scaffolding/mock-scaffolding.jsx";
 import { JsonConverters } from "./components/serialization/json-converters.jsx";
-import { createServerScalarOverrides } from "./components/type-expression.jsx";
+import { createServerScalarOverrides } from "./components/type-expression/type-expression.jsx";
 import { EmitterOptions } from "./context/emitter-options-context.js";
 import { HttpCanonicalizerContext } from "./context/http-canonicalizer-context.js";
 import { reportEmitterDiagnostics } from "./diagnostics.js";

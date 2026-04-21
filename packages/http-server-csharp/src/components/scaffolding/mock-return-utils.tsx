@@ -3,7 +3,7 @@ import { code } from "@alloy-js/core";
 import type { Program, Type } from "@typespec/compiler";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { getSuccessReturnType } from "../../utils/return-type-helpers.js";
-import { TypeExpression } from "../type-expression.jsx";
+import { TypeExpression } from "../type-expression/type-expression.jsx";
 
 // Re-export for convenience
 export { getSuccessReturnType } from "../../utils/return-type-helpers.js";

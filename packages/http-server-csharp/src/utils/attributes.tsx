@@ -17,7 +17,7 @@ import {
   type Scalar,
   type Type,
 } from "@typespec/compiler";
-import { isUnionEnum } from "../components/enums.jsx";
+import { isUnionEnum } from "../components/enums/enums.jsx";
 
 /**
  * Maps a TypeSpec scalar name to the C# type name used in attributes.
