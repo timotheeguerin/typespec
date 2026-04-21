@@ -32,9 +32,9 @@ export function Enums(_props: EnumsProps): Children {
           const enumDecl = (
             <>
               {code`[JsonConverter(typeof(JsonStringEnumConverter))]`}
-              {"\n"}
+              <hbr />
               <cs.EnumDeclaration name={namePolicy.getName(en.name, "enum")} public refkey={serverRefkey(en)} doc={getDocComment($, en)}>
-                <For each={members} joiner={",\n"}>
+                <For each={members} comma hardline>
                   {([key, value]) => {
                     const memberName = namePolicy.getName(key, "enum-member");
                     const serializedValue = typeof value.value === "string" ? value.value : key;
@@ -42,7 +42,7 @@ export function Enums(_props: EnumsProps): Children {
                       <>
                         <cs.DocWhen doc={getDocComment($, value)} />
                         {code`[JsonStringEnumMemberName("${serializedValue}")]`}
-                        {"\n"}
+                        <hbr />
                         <cs.EnumMember name={memberName} />
                       </>
                     );
@@ -77,16 +77,16 @@ export function Enums(_props: EnumsProps): Children {
           const enumDecl = (
             <>
               {code`[JsonConverter(typeof(JsonStringEnumConverter))]`}
-              {"\n"}
+              <hbr />
               <cs.EnumDeclaration name={enumName} public refkey={serverRefkey(union)} doc={getDocComment($, union)}>
-                <For each={members} joiner={",\n"}>
+                <For each={members} comma hardline>
                   {({ name, value, variant }) => {
                     const memberName = namePolicy.getName(name, "enum-member");
                     return (
                       <>
                         <cs.DocWhen doc={getDocComment($, variant)} />
                         {code`[JsonStringEnumMemberName("${value}")]`}
-                        {"\n"}
+                        <hbr />
                         <cs.EnumMember name={memberName} refkey={serverRefkey(union, name)} />
                       </>
                     );

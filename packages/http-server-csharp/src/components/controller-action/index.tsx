@@ -47,7 +47,7 @@ export function ControllerAction(props: ControllerActionProps): Children {
       const attr = getBindingAttribute(p);
       pathParams.push({
         name: namePolicy.getName(p.property.sourceType.name, "parameter"),
-        type: (<TypeExpression type={p.property.sourceType.type} />) as Children,
+        type: <TypeExpression type={p.property.sourceType.type} />,
         attributes: attr ? [attr] : undefined,
         optional: isOptional,
         default: literalDefault,
@@ -56,7 +56,7 @@ export function ControllerAction(props: ControllerActionProps): Children {
       const attr = getBindingAttribute(p);
       queryHeaderParams.push({
         name: namePolicy.getName(p.property.sourceType.name, "parameter"),
-        type: (<TypeExpression type={p.property.sourceType.type} />) as Children,
+        type: <TypeExpression type={p.property.sourceType.type} />,
         attributes: attr ? [attr] : undefined,
         optional: isOptional,
         default: literalDefault,
@@ -93,11 +93,11 @@ export function ControllerAction(props: ControllerActionProps): Children {
     callArgs = [...parameters.map((p) => p.name), "reader"].join(", ");
   } else if (isBodyRoot) {
     // @bodyRoot — the whole model is the body, no other HTTP params extracted
-    parameters = [{ name: "body", type: (<TypeExpression type={body!.bodies[0].type.sourceType} />) as Children }];
+    parameters = [{ name: "body", type: <TypeExpression type={body!.bodies[0].type.sourceType} /> }];
     callArgs = "body";
   } else if (props.requestModel && body?.bodyKind === "single" && body.bodies.length > 0) {
     // Request model for spread body: path, body, query/header
-    const bodyParam = { name: "body", type: props.requestModel.name as any as Children };
+    const bodyParam = { name: "body", type: code`${props.requestModel.name}` };
     parameters = [...pathParams, bodyParam, ...queryHeaderParams];
     // Call args: path params, then body property accesses, then query/header params
     const bodyType = body.bodies[0].type.sourceType;
@@ -115,14 +115,14 @@ export function ControllerAction(props: ControllerActionProps): Children {
   } else if (hasExplicitBody) {
     parameters.push({
       name: "body",
-      type: (<TypeExpression type={body!.bodies[0].type.sourceType} />) as Children,
+      type: <TypeExpression type={body!.bodies[0].type.sourceType} />,
       attributes: ["FromBody"],
     });
     callArgs = parameters.map((p) => p.name).join(", ");
   } else if (body?.bodyKind === "single" && body.bodies.length > 0) {
     parameters.push({
       name: "body",
-      type: (<TypeExpression type={body.bodies[0].type.sourceType} />) as Children,
+      type: <TypeExpression type={body.bodies[0].type.sourceType} />,
       attributes: ["FromBody"],
     });
     callArgs = parameters.map((p) => p.name).join(", ");
@@ -147,11 +147,11 @@ export function ControllerAction(props: ControllerActionProps): Children {
           try { if (isErrorModel($.program, vt)) continue; } catch {}
           if (vt.name?.toLowerCase() === "error") continue;
         }
-        responseTypeExpr = (<TypeExpression type={vt} />) as Children;
+        responseTypeExpr = <TypeExpression type={vt} />;
         break;
       }
     } else if (!isVoidType(returnType)) {
-      responseTypeExpr = (<TypeExpression type={returnType} />) as Children;
+      responseTypeExpr = <TypeExpression type={returnType} />;
     }
   }
 

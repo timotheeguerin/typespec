@@ -1,37 +1,13 @@
 import type { Program, Type } from "@typespec/compiler";
-import { isErrorModel, isVoidType } from "@typespec/compiler";
+import { isVoidType } from "@typespec/compiler";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import type { Children } from "@alloy-js/core";
 import { code } from "@alloy-js/core";
 import { TypeExpression } from "../type-expression.jsx";
+import { getSuccessReturnType } from "../../utils/return-type-helpers.js";
 
-/**
- * Extracts the "success" type from a return type (same logic as interfaces.tsx).
- */
-export function getSuccessReturnType(program: Program, returnType: Type): Type | undefined {
-  if (isVoidType(returnType)) return undefined;
-
-  if (returnType.kind === "Union") {
-    for (const variant of returnType.variants.values()) {
-      const variantType = variant.type;
-      if (isVoidType(variantType)) continue;
-      if (variantType.kind === "Model") {
-        try {
-          if (isErrorModel(program, variantType)) continue;
-        } catch {
-          // isErrorModel may fail on certain types
-        }
-        if (variantType.name && variantType.name.toLowerCase() === "error") {
-          continue;
-        }
-      }
-      return variantType;
-    }
-    return undefined;
-  }
-
-  return returnType;
-}
+// Re-export for convenience
+export { getSuccessReturnType } from "../../utils/return-type-helpers.js";
 
 /**
  * Returns a mock return statement for a method based on its return type.

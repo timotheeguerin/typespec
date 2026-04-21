@@ -1,24 +1,22 @@
-import { For, SourceDirectory } from "@alloy-js/core";
+import { For, SourceDirectory, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import { Namespace } from "@alloy-js/csharp";
 import { useTsp } from "@typespec/emitter-framework";
-import {
-  HttpCanonicalizer,
-  type OperationHttpCanonicalization,
-} from "@typespec/http-canonicalization";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { Controller } from "./controllers.jsx";
 import { CSharpFile } from "./csharp-file.jsx";
 import { BusinessLogicInterface } from "./interfaces.jsx";
 import { RequestModels, type RequestModelInfo } from "./request-models.jsx";
 import { useEmitterOptions } from "../context/emitter-options-context.js";
+import { useHttpCanonicalizer } from "../context/http-canonicalizer-context.js";
 import { getServiceInterfaces } from "../service-discovery.js";
 
 /**
  * Component that renders controllers and their corresponding business logic interfaces.
  */
-export function ControllersAndInterfaces(): any {
+export function ControllersAndInterfaces(): Children {
   const { $ } = useTsp();
-  const canonicalizer = useHttpCanonicalizerFromContext();
+  const canonicalizer = useHttpCanonicalizer();
   const interfaces = getServiceInterfaces($.program);
   const namePolicy = cs.useCSharpNamePolicy();
   const { serviceNamespace: parentNamespace } = useEmitterOptions();
@@ -121,7 +119,5 @@ export function ControllersAndInterfaces(): any {
   );
 }
 
-export function useHttpCanonicalizerFromContext(): HttpCanonicalizer {
-  const { $ } = useTsp();
-  return new HttpCanonicalizer($);
-}
+/** @deprecated Use useHttpCanonicalizer() from context/http-canonicalizer-context.js instead */
+export { useHttpCanonicalizer as useHttpCanonicalizerFromContext } from "../context/http-canonicalizer-context.js";

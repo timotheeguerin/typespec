@@ -26,9 +26,7 @@ export function Controller(props: ControllerProps): Children {
   const controllerName = `${baseName}Controller`;
   const implPropName = `${baseName}Impl`;
 
-  const interfaceRef = (
-    <Reference refkey={businessLogicInterfaceRefkey(props.type)} />
-  ) as Children;
+  const interfaceRef = <Reference refkey={businessLogicInterfaceRefkey(props.type)} />;
 
   const attributes: Children[] = [code`[ApiController]`];
 
@@ -45,7 +43,7 @@ export function Controller(props: ControllerProps): Children {
       <cs.Constructor public parameters={[{ name: "operations", type: interfaceRef }]}>
         {code`${implPropName} = operations;`}
       </cs.Constructor>
-      {"\n"}
+      <hbr />
       <For each={props.operations} doubleHardline>
         {(op) => {
           const rm = props.requestModels?.find(r => r.op === op);

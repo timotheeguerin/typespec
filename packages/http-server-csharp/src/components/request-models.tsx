@@ -22,10 +22,14 @@ const requestModelUsings = [
   "TypeSpec.Helpers.JsonConverters",
 ];
 
+export interface RequestModelsProps {
+  requestModels: RequestModelInfo[];
+}
+
 /**
  * Generates request model classes for operations with unnamed body types.
  */
-export function RequestModels(props: { requestModels: RequestModelInfo[] }): Children {
+export function RequestModels(props: RequestModelsProps): Children {
   return (
     <For each={props.requestModels}>
       {(rm) => {
@@ -49,10 +53,12 @@ export function RequestModels(props: { requestModels: RequestModelInfo[] }): Chi
   );
 }
 
-function RequestModelClass(props: {
+interface RequestModelClassProps {
   name: string;
   properties: [string, import("@typespec/compiler").ModelProperty][];
-}): Children {
+}
+
+function RequestModelClass(props: RequestModelClassProps): Children {
   const { $ } = useTsp();
   const namePolicy = cs.useCSharpNamePolicy();
 

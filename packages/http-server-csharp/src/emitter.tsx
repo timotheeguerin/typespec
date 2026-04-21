@@ -1,4 +1,4 @@
-import { SourceDirectory } from "@alloy-js/core";
+import { Show, SourceDirectory } from "@alloy-js/core";
 import { createCSharpNamePolicy, Namespace } from "@alloy-js/csharp";
 import { EmitContext } from "@typespec/compiler";
 import { $ } from "@typespec/compiler/typekit";
@@ -108,19 +108,17 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
                   useSwaggerUI={effectiveUseSwaggerUI}
                   openApiPath={openApiPath}
                 />
-                {emitMocks && (
+                <Show when={emitMocks}>
                   <MockImplementations
                     interfaces={interfaces}
                     canonicalOpsMap={canonicalOpsMap}
                   />
-                )}
-                {emitProjectFiles && (
-                  <>
-                    <Csproj projectName={projectName} useSwaggerUI={useSwaggerUI} />
-                    <LaunchSettings httpPort={httpPort} httpsPort={httpsPort} />
-                    <AppSettings />
-                  </>
-                )}
+                </Show>
+                <Show when={emitProjectFiles}>
+                  <Csproj projectName={projectName} useSwaggerUI={useSwaggerUI} />
+                  <LaunchSettings httpPort={httpPort} httpsPort={httpsPort} />
+                  <AppSettings />
+                </Show>
                 <Documentation
                   interfaceNames={emitMocks ? interfaceNames : []}
                   useSwaggerUI={useSwaggerUI}
@@ -129,11 +127,11 @@ export async function $onEmit(context: EmitContext<CSharpServiceEmitterOptions>)
               <SourceDirectory path="generated">
                 <JsonConverters />
               </SourceDirectory>
-              {emitMocks && (
+              <Show when={emitMocks}>
                 <MockHelpers
                   interfaceRegistrations={interfaceRegistrations}
                 />
-              )}
+              </Show>
             </SourceDirectory>
           </HttpCanonicalizerContext.Provider>
         </EmitterOptions.Provider>

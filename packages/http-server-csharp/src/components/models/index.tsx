@@ -95,13 +95,18 @@ export function Models(_props: ModelsProps): Children {
   );
 }
 
+interface ServerClassDeclarationProps {
+  type: Model;
+  emitName?: string;
+}
+
 /**
  * Server-specific class declaration that matches the old emitter output:
  * - No `required` keyword
  * - No `[JsonPropertyName]` attributes
  * - No nullable `?` suffix on reference types (string, byte[], etc.)
  */
-function ServerClassDeclaration(props: { type: Model; emitName?: string }): Children {
+function ServerClassDeclaration(props: ServerClassDeclarationProps): Children {
   const { $ } = useTsp();
   const namePolicy = cs.useCSharpNamePolicy();
   const className = namePolicy.getName(props.emitName ?? props.type.name, "class");
@@ -140,8 +145,8 @@ function ServerClassDeclaration(props: { type: Model; emitName?: string }): Chil
       doc={getDocComment($, props.type)}
     >
       {errorConstructor}
-      {errorConstructor ? <hbr /> : undefined}
-      {hasChildConstructor ? (
+      {errorConstructor && <hbr />}
+      {hasChildConstructor && (
         <cs.Constructor
           public
           parameters={[
@@ -151,8 +156,8 @@ function ServerClassDeclaration(props: { type: Model; emitName?: string }): Chil
           ]}
           baseConstructor={["statusCode", "value", "headers"]}
         />
-      ) : undefined}
-      {hasChildConstructor ? <hbr /> : undefined}
+      )}
+      {hasChildConstructor && <hbr />}
       <For each={properties} doubleHardline>
         {([_, property]) => {
           // Skip statusCode properties for error models
@@ -164,11 +169,17 @@ function ServerClassDeclaration(props: { type: Model; emitName?: string }): Chil
   );
 }
 
+interface ServerPropertyProps {
+  type: ModelProperty;
+  errorClassName?: string;
+  baseModel?: Model;
+}
+
 /**
  * Server-specific property that matches old emitter output.
  * No `required`, no `[JsonPropertyName]`, no nullable `?` for reference types.
  */
-function ServerProperty(props: { type: ModelProperty; errorClassName?: string; baseModel?: Model }): Children {
+function ServerProperty(props: ServerPropertyProps): Children {
   const { $ } = useTsp();
   const namePolicy = cs.useCSharpNamePolicy();
   const propType = props.type.type;

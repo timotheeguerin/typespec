@@ -1,4 +1,4 @@
-import { code, SourceDirectory, type Children } from "@alloy-js/core";
+import { code, Show, SourceDirectory, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import { CSharpFile } from "../csharp-file.jsx";
 
@@ -16,9 +16,9 @@ export function MockHelpers(props: MockHelpersProps): Children {
       <SourceDirectory path="mocks">
         <InitializerInterface />
         <InitializerImplementation />
-        {props.interfaceRegistrations.length > 0 && (
+        <Show when={props.interfaceRegistrations.length > 0}>
           <MockRegistration interfaceRegistrations={props.interfaceRegistrations} />
-        )}
+        </Show>
       </SourceDirectory>
     </cs.Namespace>
   );
@@ -232,7 +232,11 @@ function InitializerImplementation(): Children {
   );
 }
 
-function MockRegistration(props: { interfaceRegistrations: string[] }): Children {
+interface MockRegistrationProps {
+  interfaceRegistrations: string[];
+}
+
+function MockRegistration(props: MockRegistrationProps): Children {
   const registrations = props.interfaceRegistrations
     .map((r) => `builder.Services.AddScoped<${r}>();`)
     .join("\n");

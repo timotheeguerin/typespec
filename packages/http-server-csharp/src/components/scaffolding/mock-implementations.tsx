@@ -143,7 +143,7 @@ function MockMethods(props: MockMethodsProps): Children {
           .filter(([pName]) => !multipartBodyPropNames.has(pName))
           .map(([pName, prop]) => ({
             name: namePolicy.getName(pName, "parameter"),
-            type: (<TypeExpression type={prop.type} />) as Children,
+            type: <TypeExpression type={prop.type} />,
             optional: prop.optional,
           }))
           // Required parameters must come before optional ones in C#
@@ -153,7 +153,7 @@ function MockMethods(props: MockMethodsProps): Children {
         if (isMultipart) {
           parameters.push({
             name: "reader",
-            type: "MultipartReader" as any as Children,
+            type: code`MultipartReader`,
             optional: false,
           });
         }

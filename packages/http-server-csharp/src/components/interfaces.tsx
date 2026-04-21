@@ -1,11 +1,12 @@
 import { refkey as ayRefkey, code, For, type Children, type Refkey } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import type { Interface, Operation, Program, Type } from "@typespec/compiler";
-import { isErrorModel, isTemplateDeclaration, isVoidType } from "@typespec/compiler";
+import type { Interface, Operation, Type } from "@typespec/compiler";
+import { isTemplateDeclaration, isVoidType } from "@typespec/compiler";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { getUniqueItems } from "@typespec/json-schema";
 import { useTsp } from "@typespec/emitter-framework";
 import { getDocComment } from "../utils/doc-comments.jsx";
+import { getSuccessReturnType } from "../utils/return-type-helpers.js";
 import { TypeExpression } from "./type-expression.jsx";
 
 const interfaceRefKeyPrefix = Symbol.for("http-server-csharp:interface");
@@ -61,53 +62,6 @@ interface BusinessLogicMethodProps {
   name: string;
   operation: Operation;
   canonicalOp?: OperationHttpCanonicalization;
-}
-
-/**
- * Extracts the "success" type from a return type.
- * If the return type is a Union, returns the first non-error variant.
- * If the return type is void, returns undefined.
- */
-function getSuccessReturnType(program: Program, returnType: Type): Type | undefined {
-  if (isVoidType(returnType)) return undefined;
-
-  if (returnType.kind === "Union") {
-    for (const variant of returnType.variants.values()) {
-      const variantType = variant.type;
-      if (isVoidType(variantType)) continue;
-      // Skip error models by checking the @error decorator or name convention
-      if (variantType.kind === "Model") {
-        try {
-          if (isErrorModel(program, variantType)) continue;
-        } catch {
-          // isErrorModel may fail on certain types
-        }
-        if (variantType.name && variantType.name.toLowerCase() === "error") {
-          continue;
-        }
-        // Skip response-only models (only @statusCode, no body props)
-        if (isStatusCodeOnlyModel(variantType)) continue;
-      }
-      return variantType;
-    }
-    // All variants are errors or void
-    return undefined;
-  }
-
-  // Check if it's a status-code-only model (e.g., OkResponse, NoContentResponse)
-  if (returnType.kind === "Model" && isStatusCodeOnlyModel(returnType)) {
-    return undefined;
-  }
-
-  return returnType;
-}
-
-/** Returns true if the model only has statusCode-related properties (no body). */
-function isStatusCodeOnlyModel(model: import("@typespec/compiler").Model): boolean {
-  for (const prop of model.properties.values()) {
-    if (prop.name !== "statusCode") return false;
-  }
-  return model.properties.size > 0;
 }
 
 /**
@@ -187,7 +141,7 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
   if (isMultipart) {
     parameters.push({
       name: "reader",
-      type: "MultipartReader" as any as Children,
+      type: code`MultipartReader`,
       optional: false,
     });
   }

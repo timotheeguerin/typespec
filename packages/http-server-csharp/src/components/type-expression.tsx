@@ -8,11 +8,15 @@ import { isUnionEnum } from "./enums.jsx";
 import { useEmitterOptions } from "../context/emitter-options-context.js";
 import { getAnonymousModelName } from "./models/index.jsx";
 
+export interface TypeExpressionProps {
+  type: Type;
+}
+
 /**
  * Wrapper around emitter-framework's TypeExpression that handles
  * additional type kinds the server emitter encounters.
  */
-export function TypeExpression(props: { type: Type }): Children {
+export function TypeExpression(props: TypeExpressionProps): Children {
   const { $ } = useTsp();
   const type = props.type;
 
