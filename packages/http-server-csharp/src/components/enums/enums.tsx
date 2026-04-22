@@ -2,7 +2,6 @@ import type { Refkey } from "@alloy-js/core";
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import {
-  isStdNamespace,
   type Enum,
   type Namespace as TspNamespace,
   type Type,
@@ -10,7 +9,7 @@ import {
 } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import { getDocComments } from "../../utils/doc-comments.jsx";
-import { findServiceNamespace, getSubNamespaceParts } from "../../utils/namespace-utils.js";
+import { getSubNamespaceParts } from "../../utils/namespace-utils.js";
 import { CSharpFile } from "../csharp-file.jsx";
 import { efRefkey } from "../type-expression/type-expression.jsx";
 
@@ -57,25 +56,32 @@ function normalizeUnionEnum(union: Union): EnumInfo {
   };
 }
 
+export interface EnumsProps {
+  /** Pre-resolved TypeSpec enums. */
+  enums: Enum[];
+  /** Pre-resolved union-as-enum types. */
+  unionEnums: Union[];
+  /** The service namespace for sub-namespace wrapping. */
+  serviceNamespace: TspNamespace | undefined;
+}
+
 /**
- * Iterates all enums and union-enums in the TypeSpec program and emits C# enum declarations.
+ * Iterates pre-resolved enums and union-enums and emits C# enum declarations.
  * Each enum is emitted in its own source file with JSON serialization attributes.
  */
-export function Enums(): Children {
+export function Enums(props: EnumsProps): Children {
   const { $ } = useTsp();
-  const globalNs = $.program.getGlobalNamespaceType();
-  const serviceNs = findServiceNamespace(globalNs);
 
   const allEnums: EnumInfo[] = [
-    ...collectFromServiceNamespaces<Enum>(globalNs, "enums", (en) => !!en.name).map(normalizeEnum),
-    ...collectFromServiceNamespaces<Union>(globalNs, "unions", isUnionEnum).map(normalizeUnionEnum),
+    ...props.enums.map(normalizeEnum),
+    ...props.unionEnums.map(normalizeUnionEnum),
   ];
 
   return (
     <For each={allEnums}>
       {(info) => {
         const namePolicy = cs.useCSharpNamePolicy();
-        const subNsParts = getSubNamespaceParts(info.namespace, serviceNs);
+        const subNsParts = getSubNamespaceParts(info.namespace, props.serviceNamespace);
 
         const enumDecl = (
           <>
@@ -120,35 +126,6 @@ export function Enums(): Children {
       }}
     </For>
   );
-}
-
-/**
- * Recursively collects items from the global namespace and all non-std child namespaces.
- * Replaces the per-type recursive traversal functions.
- */
-function collectFromServiceNamespaces<T>(
-  globalNs: TspNamespace,
-  collectionKey: "enums" | "unions",
-  filter: (item: T) => boolean,
-): T[] {
-  const items: T[] = [];
-  const seen = new Set<T>();
-
-  function walk(ns: TspNamespace): void {
-    for (const item of (ns[collectionKey] as Map<string, T>)?.values() ?? []) {
-      if (!seen.has(item) && filter(item)) {
-        seen.add(item);
-        items.push(item);
-      }
-    }
-    for (const childNs of ns.namespaces?.values() ?? []) {
-      if (isStdNamespace(childNs)) continue;
-      walk(childNs);
-    }
-  }
-
-  walk(globalNs);
-  return items;
 }
 
 /**

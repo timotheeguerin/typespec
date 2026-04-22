@@ -1,31 +1,31 @@
 import { For, SourceDirectory, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import { Namespace } from "@alloy-js/csharp";
-import { useTsp } from "@typespec/emitter-framework";
+import type { Interface } from "@typespec/compiler";
+import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { useEmitterOptions } from "../context/emitter-options-context.js";
-import { useHttpCanonicalizer } from "../context/http-canonicalizer-context.js";
-import { canonicalizeAllInterfaces } from "../emitter.jsx";
-import { getServiceInterfaces } from "../service-discovery.js";
 import { Controller } from "./controllers/controllers.jsx";
 import { CSharpFile } from "./csharp-file.jsx";
 import { BusinessLogicInterface } from "./interfaces/interfaces.jsx";
 import { RequestModels, type RequestModelInfo } from "./request-models.jsx";
 
+export interface ControllersAndInterfacesProps {
+  /** Pre-resolved service interfaces (including synthetic ones for namespace-level ops). */
+  interfaces: Interface[];
+  /** Pre-computed canonical HTTP operations per interface. */
+  canonicalOpsMap: Map<string, OperationHttpCanonicalization[]>;
+}
+
 /**
  * Component that renders controllers and their corresponding business logic interfaces.
  */
-export function ControllersAndInterfaces(): Children {
-  const { $ } = useTsp();
-  const canonicalizer = useHttpCanonicalizer();
-  const interfaces = getServiceInterfaces($.program);
+export function ControllersAndInterfaces(props: ControllersAndInterfacesProps): Children {
   const namePolicy = cs.useCSharpNamePolicy();
   const { serviceNamespace: parentNamespace } = useEmitterOptions();
 
-  // Canonicalize all operations for each interface
-  const opsMap = canonicalizeAllInterfaces(canonicalizer, interfaces);
-  const interfaceOps = interfaces.map((iface) => ({
+  const interfaceOps = props.interfaces.map((iface) => ({
     iface,
-    ops: opsMap.get(iface.name) ?? [],
+    ops: props.canonicalOpsMap.get(iface.name) ?? [],
   }));
 
   // Collect operations that need request model classes

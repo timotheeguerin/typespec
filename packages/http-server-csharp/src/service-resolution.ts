@@ -1,21 +1,162 @@
 import {
   isStdNamespace,
   isTemplateDeclaration,
+  type Enum,
+  type Interface,
   type Model,
   type Namespace as TspNamespace,
   type Type,
+  type Union,
 } from "@typespec/compiler";
-import type { useTsp } from "@typespec/emitter-framework";
-import { assignAnonymousName } from "./anonymous-models.js";
+import type { Typekit } from "@typespec/compiler/typekit";
+import type {
+  HttpCanonicalizer,
+  OperationHttpCanonicalization,
+} from "@typespec/http-canonicalization";
+import { isUnionEnum } from "./components/enums/enums.jsx";
+import {
+  assignAnonymousName,
+  preAssignAnonymousResponseNames,
+  resetAnonymousModels,
+} from "./components/models/anonymous-models.js";
+import { getServiceInterfaces, getServiceNamespaceName } from "./service-discovery.js";
+import { findServiceNamespace } from "./utils/namespace-utils.js";
+
+/** All resolved service types, computed once before rendering. */
+export interface ServiceTypeResolution {
+  /** The service namespace (first non-std namespace with content). */
+  serviceNamespace: TspNamespace | undefined;
+  /** The C#-normalized service namespace name. */
+  serviceNamespaceName: string | undefined;
+  /** All service interfaces (including synthetic ones for namespace-level operations). */
+  interfaces: Interface[];
+  /** All models to emit (namespace-level + operation-referenced). */
+  models: Model[];
+  /** All named enums from service namespaces. */
+  enums: Enum[];
+  /** All named unions that qualify as C# string enums. */
+  unionEnums: Union[];
+  /** Canonicalized HTTP operations per interface. */
+  canonicalOpsMap: Map<string, OperationHttpCanonicalization[]>;
+}
+
+/**
+ * Resolves all service types in a single pass, eliminating redundant
+ * namespace traversals that previously occurred in individual components.
+ *
+ * Ordering:
+ * 1. Service namespace discovery
+ * 2. Interface collection (including synthetic interfaces for namespace-level ops)
+ * 3. Anonymous response model naming (depends on interfaces)
+ * 4. Enum and union-enum collection
+ * 5. Model discovery (walks operations from interfaces + namespace models)
+ * 6. Canonicalization of HTTP operations
+ */
+export function resolveServiceTypes(
+  program: Parameters<typeof getServiceNamespaceName>[0],
+  $: Typekit,
+  canonicalizer: HttpCanonicalizer,
+): ServiceTypeResolution {
+  resetAnonymousModels();
+
+  const globalNs = program.getGlobalNamespaceType();
+
+  // Phase 1: Service namespace
+  const serviceNamespace = findServiceNamespace(globalNs);
+  const serviceNamespaceName = getServiceNamespaceName(program);
+
+  // Phase 2: Interfaces (includes synthetic ones for namespace-level operations)
+  const interfaces = getServiceInterfaces(program);
+
+  // Phase 3: Pre-assign contextual names to anonymous response models
+  preAssignAnonymousResponseNames(interfaces);
+
+  // Phase 4: Enums and union-enums from all non-std namespaces
+  const enums: Enum[] = [];
+  const unionEnums: Union[] = [];
+  collectEnumsFromNamespaces(globalNs, enums, unionEnums);
+
+  // Phase 5: Model discovery (namespace models + operation-referenced models)
+  const models = getServiceModels($, globalNs);
+
+  // Phase 6: Canonicalize all HTTP operations
+  const canonicalOpsMap = canonicalizeAllInterfaces(canonicalizer, interfaces);
+
+  return {
+    serviceNamespace,
+    serviceNamespaceName,
+    interfaces,
+    models,
+    enums,
+    unionEnums,
+    canonicalOpsMap,
+  };
+}
+
+/**
+ * Collects all enums and union-enums from non-std namespaces in a single walk.
+ */
+function collectEnumsFromNamespaces(
+  globalNs: TspNamespace,
+  enums: Enum[],
+  unionEnums: Union[],
+): void {
+  const seenEnums = new Set<Enum>();
+  const seenUnions = new Set<Union>();
+
+  function walk(ns: TspNamespace): void {
+    for (const en of ns.enums?.values() ?? []) {
+      if (!seenEnums.has(en) && en.name) {
+        seenEnums.add(en);
+        enums.push(en);
+      }
+    }
+    for (const union of ns.unions?.values() ?? []) {
+      if (!seenUnions.has(union) && isUnionEnum(union)) {
+        seenUnions.add(union);
+        unionEnums.push(union);
+      }
+    }
+    for (const childNs of ns.namespaces?.values() ?? []) {
+      if (isStdNamespace(childNs)) continue;
+      walk(childNs);
+    }
+  }
+
+  walk(globalNs);
+}
+
+/**
+ * Canonicalize all operations for each interface, skipping any that fail.
+ */
+export function canonicalizeAllInterfaces(
+  canonicalizer: HttpCanonicalizer,
+  interfaces: Interface[],
+): Map<string, OperationHttpCanonicalization[]> {
+  const result = new Map<string, OperationHttpCanonicalization[]>();
+  for (const iface of interfaces) {
+    const ops: OperationHttpCanonicalization[] = [];
+    for (const [, op] of iface.operations) {
+      try {
+        ops.push(canonicalizer.canonicalize(op) as OperationHttpCanonicalization);
+      } catch {
+        // Skip operations that can't be canonicalized
+      }
+    }
+    result.set(iface.name, ops);
+  }
+  return result;
+}
+
+// ── Model discovery ─────────────────────────────────────────────────────
 
 /**
  * Retrieves all models from the program that should be emitted.
- * Includes namespace-level models AND models referenced by operations (template instantiations, anonymous models).
+ * Includes namespace-level models AND models referenced by operations.
  */
-export function getServiceModels($: ReturnType<typeof useTsp>["$"]): Model[] {
+function getServiceModels($: Typekit, globalNs: TspNamespace): Model[] {
   const models: Model[] = [];
   const seen = new Set<Model>();
-  const globalNs = $.program.getGlobalNamespaceType();
 
   function addModel(model: Model) {
     if (seen.has(model)) return;
@@ -42,7 +183,6 @@ export function getServiceModels($: ReturnType<typeof useTsp>["$"]): Model[] {
   }
 
   // Walk all collected model properties to discover anonymous sub-models
-  // Need to iterate over a snapshot since addModel may modify the list
   const modelsSnapshot = [...models];
   for (const model of modelsSnapshot) {
     for (const prop of model.properties.values()) {
@@ -58,13 +198,12 @@ export function getServiceModels($: ReturnType<typeof useTsp>["$"]): Model[] {
 
 /** Walks operations in a namespace to discover referenced model types. */
 function discoverReferencedModels(
-  $: ReturnType<typeof useTsp>["$"],
-  ns: any,
+  $: Typekit,
+  ns: TspNamespace,
   addModel: (m: Model) => void,
   visited: Set<Type>,
 ): void {
   for (const op of ns.operations?.values() ?? []) {
-    // Name anonymous response models contextually
     nameAnonymousResponse(op, op.interface?.name ?? ns.name);
     discoverModelsInType($, op.returnType, addModel, visited);
     for (const param of op.parameters?.properties?.values() ?? []) {
@@ -101,7 +240,7 @@ function nameAnonymousResponse(
 
 /** Recursively discovers models referenced by a type. */
 function discoverModelsInType(
-  $: ReturnType<typeof useTsp>["$"],
+  $: Typekit,
   type: Type,
   addModel: (m: Model) => void,
   visited: Set<Type>,
@@ -122,7 +261,6 @@ function discoverModelsInType(
       if (type.baseModel) {
         discoverModelsInType($, type.baseModel, addModel, visited);
       }
-      // Walk template arguments to discover inner types (e.g., HttpPart<Bar<Foo>> → Bar<Foo>)
       if (type.templateMapper) {
         for (const arg of type.templateMapper.args) {
           if (arg.entityKind === "Type") {
@@ -139,8 +277,8 @@ function discoverModelsInType(
 }
 
 function collectModelsFromNamespace(
-  $: ReturnType<typeof useTsp>["$"],
-  ns: any,
+  $: Typekit,
+  ns: TspNamespace,
   models: Model[],
   seen: Set<Model>,
 ): void {
@@ -155,29 +293,22 @@ function collectModelsFromNamespace(
   }
 }
 
-function shouldEmitModel($: ReturnType<typeof useTsp>["$"], model: Model): boolean {
-  // Anonymous models are allowed — they get auto-generated names (Model0, Model1, ...)
+function shouldEmitModel($: Typekit, model: Model): boolean {
   if (model.name === "") return true;
   if (!model.name) return false;
   if ($.array.is(model)) return false;
   if ($.record.is(model)) return false;
-  // Skip template declarations (e.g. Foo<T>) — only emit instantiations (e.g. Foo<Toy>)
   if (isTemplateDeclaration(model)) return false;
-  // Skip HttpPart<T> template instantiations — multipart wrapper types, not emitted models
   if (model.name === "HttpPart" && model.templateMapper) return false;
-  // Skip multipart body container models (all properties are HttpPart<T>)
   if (isMultipartBodyContainer(model)) return false;
-  // Template instantiations are always emittable if they have a name
   if (model.templateMapper) return true;
-  // Skip HTTP response-only models (OkResponse, NoContentResponse, etc.)
   if (model.namespace && isStdNamespace(model.namespace)) return false;
-  // Skip models from @typespec/http namespace (Response<T>, etc.)
   const nsName = getFullNamespaceName(model.namespace);
   if (nsName.startsWith("TypeSpec.Http") || nsName.startsWith("TypeSpec.Rest")) return false;
   return true;
 }
 
-/** Detects models whose properties are all HttpPart<T> — these are multipart body containers, not emitted as C# types. */
+/** Detects models whose properties are all HttpPart<T>. */
 function isMultipartBodyContainer(model: Model): boolean {
   if (model.properties.size === 0) return false;
   for (const prop of model.properties.values()) {
@@ -187,19 +318,16 @@ function isMultipartBodyContainer(model: Model): boolean {
   return true;
 }
 
-/** Checks if a type is HttpPart<T> or an array of HttpPart<T>. */
 function isHttpPartType(type: Type): boolean {
   if (type.kind !== "Model") return false;
-  // Direct HttpPart<T>
   if (type.name === "HttpPart" && type.templateMapper) return true;
-  // Array of HttpPart<T> — check indexer value
   if (type.indexer?.value) {
     return isHttpPartType(type.indexer.value);
   }
   return false;
 }
 
-export function getFullNamespaceName(ns: TspNamespace | undefined): string {
+function getFullNamespaceName(ns: TspNamespace | undefined): string {
   const parts: string[] = [];
   let current = ns;
   while (current && current.name) {

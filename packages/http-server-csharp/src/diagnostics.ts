@@ -8,7 +8,7 @@ import {
 } from "@typespec/compiler";
 import { $ } from "@typespec/compiler/typekit";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
-import { assignAnonymousName } from "./components/models/models.jsx";
+import { assignAnonymousName } from "./components/models/anonymous-models.js";
 import { reportDiagnostic } from "./lib.js";
 import { isValidCSharpIdentifier } from "./utils/naming.js";
 

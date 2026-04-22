@@ -1,17 +1,22 @@
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import { isErrorModel, isVoidType, type Model, type ModelProperty } from "@typespec/compiler";
+import {
+  isErrorModel,
+  isVoidType,
+  type Model,
+  type ModelProperty,
+  type Namespace as TspNamespace,
+} from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import { isStatusCode } from "@typespec/http";
 import { getUniqueItems } from "@typespec/json-schema";
 import { useEmitterOptions } from "../../context/emitter-options-context.js";
 import { getPropertyAttributes } from "../../utils/attributes.jsx";
 import { getDocComments } from "../../utils/doc-comments.jsx";
-import { findServiceNamespace, getSubNamespaceParts } from "../../utils/namespace-utils.js";
+import { getSubNamespaceParts } from "../../utils/namespace-utils.js";
 import { CSharpFile } from "../csharp-file.jsx";
 import { efRefkey, TypeExpression } from "../type-expression/type-expression.jsx";
 import { getErrorConstructor } from "./error-models.jsx";
-import { getServiceModels } from "./model-discovery.js";
 import {
   getDefaultValueString,
   getEnumDefaultInitializer,
@@ -27,12 +32,7 @@ import {
 } from "./model-helpers.js";
 
 // Re-export public API used by other modules
-export {
-  assignAnonymousName,
-  getAnonymousModelName,
-  preAssignAnonymousResponseNames,
-  resetAnonymousModels,
-} from "./anonymous-models.js";
+export { getAnonymousModelName } from "./anonymous-models.js";
 
 const modelUsings = [
   "System",
@@ -43,23 +43,27 @@ const modelUsings = [
   "TypeSpec.Helpers",
 ];
 
+export interface ModelsProps {
+  /** Pre-resolved models to emit. */
+  models: Model[];
+  /** The service namespace for sub-namespace wrapping. */
+  serviceNamespace: TspNamespace | undefined;
+}
+
 /**
- * Iterates all models in the TypeSpec program and emits C# class declarations.
+ * Iterates pre-resolved models and emits C# class declarations.
  * Each model is emitted in its own source file under the models directory.
  */
-export function Models(): Children {
+export function Models(props: ModelsProps): Children {
   const { $ } = useTsp();
-  const models = getServiceModels($);
-  const globalNs = $.program.getGlobalNamespaceType();
-  const serviceNs = findServiceNamespace(globalNs);
 
   return (
-    <For each={models}>
+    <For each={props.models}>
       {(model) => {
         const needsJsonNodes = modelNeedsJsonNodes($, model);
         const usings = needsJsonNodes ? [...modelUsings, "System.Text.Json.Nodes"] : modelUsings;
         const modelName = getModelEmitName($.program, model);
-        const subNsParts = getSubNamespaceParts(model.namespace, serviceNs);
+        const subNsParts = getSubNamespaceParts(model.namespace, props.serviceNamespace);
 
         const modelContent = <ServerClassDeclaration type={model} emitName={modelName} />;
 
