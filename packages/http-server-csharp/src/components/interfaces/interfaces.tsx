@@ -5,7 +5,7 @@ import { isTemplateDeclaration, isVoidType } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { getUniqueItems } from "@typespec/json-schema";
-import { getDocComment } from "../../utils/doc-comments.jsx";
+import { getDocComments } from "../../utils/doc-comments.jsx";
 import { getSuccessReturnType } from "../../utils/return-type-helpers.js";
 import { TypeExpression } from "../type-expression/type-expression.jsx";
 
@@ -48,7 +48,7 @@ export function BusinessLogicInterface(props: BusinessLogicInterfaceProps): Chil
       name={interfaceName}
       public
       refkey={businessLogicInterfaceRefkey(props.type)}
-      doc={getDocComment($, props.type)}
+      doc={getDocComments($, props.type)}
     >
       <For each={operations} doubleHardline>
         {([name, op]) => (
@@ -164,7 +164,7 @@ function BusinessLogicMethod(props: BusinessLogicMethodProps): Children {
       name={methodName}
       parameters={parameters}
       returns={returnType}
-      doc={getDocComment($, props.operation)}
+      doc={getDocComments($, props.operation)}
     />
   );
 }

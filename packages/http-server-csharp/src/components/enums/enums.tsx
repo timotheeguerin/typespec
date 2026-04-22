@@ -1,3 +1,4 @@
+import type { Refkey } from "@alloy-js/core";
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
 import {
@@ -7,12 +8,11 @@ import {
   type Type,
   type Union,
 } from "@typespec/compiler";
-import type { Refkey } from "@alloy-js/core";
 import { useTsp } from "@typespec/emitter-framework";
-import { getDocComment } from "../../utils/doc-comments.jsx";
+import { getDocComments } from "../../utils/doc-comments.jsx";
 import { findServiceNamespace, getSubNamespaceParts } from "../../utils/namespace-utils.js";
 import { CSharpFile } from "../csharp-file.jsx";
-import { serverRefkey } from "../type-expression/type-expression.jsx";
+import { efRefkey } from "../type-expression/type-expression.jsx";
 
 /** Normalized member info shared by both enums and union-enums. */
 interface EnumMemberInfo {
@@ -52,7 +52,7 @@ function normalizeUnionEnum(union: Union): EnumInfo {
       name,
       serializedValue: value,
       docSource: variant,
-      memberRefkey: serverRefkey(union, name),
+      memberRefkey: efRefkey(union, name),
     })),
   };
 }
@@ -84,13 +84,13 @@ export function Enums(): Children {
             <cs.EnumDeclaration
               name={namePolicy.getName(info.name, "enum")}
               public
-              refkey={serverRefkey(info.type)}
-              doc={getDocComment($, info.type)}
+              refkey={efRefkey(info.type)}
+              doc={getDocComments($, info.type)}
             >
               <For each={info.members} comma hardline>
                 {(member) => (
                   <>
-                    <cs.DocWhen doc={getDocComment($, member.docSource)} />
+                    <cs.DocWhen doc={getDocComments($, member.docSource)} />
                     {code`[JsonStringEnumMemberName("${member.serializedValue}")]`}
                     <hbr />
                     <cs.EnumMember

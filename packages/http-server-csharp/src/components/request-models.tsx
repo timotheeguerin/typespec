@@ -3,7 +3,7 @@ import * as cs from "@alloy-js/csharp";
 import { isVoidType } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
-import { getDocComment } from "../utils/doc-comments.jsx";
+import { getDocComments } from "../utils/doc-comments.jsx";
 import { CSharpFile } from "./csharp-file.jsx";
 import { TypeExpression } from "./type-expression/type-expression.jsx";
 
@@ -78,7 +78,7 @@ function RequestModelClass(props: RequestModelClassProps): Children {
               public
               get
               set
-              doc={getDocComment($, property)}
+              doc={getDocComments($, property)}
               attributes={attrs.length > 0 ? attrs : undefined}
             />
           );

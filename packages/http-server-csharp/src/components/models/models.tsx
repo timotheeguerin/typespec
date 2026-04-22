@@ -6,10 +6,10 @@ import { isStatusCode } from "@typespec/http";
 import { getUniqueItems } from "@typespec/json-schema";
 import { useEmitterOptions } from "../../context/emitter-options-context.js";
 import { getPropertyAttributes } from "../../utils/attributes.jsx";
-import { getDocComment } from "../../utils/doc-comments.jsx";
+import { getDocComments } from "../../utils/doc-comments.jsx";
 import { findServiceNamespace, getSubNamespaceParts } from "../../utils/namespace-utils.js";
 import { CSharpFile } from "../csharp-file.jsx";
-import { serverRefkey, TypeExpression } from "../type-expression/type-expression.jsx";
+import { efRefkey, TypeExpression } from "../type-expression/type-expression.jsx";
 import { getErrorConstructor } from "./error-models.jsx";
 import { getServiceModels } from "./model-discovery.js";
 import {
@@ -94,7 +94,7 @@ function ServerClassDeclaration(props: ServerClassDeclarationProps): Children {
   const { $ } = useTsp();
   const namePolicy = cs.useCSharpNamePolicy();
   const className = namePolicy.getName(props.emitName ?? props.type.name, "class");
-  const refkeys = serverRefkey(props.type);
+  const refkeys = efRefkey(props.type);
 
   const isError = isErrorModel($.program, props.type);
 
@@ -116,8 +116,6 @@ function ServerClassDeclaration(props: ServerClassDeclarationProps): Children {
     : undefined;
 
   // For error models with base model, check if base is also an error (child constructor)
-  const isChildError =
-    isError && props.type.baseModel && isErrorModel($.program, props.type.baseModel);
   const hasChildConstructor =
     isError && props.type.derivedModels && props.type.derivedModels.length > 0;
 
@@ -128,7 +126,7 @@ function ServerClassDeclaration(props: ServerClassDeclarationProps): Children {
       public
       partial
       baseType={baseType}
-      doc={getDocComment($, props.type)}
+      doc={getDocComments($, props.type)}
     >
       {errorConstructor}
       {errorConstructor && <hbr />}
@@ -254,7 +252,7 @@ function ServerProperty(props: ServerPropertyProps): Children {
       public
       new={isOverride}
       nullable={needsNullable}
-      doc={getDocComment($, props.type)}
+      doc={getDocComments($, props.type)}
       attributes={attrs.length > 0 ? attrs : undefined}
       get
       set={!isLiteralOnly}

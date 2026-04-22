@@ -1,17 +1,24 @@
-import { refkey as ayRefkey, code, type Children, type Refkey } from "@alloy-js/core";
+import { code, type Children } from "@alloy-js/core";
 import type { Scalar, Type } from "@typespec/compiler";
 import type { Typekit } from "@typespec/compiler/typekit";
 import { Experimental_ComponentOverridesConfig, useTsp } from "@typespec/emitter-framework";
-import { TypeExpression as EfTypeExpression } from "@typespec/emitter-framework/csharp";
+import {
+  efRefkey,
+  TypeExpression as EfTypeExpression,
+  getNullableUnionInnerType,
+} from "@typespec/emitter-framework/csharp";
 import { getUniqueItems } from "@typespec/json-schema";
 import { useEmitterOptions } from "../../context/emitter-options-context.js";
 import { isUnionEnum } from "../enums/enums.jsx";
-import { getAnonymousModelName } from "../models/models.jsx";
 import { isValueType } from "../models/model-helpers.js";
+import { getAnonymousModelName } from "../models/models.jsx";
 
 export interface TypeExpressionProps {
   type: Type;
 }
+
+// Re-export efRefkey for consumers that were using serverRefkey
+export { efRefkey } from "@typespec/emitter-framework/csharp";
 
 /**
  * Wrapper around emitter-framework's TypeExpression that handles
@@ -27,7 +34,7 @@ export function TypeExpression(props: TypeExpressionProps): Children {
     case "UnionVariant":
       // If this variant belongs to a union-as-enum, resolve to the parent enum type
       if (type.union && isUnionEnum(type.union)) {
-        return code`${serverRefkey(type.union)}`;
+        return code`${efRefkey(type.union)}`;
       }
       return <TypeExpression type={type.type} />;
     case "Enum":
@@ -127,7 +134,7 @@ export function TypeExpression(props: TypeExpressionProps): Children {
       }
       // Handle anonymous models — use refkey to link to their generated class
       if (type.name === "" && getAnonymousModelName(type)) {
-        return code`${serverRefkey(type)}`;
+        return code`${efRefkey(type)}`;
       }
       // Fall through to EF for regular models
       try {
@@ -154,30 +161,30 @@ export function TypeExpression(props: TypeExpressionProps): Children {
 function resolveUnionType($: Typekit, union: import("@typespec/compiler").Union): Children {
   // Named unions that qualify as enums should reference the enum type
   if (isUnionEnum(union)) {
-    return code`${serverRefkey(union)}`;
+    return code`${efRefkey(union)}`;
   }
 
-  const allVariants = Array.from(union.variants.values());
-  // Check if null is present in the union
-  const hasNull = allVariants.some((v) => v.type.kind === "Intrinsic" && v.type.name === "null");
-  // Filter out null/void variants
-  const variants = allVariants.filter(
-    (v) => !(v.type.kind === "Intrinsic" && (v.type.name === "null" || v.type.name === "void")),
-  );
-
-  if (variants.length === 0) return code`object`;
-  if (variants.length === 1) {
-    if (hasNull && isValueType($, variants[0].type)) {
+  // Use emitter-framework's nullable union detection
+  const innerType = getNullableUnionInnerType(union);
+  if (innerType !== undefined) {
+    // null|void-only union → object
+    if (innerType.kind === "Intrinsic" && innerType.name === "void") {
+      return code`object`;
+    }
+    // Nullable value type → T?
+    if (isValueType($, innerType)) {
       return (
         <>
-          <TypeExpression type={variants[0].type} />?
+          <TypeExpression type={innerType} />?
         </>
       );
     }
-    return <TypeExpression type={variants[0].type} />;
+    // Nullable reference type or multi-variant nullable → resolve inner type
+    return <TypeExpression type={innerType} />;
   }
 
-  // Check if all variants resolve to the same base kind
+  // Non-nullable union: check if all variants resolve to the same base kind
+  const variants = Array.from(union.variants.values());
   const firstType = variants[0].type;
   const allSameKind = variants.every((v) => {
     if (v.type.kind !== firstType.kind) return false;
@@ -197,19 +204,6 @@ function resolveUnionType($: Typekit, union: import("@typespec/compiler").Union)
 
   // For mixed types, use object
   return code`object`;
-}
-
-// --- Refkey helpers ---
-
-// Must match the emitter-framework's C# refkey prefix so that references
-// resolve to declarations created by ClassDeclaration / EnumDeclaration.
-const refKeyPrefix = Symbol.for("emitter-framework:csharp");
-
-export function serverRefkey(...args: unknown[]): Refkey {
-  if (args.length === 0) {
-    return ayRefkey();
-  }
-  return ayRefkey(refKeyPrefix, ...args);
 }
 
 // --- Server-specific scalar overrides ---

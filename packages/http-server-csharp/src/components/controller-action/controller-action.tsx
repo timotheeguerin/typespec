@@ -3,7 +3,7 @@ import * as cs from "@alloy-js/csharp";
 import { isErrorModel, isVoidType } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
-import { getDocComment } from "../../utils/doc-comments.jsx";
+import { getDocComments } from "../../utils/doc-comments.jsx";
 import { getHttpVerbAttribute, getRouteTemplate } from "../../utils/http-helpers.js";
 import type { RequestModelInfo } from "../request-models.jsx";
 import { TypeExpression } from "../type-expression/type-expression.jsx";
@@ -219,7 +219,7 @@ ${implCall}`;
       returns={code`Task<IActionResult>`}
       parameters={parameters}
       attributes={attributes}
-      doc={getDocComment($, props.operation.sourceType)}
+      doc={getDocComments($, props.operation.sourceType)}
     >
       {methodBody}
     </cs.Method>
