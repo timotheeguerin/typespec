@@ -1,6 +1,6 @@
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
-import { Reference } from "@alloy-js/csharp";
+import { Attribute, Reference } from "@alloy-js/csharp";
 import type { Interface } from "@typespec/compiler";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
 import { ControllerAction } from "../controller-action/controller-action.jsx";
@@ -28,7 +28,7 @@ export function Controller(props: ControllerProps): Children {
 
   const interfaceRef = <Reference refkey={businessLogicInterfaceRefkey(props.type)} />;
 
-  const attributes: Children[] = [code`[ApiController]`];
+  const attributes = [<Attribute name="ApiController" />];
 
   return (
     <cs.ClassDeclaration

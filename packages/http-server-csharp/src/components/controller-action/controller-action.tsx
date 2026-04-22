@@ -1,5 +1,6 @@
 import { code, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
+import { Attribute } from "@alloy-js/csharp";
 import { isErrorModel, isVoidType } from "@typespec/compiler";
 import { useTsp } from "@typespec/emitter-framework";
 import type { OperationHttpCanonicalization } from "@typespec/http-canonicalization";
@@ -165,9 +166,12 @@ export function ControllerAction(props: ControllerActionProps): Children {
     }
   }
 
-  const attributes: Children[] = [code`[${verb}]`, code`[Route("${route}")]`];
+  const attributes: Children[] = [
+    <Attribute name={verb} />,
+    <Attribute name="Route" args={[`"${route}"`]} />,
+  ];
   if (isMultipart) {
-    attributes.push(code`[Consumes("multipart/form-data")]`);
+    attributes.push(<Attribute name="Consumes" args={[`"multipart/form-data"`]} />);
   }
   if (responseTypeExpr) {
     attributes.push(

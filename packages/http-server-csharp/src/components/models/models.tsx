@@ -1,5 +1,7 @@
 import { code, For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
+import { Attribute } from "@alloy-js/csharp";
+import { JsonSerialization } from "../../utils/csharp-libs.jsx";
 import {
   isErrorModel,
   isVoidType,
@@ -38,7 +40,6 @@ const modelUsings = [
   "System",
   "System.Collections.Generic",
   "System.Text.Json",
-  "System.Text.Json.Serialization",
   "TypeSpec.Helpers.JsonConverters",
   "TypeSpec.Helpers",
 ];
@@ -191,7 +192,7 @@ function ServerProperty(props: ServerPropertyProps): Children {
   // Add JsonPropertyName if the C# name differs from the original TypeSpec name
   const csharpName = namePolicy.getName(propName, "class-property");
   if (csharpName !== props.type.name) {
-    attrs.unshift(code`[JsonPropertyName("${props.type.name}")]`);
+    attrs.unshift(<Attribute name={JsonSerialization.JsonPropertyNameAttribute} args={[`"${props.type.name}"`]} />);
   }
 
   // Check if this property overrides a base model property (discriminator pattern)

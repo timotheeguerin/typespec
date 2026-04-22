@@ -1,6 +1,8 @@
 import type { Refkey } from "@alloy-js/core";
-import { code, For, type Children } from "@alloy-js/core";
+import { For, type Children } from "@alloy-js/core";
 import * as cs from "@alloy-js/csharp";
+import { Attribute } from "@alloy-js/csharp";
+import { JsonSerialization } from "../../utils/csharp-libs.jsx";
 import {
   type Enum,
   type Namespace as TspNamespace,
@@ -85,7 +87,7 @@ export function Enums(props: EnumsProps): Children {
 
         const enumDecl = (
           <>
-            {code`[JsonConverter(typeof(JsonStringEnumConverter))]`}
+            <Attribute name={JsonSerialization.JsonConverterAttribute} args={["typeof(JsonStringEnumConverter)"]} />
             <hbr />
             <cs.EnumDeclaration
               name={namePolicy.getName(info.name, "enum")}
@@ -97,7 +99,10 @@ export function Enums(props: EnumsProps): Children {
                 {(member) => (
                   <>
                     <cs.DocWhen doc={getDocComments($, member.docSource)} />
-                    {code`[JsonStringEnumMemberName("${member.serializedValue}")]`}
+                    <Attribute
+                      name={JsonSerialization.JsonStringEnumMemberNameAttribute}
+                      args={[`"${member.serializedValue}"`]}
+                    />
                     <hbr />
                     <cs.EnumMember
                       name={namePolicy.getName(member.name, "enum-member")}
@@ -118,7 +123,7 @@ export function Enums(props: EnumsProps): Children {
         return (
           <CSharpFile
             path={`${info.name}.cs`}
-            using={["System.Text.Json", "System.Text.Json.Serialization"]}
+            using={["System.Text.Json"]}
           >
             {wrappedContent}
           </CSharpFile>

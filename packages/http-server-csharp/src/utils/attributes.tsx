@@ -1,4 +1,6 @@
 import { code, type Children } from "@alloy-js/core";
+import { Attribute } from "@alloy-js/csharp";
+import { JsonSerialization } from "./csharp-libs.jsx";
 import {
   getEncode,
   getMaxItems,
@@ -95,7 +97,7 @@ export function getPropertyAttributes(program: Program, property: ModelProperty)
     property.type.kind === "Enum" ||
     (property.type.kind === "Union" && isUnionEnum(property.type))
   ) {
-    attrs.push(code`[JsonConverter(typeof(JsonStringEnumConverter))]`);
+    attrs.push(<Attribute name={JsonSerialization.JsonConverterAttribute} args={["typeof(JsonStringEnumConverter)"]} />);
   }
 
   // Constraint attributes
@@ -132,20 +134,28 @@ function getEncodingAttributes(program: Program, property: ModelProperty): Child
 
   switch (stdBase.name) {
     case "duration":
-      result.push(code`[JsonConverter(typeof(TimeSpanDurationConverter))]`);
+      result.push(
+        <Attribute name={JsonSerialization.JsonConverterAttribute} args={["typeof(TimeSpanDurationConverter)"]} />,
+      );
       break;
     case "unixTimestamp32":
-      result.push(code`[JsonConverter(typeof(UnixEpochDateTimeOffsetConverter))]`);
+      result.push(
+        <Attribute name={JsonSerialization.JsonConverterAttribute} args={["typeof(UnixEpochDateTimeOffsetConverter)"]} />,
+      );
       break;
     case "bytes":
       if (encoding && encoding.encoding.toLowerCase() === "base64url") {
-        result.push(code`[JsonConverter(typeof(Base64UrlJsonConverter))]`);
+        result.push(
+          <Attribute name={JsonSerialization.JsonConverterAttribute} args={["typeof(Base64UrlJsonConverter)"]} />,
+        );
       }
       break;
     case "utcDateTime":
     case "offsetDateTime":
       if (encoding && encoding.encoding.toLowerCase() === "unixtimestamp") {
-        result.push(code`[JsonConverter(typeof(UnixEpochDateTimeOffsetConverter))]`);
+        result.push(
+          <Attribute name={JsonSerialization.JsonConverterAttribute} args={["typeof(UnixEpochDateTimeOffsetConverter)"]} />,
+        );
       }
       break;
   }
@@ -203,7 +213,7 @@ function getStringConstraintAttribute(
   if (maxLen !== undefined) params.push(`MaxLength = ${maxLen}`);
   if (pattern !== undefined) params.push(`Pattern = "${pattern}"`);
 
-  return code`[StringConstraint(${params.join(", ")})]`;
+  return <Attribute name="StringConstraint" args={params} />;
 }
 
 function getArrayConstraintAttribute(
@@ -232,7 +242,7 @@ function getArrayConstraintAttribute(
 function getEncodedNameAttribute(program: Program, property: ModelProperty): Children | undefined {
   const encodedName = resolveEncodedName(program, property, "application/json");
   if (encodedName !== property.name) {
-    return code`[JsonPropertyName("${encodedName}")]`;
+    return <Attribute name={JsonSerialization.JsonPropertyNameAttribute} args={[`"${encodedName}"`]} />;
   }
   return undefined;
 }
