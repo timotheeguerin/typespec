@@ -58,9 +58,3 @@ export function getLiteralDefaultValue(type: Type): string | undefined {
   }
 }
 
-/**
- * Checks if a parameter has a literal default value (i.e., its type is a literal).
- */
-export function hasLiteralDefault(type: Type): boolean {
-  return getLiteralDefaultValue(type) !== undefined;
-}

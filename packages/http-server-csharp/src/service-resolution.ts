@@ -129,7 +129,7 @@ function collectEnumsFromNamespaces(
 /**
  * Canonicalize all operations for each interface, skipping any that fail.
  */
-export function canonicalizeAllInterfaces(
+function canonicalizeAllInterfaces(
   canonicalizer: HttpCanonicalizer,
   interfaces: Interface[],
 ): Map<string, OperationHttpCanonicalization[]> {
