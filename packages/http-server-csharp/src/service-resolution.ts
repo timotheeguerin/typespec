@@ -5,6 +5,7 @@ import {
   type Interface,
   type Model,
   type Namespace as TspNamespace,
+  type Program,
   type Type,
   type Union,
 } from "@typespec/compiler";
@@ -15,7 +16,6 @@ import type {
 } from "@typespec/http-canonicalization";
 import { isUnionEnum } from "./components/enums/enums.jsx";
 import {
-  assignAnonymousName,
   preAssignAnonymousResponseNames,
   resetAnonymousModels,
 } from "./components/models/anonymous-models.js";
@@ -53,7 +53,7 @@ export interface ServiceTypeResolution {
  * 6. Canonicalization of HTTP operations
  */
 export function resolveServiceTypes(
-  program: Parameters<typeof getServiceNamespaceName>[0],
+  program: Program,
   $: Typekit,
   canonicalizer: HttpCanonicalizer,
 ): ServiceTypeResolution {
@@ -204,7 +204,6 @@ function discoverReferencedModels(
   visited: Set<Type>,
 ): void {
   for (const op of ns.operations?.values() ?? []) {
-    nameAnonymousResponse(op, op.interface?.name ?? ns.name);
     discoverModelsInType($, op.returnType, addModel, visited);
     for (const param of op.parameters?.properties?.values() ?? []) {
       discoverModelsInType($, param.type, addModel, visited);
@@ -212,7 +211,6 @@ function discoverReferencedModels(
   }
   for (const iface of ns.interfaces?.values() ?? []) {
     for (const op of iface.operations?.values() ?? []) {
-      nameAnonymousResponse(op, iface.name);
       discoverModelsInType($, op.returnType, addModel, visited);
       for (const param of op.parameters?.properties?.values() ?? []) {
         discoverModelsInType($, param.type, addModel, visited);
@@ -222,19 +220,6 @@ function discoverReferencedModels(
   for (const childNs of ns.namespaces?.values() ?? []) {
     if (isStdNamespace(childNs)) continue;
     discoverReferencedModels($, childNs, addModel, visited);
-  }
-}
-
-/** Assigns a contextual name to an anonymous response model: {InterfaceName}{OperationName}Response */
-function nameAnonymousResponse(
-  op: import("@typespec/compiler").Operation,
-  containerName: string,
-): void {
-  const returnType = op.returnType;
-  if (returnType.kind === "Model" && !returnType.name) {
-    const opName = op.name.charAt(0).toUpperCase() + op.name.slice(1);
-    const ctxName = containerName.charAt(0).toUpperCase() + containerName.slice(1);
-    assignAnonymousName(returnType, `${ctxName}${opName}Response`);
   }
 }
 
