@@ -528,7 +528,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
    * Set keeping track of node pending type resolution.
    * Key is the SymId of a node. It can be retrieved with getNodeSymId(node)
    */
-  const pendingResolutions = new PendingResolutions();
+  const pendingResolutions = new CircularityGuard();
   const postCheckValidators: ValidatorFn[] = [];
 
   const typespecNamespaceBinding = resolver.symbols.global.exports!.get("TypeSpec");
@@ -1149,19 +1149,6 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       templateParameterUsageMap.set(node, false);
     }
 
-    if (pendingResolutions.has(getNodeSym(node), ResolutionKind.Constraint)) {
-      if (ctx.mapper === undefined) {
-        reportCheckerDiagnostic(
-          createDiagnostic({
-            code: "circular-constraint",
-            format: { typeName: node.id.sv },
-            target: node.constraint!,
-          }),
-        );
-      }
-      return errorType;
-    }
-
     let type: TemplateParameter | undefined = links.declaredType as TemplateParameter;
     if (type === undefined) {
       if (grandParentNode) {
@@ -1182,9 +1169,20 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       });
 
       if (node.constraint) {
-        pendingResolutions.start(getNodeSym(node), ResolutionKind.Constraint);
+        using guard = pendingResolutions.enter(getNodeSym(node), ResolutionKind.Constraint);
+        if (!guard.ok) {
+          if (ctx.mapper === undefined) {
+            reportCheckerDiagnostic(
+              createDiagnostic({
+                code: "circular-constraint",
+                format: { typeName: node.id.sv },
+                target: node.constraint!,
+              }),
+            );
+          }
+          return errorType;
+        }
         type.constraint = getParamConstraintEntityForNode(ctx, node.constraint);
-        pendingResolutions.finish(getNodeSym(node), ResolutionKind.Constraint);
       }
       if (node.default) {
         // Set this to unknownType in case the default points back to the template itself causing failures
@@ -2726,14 +2724,14 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     if (!opReference) return undefined;
     // Ensure that we don't end up with a circular reference to the same operation
     const opSymId = getNodeSym(operation);
-    if (opSymId) {
-      pendingResolutions.start(opSymId, ResolutionKind.BaseType);
-    }
+    using guard = opSymId
+      ? pendingResolutions.enter(opSymId, ResolutionKind.BaseType)
+      : undefined;
 
     const target = resolver.getNodeLinks(opReference).resolvedSymbol;
 
     // Did we encounter a circular operation reference?
-    if (target && pendingResolutions.has(target, ResolutionKind.BaseType)) {
+    if (target && pendingResolutions.isResolving(target, ResolutionKind.BaseType)) {
       if (ctx.mapper === undefined) {
         reportCheckerDiagnostic(
           createDiagnostic({
@@ -2749,9 +2747,6 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
 
     // Resolve the base operation type
     const baseOperation = getTypeForNode(opReference, ctx);
-    if (opSymId) {
-      pendingResolutions.finish(opSymId, ResolutionKind.BaseType);
-    }
 
     if (isErrorType(baseOperation)) {
       return undefined;
@@ -4569,7 +4564,8 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     sym: Sym,
     node: MemberExpressionNode | IdentifierNode,
   ): Sym | undefined {
-    if (pendingResolutions.has(sym, ResolutionKind.Type)) {
+    using guard = pendingResolutions.enter(sym, ResolutionKind.Type);
+    if (!guard.ok) {
       if (ctx.mapper === undefined) {
         reportCheckerDiagnostic(
           createDiagnostic({
@@ -4582,9 +4578,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       return undefined;
     }
 
-    pendingResolutions.start(sym, ResolutionKind.Type);
     const type = checkTypeReferenceSymbol(ctx, sym, node);
-    pendingResolutions.finish(sym, ResolutionKind.Type);
 
     return lateBindContainer(type, sym);
   }
@@ -6354,10 +6348,10 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       return undefined;
     }
     const modelSymId = getNodeSym(model);
-    pendingResolutions.start(modelSymId, ResolutionKind.BaseType);
+    using guard = pendingResolutions.enter(modelSymId, ResolutionKind.BaseType);
 
     const target = resolver.getNodeLinks(heritageRef).resolvedSymbol;
-    if (target && pendingResolutions.has(target, ResolutionKind.BaseType)) {
+    if (target && pendingResolutions.isResolving(target, ResolutionKind.BaseType)) {
       if (ctx.mapper === undefined) {
         reportCheckerDiagnostic(
           createDiagnostic({
@@ -6370,7 +6364,6 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       return undefined;
     }
     const heritageType = getTypeForNode(heritageRef, ctx);
-    pendingResolutions.finish(modelSymId, ResolutionKind.BaseType);
     if (isErrorType(heritageType)) {
       compilerAssert(program.hasError(), "Should already have reported an error.", heritageRef);
       return undefined;
@@ -6402,7 +6395,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     if (!isExpr) return undefined;
 
     const modelSymId = getNodeSym(model);
-    pendingResolutions.start(modelSymId, ResolutionKind.BaseType);
+    using guard = pendingResolutions.enter(modelSymId, ResolutionKind.BaseType);
     let isType;
     if (isExpr.kind === SyntaxKind.ModelExpression) {
       reportCheckerDiagnostic(
@@ -6417,7 +6410,7 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       isType = checkArrayExpression(ctx, isExpr);
     } else if (isExpr.kind === SyntaxKind.TypeReference) {
       const target = resolver.getNodeLinks(isExpr).resolvedSymbol;
-      if (target && pendingResolutions.has(target, ResolutionKind.BaseType)) {
+      if (target && pendingResolutions.isResolving(target, ResolutionKind.BaseType)) {
         if (ctx.mapper === undefined) {
           reportCheckerDiagnostic(
             createDiagnostic({
@@ -6434,8 +6427,6 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       reportCheckerDiagnostic(createDiagnostic({ code: "is-model", target: isExpr }));
       return undefined;
     }
-
-    pendingResolutions.finish(modelSymId, ResolutionKind.BaseType);
 
     if (isType.kind !== "Model") {
       reportCheckerDiagnostic(createDiagnostic({ code: "is-model", target: isExpr }));
@@ -7154,11 +7145,11 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
     extendsRef: TypeReferenceNode,
   ): Scalar | undefined {
     const symId = getNodeSym(scalar);
-    pendingResolutions.start(symId, ResolutionKind.BaseType);
+    using guard = pendingResolutions.enter(symId, ResolutionKind.BaseType);
 
     const target = resolver.getNodeLinks(extendsRef).resolvedSymbol;
 
-    if (target && pendingResolutions.has(target, ResolutionKind.BaseType)) {
+    if (target && pendingResolutions.isResolving(target, ResolutionKind.BaseType)) {
       if (ctx.mapper === undefined) {
         reportCheckerDiagnostic(
           createDiagnostic({
@@ -7171,7 +7162,6 @@ export function createChecker(program: Program, resolver: NameResolver): Checker
       return undefined;
     }
     const extendsType = getTypeForNode(extendsRef, ctx);
-    pendingResolutions.finish(symId, ResolutionKind.BaseType);
     if (isErrorType(extendsType)) {
       compilerAssert(program.hasError(), "Should already have reported an error.", extendsRef);
       return undefined;
@@ -8656,31 +8646,59 @@ enum ResolutionKind {
   Constraint,
 }
 
-class PendingResolutions {
-  #data = new Map<Sym, Set<ResolutionKind>>();
+/**
+ * Disposable guard for detecting circular type references.
+ *
+ * Uses `using` declarations (ES2024) for automatic cleanup — no manual finish() needed.
+ *
+ * Two usage patterns:
+ * - **Self-cycle guard:** `using guard = enter(sym, kind)` — returns `{ ok: false }` if sym
+ *   is already being resolved for the given kind. Auto-cleans on scope exit.
+ *   Used for: aliases, consts, template constraints.
+ * - **Base-type cycle guard:** `using guard = enter(self, BaseType)` then
+ *   `isResolving(target, BaseType)` checks if the resolution target is also resolving.
+ *   Used for: model heritage/is, scalar extends, operation is.
+ */
+interface ResolutionGuard {
+  /** Whether entering was successful (no cycle detected). */
+  readonly ok: boolean;
+  [Symbol.dispose](): void;
+}
 
-  start(symId: Sym, kind: ResolutionKind) {
-    let existing = this.#data.get(symId);
-    if (existing === undefined) {
-      existing = new Set();
-      this.#data.set(symId, existing);
+const noopGuard: ResolutionGuard = { ok: false, [Symbol.dispose]() {} };
+
+class CircularityGuard {
+  #resolving = new Map<Sym, Set<ResolutionKind>>();
+
+  /**
+   * Enter a resolution. Returns `{ ok: false }` if the symbol is already being
+   * resolved for the given kind (cycle detected). Use with `using` for automatic cleanup.
+   */
+  enter(sym: Sym, kind: ResolutionKind): ResolutionGuard {
+    const kinds = this.#resolving.get(sym);
+    if (kinds?.has(kind)) {
+      return noopGuard;
     }
-    existing.add(kind);
+    if (kinds) {
+      kinds.add(kind);
+    } else {
+      this.#resolving.set(sym, new Set([kind]));
+    }
+    return {
+      ok: true,
+      [Symbol.dispose]: () => {
+        const k = this.#resolving.get(sym);
+        if (k) {
+          k.delete(kind);
+          if (k.size === 0) this.#resolving.delete(sym);
+        }
+      },
+    };
   }
 
-  has(symId: Sym, kind: ResolutionKind): boolean {
-    return this.#data.get(symId)?.has(kind) ?? false;
-  }
-
-  finish(symId: Sym, kind: ResolutionKind) {
-    const existing = this.#data.get(symId);
-    if (existing === undefined) {
-      return;
-    }
-    existing?.delete(kind);
-    if (existing.size === 0) {
-      this.#data.delete(symId);
-    }
+  /** Check if a symbol is currently being resolved for a given kind. */
+  isResolving(sym: Sym, kind: ResolutionKind): boolean {
+    return this.#resolving.get(sym)?.has(kind) ?? false;
   }
 }
 
