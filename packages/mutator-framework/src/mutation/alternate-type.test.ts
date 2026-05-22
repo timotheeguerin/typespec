@@ -1,5 +1,5 @@
-import type { MemberType, Model, ModelProperty, Operation, Type, UnionVariant } from "@typespec/compiler";
-import { expectTypeEquals, t } from "@typespec/compiler/testing";
+import type { Entity, MemberType, Model, ModelProperty, Operation, Type, UnionVariant } from "@typespec/compiler";
+import { expectTypeEquals, t, type TemplateWithMarkers } from "@typespec/compiler/testing";
 import { $ } from "@typespec/compiler/typekit";
 import type { Typekit } from "@typespec/compiler/typekit";
 import { describe, expect, it } from "vitest";
@@ -16,7 +16,7 @@ import {
 
 // --- Helpers ---
 
-async function compile(code: ReturnType<typeof t.code>) {
+async function compile<T extends Record<string, Entity>>(code: TemplateWithMarkers<T>) {
   const runner = await Tester.createInstance();
   const result = await runner.compile(code);
   return { ...result, tk: $(result.program) };
@@ -26,7 +26,7 @@ function createPropertyEngine(
   tk: Typekit,
   MutationClass: typeof SimpleModelPropertyMutation<SimpleMutationOptions>,
 ) {
-  return new SimpleMutationEngine<{ ModelProperty: typeof MutationClass }>(tk, {
+  return new SimpleMutationEngine<{ ModelProperty: SimpleModelPropertyMutation<SimpleMutationOptions> }>(tk, {
     ModelProperty: MutationClass,
   } as any);
 }
@@ -35,7 +35,7 @@ function createOperationEngine(
   tk: Typekit,
   MutationClass: typeof SimpleOperationMutation<SimpleMutationOptions>,
 ) {
-  return new SimpleMutationEngine<{ Operation: typeof MutationClass }>(tk, {
+  return new SimpleMutationEngine<{ Operation: SimpleOperationMutation<SimpleMutationOptions> }>(tk, {
     Operation: MutationClass,
   } as any);
 }
@@ -44,7 +44,7 @@ function createVariantEngine(
   tk: Typekit,
   MutationClass: typeof SimpleUnionVariantMutation<SimpleMutationOptions>,
 ) {
-  return new SimpleMutationEngine<{ UnionVariant: typeof MutationClass }>(tk, {
+  return new SimpleMutationEngine<{ UnionVariant: SimpleUnionVariantMutation<SimpleMutationOptions> }>(tk, {
     UnionVariant: MutationClass,
   } as any);
 }
