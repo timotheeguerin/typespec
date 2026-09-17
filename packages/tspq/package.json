@@ -1,0 +1,56 @@
+{
+  "name": "@typespec/tspq",
+  "version": "0.1.0",
+  "author": "Microsoft Corporation",
+  "description": "TypeSpec query CLI",
+  "homepage": "https://typespec.io",
+  "readme": "https://github.com/microsoft/typespec/blob/main/README.md",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/microsoft/typespec.git"
+  },
+  "bugs": {
+    "url": "https://github.com/microsoft/typespec/issues"
+  },
+  "keywords": [
+    "typespec"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "bin": {
+    "tspq": "./cmd/tspq.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "clean": "rimraf ./dist ./temp",
+    "build": "tsc -p tsconfig.build.json",
+    "watch": "tsc -p tsconfig.build.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest -w",
+    "test:ci": "vitest run --coverage --reporter=junit --reporter=default",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix"
+  },
+  "files": [
+    "cmd/**",
+    "dist/**",
+    "!dist/test/**"
+  ],
+  "dependencies": {
+    "@typespec/compiler": "workspace:^",
+    "picocolors": "catalog:",
+    "yargs": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/yargs": "catalog:",
+    "rimraf": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

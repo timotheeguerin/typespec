@@ -1,4 +1,5 @@
 import type {
+  AiLinterRuleDefinition,
   Decorator,
   Enum,
   EnumMember,
@@ -74,7 +75,7 @@ export type LinterRuleSetRefDoc = ReferencableElement & {
 };
 export type LinterRuleRefDoc = ReferencableElement & {
   readonly kind: "rule";
-  readonly rule: LinterRuleDefinition<any, any>;
+  readonly rule: LinterRuleDefinition<any, any> | AiLinterRuleDefinition;
   /** Extended documentation as raw markdown, read from a co-located `.md` file. */
   readonly doc?: string;
 };

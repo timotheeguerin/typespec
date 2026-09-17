@@ -20,6 +20,8 @@ import type {
   Diagnostic,
   DiagnosticMessages,
   DiagnosticTarget,
+  EnabledAiLinterRule,
+  LibraryInstance,
   LinterDefinition,
   LinterResolvedDefinition,
   LinterRule,
@@ -27,12 +29,20 @@ import type {
   LinterRuleDiagnosticReport,
   LinterRuleEnableValue,
   LinterRuleSet,
+  ResolvedAiLinterRule,
   RuleRef,
   SemanticNodeListener,
 } from "./types.js";
 import { NoTarget } from "./types.js";
 
-type LinterLibraryInstance = { linter: LinterResolvedDefinition };
+type LinterLibraryInstance = {
+  linter: LinterResolvedDefinition;
+  module?: LibraryInstance["module"];
+};
+type AnyLinterRule = LinterRule<string, any, any> | ResolvedAiLinterRule;
+export function getAiLinterRules(program: Program): readonly EnabledAiLinterRule[] {
+  return program.aiLinterRules ?? [];
+}
 
 /**
  * Where a ruleset came from. `file:` references need a directory to resolve against, so they are
@@ -71,6 +81,7 @@ export interface Linter {
   ): Promise<readonly Diagnostic[]>;
   registerLinterLibrary(name: string, lib?: LinterLibraryInstance): void;
   lint(): Promise<LinterResult>;
+  getAiRules(): readonly EnabledAiLinterRule[];
 }
 
 export interface LinterStats {
@@ -94,13 +105,18 @@ export function resolveLinterDefinition(
   const rules: LinterRule<string, any>[] = linter.rules.map((rule) => {
     return { ...rule, id: `${libName}/${rule.name}` };
   });
+  const ai = linter.aiRules
+    ? { aiRules: linter.aiRules.map((rule) => ({ ...rule, id: `${libName}/${rule.name}` })) }
+    : {};
   if (linter.rules.length === 0 || (linter.ruleSets && "all" in linter.ruleSets)) {
     return {
+      ...ai,
       rules,
       ruleSets: linter.ruleSets ?? {},
     };
   } else {
     return {
+      ...ai,
       rules,
       ruleSets: {
         all: {
@@ -143,18 +159,23 @@ export function createLinter(
     return false;
   };
 
-  const ruleMap = new Map<string, LinterRule<string, any, any>>();
-  const enabledRules = new Map<
-    string,
-    { rule: LinterRule<string, any, any>; options: Record<string, unknown> }
-  >();
+  const ruleMap = new Map<string, AnyLinterRule>();
+  const enabledRules = new Map<string, { rule: AnyLinterRule; options: Record<string, unknown> }>();
   const linterLibraries = new Map<string, LinterLibraryInstance | undefined>();
+  Object.defineProperty(program, "aiLinterRules", { get: getAiRules, configurable: true });
 
   return {
     extendRuleSet,
     registerLinterLibrary,
     lint,
+    getAiRules,
   };
+
+  function getAiRules(): readonly EnabledAiLinterRule[] {
+    return [...enabledRules.values()].flatMap(({ rule, options }) =>
+      "instructions" in rule ? [{ rule, options }] : [],
+    );
+  }
 
   async function extendRuleSet(
     ruleSet: LinterRuleSet,
@@ -333,8 +354,9 @@ export function createLinter(
       { rule: LinterRule<string, any, any>; options: Record<string, unknown> }
     >();
     for (const [ruleId, entry] of enabledRules) {
-      if ((entry.rule.async ?? false) === asyncRules) {
-        filteredRules.set(ruleId, entry);
+      const rule = entry.rule;
+      if (!("instructions" in rule) && (rule.async ?? false) === asyncRules) {
+        filteredRules.set(ruleId, { rule, options: entry.options });
       }
     }
     tracer.trace(
@@ -443,8 +465,17 @@ export function createLinter(
 
     const library = lib ?? (await loadLibrary(name));
     const linter = library?.linter;
+    const module = library?.module;
     if (linter?.rules) {
-      for (const rule of linter.rules) {
+      for (const definition of [...linter.rules, ...(linter.aiRules ?? [])]) {
+        const rule =
+          "instructions" in definition
+            ? {
+                ...definition,
+                libraryRoot:
+                  module?.type === "module" ? module.path : module && getDirectoryPath(module.path),
+              }
+            : definition;
         tracer.trace(
           "register-library.rule",
           `Registering rule "${rule.id}" for library "${name}".`,
@@ -477,7 +508,7 @@ export function createLinter(
   }
 
   function resolveRuleOptions(
-    rule: LinterRule<string, any, any>,
+    rule: AnyLinterRule,
     enableValue: Exclude<LinterRuleEnableValue, false>,
   ): [Record<string, unknown>, readonly Diagnostic[]] {
     const options =

@@ -47,6 +47,7 @@ import type {
   SourceLocation,
   TypeSpecScriptNode,
 } from "../core/types.js";
+import type { AiEvaluator, AiLintReport } from "../experimental/ai-linter.js";
 import type { LoadedCoreTemplates } from "../init/core-templates.js";
 import type {
   EmitterTemplate,
@@ -64,6 +65,7 @@ export interface ServerLog {
 }
 
 export interface ServerHost {
+  readonly evaluateAi?: AiEvaluator;
   readonly compilerHost: CompilerHost;
   readonly throwInternalErrors?: boolean;
   readonly getOpenDocumentByURL: (url: string) => TextDocument | undefined;
@@ -100,6 +102,7 @@ export interface InternalCompileResult {
 }
 
 export interface Server {
+  aiLint(document: TextDocumentIdentifier, signal: AbortSignal): Promise<AiLintReport>;
   readonly pendingMessages: readonly ServerLog[];
   readonly workspaceFolders: readonly ServerWorkspaceFolder[];
   compile(
@@ -198,6 +201,7 @@ export type CustomRequestName =
   | "typespec/validateInitProjectTemplate"
   | "typespec/internalCompile";
 export interface ServerCustomCapacities {
+  aiLint?: boolean;
   getInitProjectContext?: boolean;
   validateInitProjectTemplate?: boolean;
   initProject?: boolean;

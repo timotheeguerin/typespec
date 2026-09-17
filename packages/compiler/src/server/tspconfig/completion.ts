@@ -166,7 +166,7 @@ export async function provideTspconfigCompletionItems(
 
           if (exports?.$linter?.rules !== undefined) {
             for (const [, rule] of Object.entries<LinterRuleDefinition<string, DiagnosticMessages>>(
-              exports?.$linter?.rules,
+              [...exports.$linter.rules, ...(exports.$linter.aiRules ?? [])],
             )) {
               const labelName = `${name}/${rule.name}`;
               const item = createCompletionItemWithQuote(

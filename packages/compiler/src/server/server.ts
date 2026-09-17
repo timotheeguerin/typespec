@@ -36,6 +36,19 @@ function main() {
   let clientHasWorkspaceFolderCapability = false;
   const connection = createConnection(ProposedFeatures.all);
   const documents = new TextDocuments(TextDocument);
+  let evaluationId = 0;
+  const aiQueries = new Map<
+    number,
+    (call: import("../experimental/ai-linter.js").AiQueryCall) => unknown
+  >();
+  connection.onRequest(
+    "typespec/aiQuery",
+    (params: { id: number; call: import("../experimental/ai-linter.js").AiQueryCall }) => {
+      const query = aiQueries.get(params.id);
+      if (!query) throw new Error("AI query session is no longer active.");
+      return query(params.call);
+    },
+  );
 
   // eslint-disable-next-line no-console
   console.log = (data: any, ...args: any[]) => connection.console.info(format(data, ...args));
@@ -49,6 +62,22 @@ function main() {
   console.error = (data: any, ...args: any[]) => connection.console.error(format(data, ...args));
 
   const host: ServerHost = {
+    async evaluateAi(request, query, signal) {
+      const id = ++evaluationId;
+      aiQueries.set(id, query);
+      const { CancellationTokenSource } = await import("vscode-languageserver");
+      const source = new CancellationTokenSource();
+      const cancel = () => source.cancel();
+      signal.addEventListener("abort", cancel, { once: true });
+      if (signal.aborted) source.cancel();
+      try {
+        return await connection.sendRequest("typespec/aiEvaluate", { id, request }, source.token);
+      } finally {
+        signal.removeEventListener("abort", cancel);
+        source.dispose();
+        aiQueries.delete(id);
+      }
+    },
     compilerHost: NodeHost,
     sendDiagnostics(params: PublishDiagnosticsParams) {
       void connection.sendDiagnostics(params);
@@ -95,6 +124,16 @@ function main() {
 
   const clientConfigProvider = createClientConfigProvider();
   const s = createServer(host, clientConfigProvider);
+  connection.onRequest("typespec/aiLint", async (params: { doc: { uri: string } }, token) => {
+    const controller = new AbortController();
+    const cancellation = token.onCancellationRequested(() => controller.abort());
+    if (token.isCancellationRequested) controller.abort();
+    try {
+      return await s.aiLint(params.doc, controller.signal);
+    } finally {
+      cancellation.dispose();
+    }
+  });
   server = s;
   s.log({ level: `info`, message: `TypeSpec language server v${typespecVersion}` });
   s.log({ level: `info`, message: `Module: ${fileURLToPath(import.meta.url)}` });

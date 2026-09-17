@@ -1,0 +1,3 @@
+linter:
+  extends:
+    - "@typespec/ai-linter/recommended"

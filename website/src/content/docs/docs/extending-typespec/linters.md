@@ -9,6 +9,20 @@ A TypeSpec library can provide an `$onValidate` hook, which can be used to valid
 
 On the other hand, a linter might provide optional validation. The program could be correct, but there might be room for improvements. For instance, a linter might require documentation on every type. While this isn't necessary to represent the TypeSpec program, it could enhance the end user experience. Linters need to be explicitly enabled, whereas `$onValidate` will run automatically if that library is imported.
 
+## Experimental AI rules
+
+A library can also export an optional `aiRules` collection alongside `$linter.rules`.
+AI rules collect candidates through semantic visitors and provide instructions for
+model-based interpretation. They share rule IDs, options, configuration, and
+suppression conventions, but run only through an explicit AI lint host, never as
+part of ordinary compilation. The existing `all` ruleset includes code rules only.
+
+The experimental `@typespec/ai-linter` package provides CLI/GitHub reporting and a
+numeric-duration rule. The TypeSpec VS Code extension offers explicit model consent
+and on-save inline diagnostics. See the
+[AI linter guide](https://github.com/microsoft/typespec/tree/main/packages/ai-linter)
+for the rule contract, provider setup, execution limits, and privacy considerations.
+
 ## Creating a linter
 
 You can find examples in `packages/best-practices`.

@@ -1,0 +1,24 @@
+Type: Widget.Widget
+Kind: Model
+Description: Widget model
+Location: <stripped>
+{
+  "related": [
+    {
+      "name": "Widget.Widget.id",
+      "kind": "ModelProperty",
+      "origin": "project",
+      "details": {
+        "optional": false
+      }
+    },
+    {
+      "name": "Widget.Widget.name",
+      "kind": "ModelProperty",
+      "origin": "project",
+      "details": {
+        "optional": true
+      }
+    }
+  ]
+}

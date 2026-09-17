@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "references": [{ "path": "../compiler" }, { "path": "../tspq" }],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "tsBuildInfoFile": "temp/tsconfig.tsbuildinfo"
+  }
+}
