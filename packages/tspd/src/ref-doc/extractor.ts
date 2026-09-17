@@ -8,7 +8,6 @@ import type {
   Interface,
   JSONSchemaType,
   LinterResolvedDefinition,
-  LinterRuleDefinition,
   LinterRuleSet,
   Model,
   ModelProperty,
@@ -965,7 +964,9 @@ async function extractLinterRefDoc(
   return {
     ruleSets: linter.ruleSets && extractLinterRuleSetsRefDoc(libName, linter.ruleSets),
     rules: await Promise.all(
-      linter.rules.map((rule) => extractLinterRuleRefDoc(libName, rule, libraryPath)),
+      [...linter.rules, ...(linter.aiRules ?? [])].map((rule) =>
+        extractLinterRuleRefDoc(libName, rule, libraryPath),
+      ),
     ),
   };
 }
@@ -1001,7 +1002,7 @@ function extractLinterRuleSetsRefDoc(
 }
 async function extractLinterRuleRefDoc(
   libName: string,
-  rule: LinterRuleDefinition<any, any>,
+  rule: LinterRuleRefDoc["rule"],
   libraryPath: string,
 ): Promise<LinterRuleRefDoc> {
   const fullName = `${libName}/${rule.name}`;

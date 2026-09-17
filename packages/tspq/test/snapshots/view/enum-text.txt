@@ -1,0 +1,18 @@
+Type: Widget.Kind
+Kind: Enum
+Description: Widget enum
+Location: <stripped>
+{
+  "related": [
+    {
+      "name": "Widget.Kind.One",
+      "kind": "EnumMember",
+      "origin": "project"
+    },
+    {
+      "name": "Widget.Kind.Two",
+      "kind": "EnumMember",
+      "origin": "project"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "name": "Widget.Widget",
+  "kind": "Model",
+  "description": "Widget model",
+  "origin": "project",
+  "details": {
+    "related": [
+      {
+        "name": "Widget.Widget.id",
+        "kind": "ModelProperty",
+        "origin": "project",
+        "details": {
+          "optional": false,
+          "related": [
+            {
+              "name": "string",
+              "kind": "Scalar",
+              "description": "A sequence of textual characters.",
+              "origin": "compiler"
+            },
+            {
+              "name": "Widget.Widget",
+              "kind": "Model",
+              "description": "Widget model",
+              "origin": "project"
+            }
+          ]
+        }
+      },
+      {
+        "name": "Widget.Widget.name",
+        "kind": "ModelProperty",
+        "origin": "project",
+        "details": {
+          "optional": true,
+          "related": [
+            {
+              "name": "string",
+              "kind": "Scalar",
+              "description": "A sequence of textual characters.",
+              "origin": "compiler"
+            },
+            {
+              "name": "Widget.Widget",
+              "kind": "Model",
+              "description": "Widget model",
+              "origin": "project"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

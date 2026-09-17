@@ -28,7 +28,9 @@ export interface TestServerHost extends ServerHost, TestFileSystem {
   getURL(path: string): string;
 }
 
-export async function createTestServerHost(options?: TestHostOptions & { workspaceDir?: string }) {
+export async function createTestServerHost(
+  options?: TestHostOptions & { workspaceDir?: string; evaluateAi?: ServerHost["evaluateAi"] },
+) {
   const logMessages: string[] = [];
   const documents = createStringMap<TextDocument>(!!options?.caseInsensitiveFileSystem);
   const diagnostics = createStringMap<Diagnostic[]>(!!options?.caseInsensitiveFileSystem);
@@ -36,6 +38,7 @@ export async function createTestServerHost(options?: TestHostOptions & { workspa
   await fileSystem.addTypeSpecLibrary(StandardTestLibrary);
 
   const serverHost: TestServerHost = {
+    evaluateAi: options?.evaluateAi,
     ...fileSystem,
     throwInternalErrors: true,
     server: undefined!, // initialized later due to cycle

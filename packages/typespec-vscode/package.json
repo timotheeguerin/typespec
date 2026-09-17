@@ -186,6 +186,21 @@
     ],
     "commands": [
       {
+        "command": "typespec.aiLint.enable",
+        "title": "Enable AI Lint on Save",
+        "category": "TypeSpec"
+      },
+      {
+        "command": "typespec.aiLint.disable",
+        "title": "Disable AI Lint",
+        "category": "TypeSpec"
+      },
+      {
+        "command": "typespec.aiLint.run",
+        "title": "Run AI Lint for Current Project",
+        "category": "TypeSpec"
+      },
+      {
         "command": "typespec.restartServer",
         "title": "Restart TypeSpec server",
         "category": "TypeSpec"

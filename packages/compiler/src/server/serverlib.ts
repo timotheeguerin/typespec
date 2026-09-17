@@ -94,6 +94,7 @@ import type {
   TypeSpecScriptNode,
 } from "../core/types.js";
 import { NoTarget, SyntaxKind } from "../core/types.js";
+import { getAiLinterRules, runAiLinter, type AiLintReport } from "../experimental/ai-linter.js";
 import { getTypeSpecCoreTemplates } from "../init/core-templates.js";
 import { validateTemplateDefinitions } from "../init/init-template-validate.js";
 import type { InitTemplate } from "../init/init-template.js";
@@ -179,6 +180,42 @@ export function createServer(
     log,
     clientConfigsProvider,
   });
+  const aiRuns = new Set<AbortController>();
+
+  function invalidateAiRuns() {
+    for (const controller of aiRuns) controller.abort();
+    aiRuns.clear();
+  }
+
+  async function aiLint(
+    document: TextDocumentIdentifier,
+    signal: AbortSignal,
+  ): Promise<AiLintReport> {
+    if (!host.evaluateAi) throw new Error("This language client does not support AI evaluation.");
+    const controller = new AbortController();
+    aiRuns.add(controller);
+    const runSignal = AbortSignal.any([signal, controller.signal]);
+    try {
+      const compiled = await compileService.compile(document, undefined, {
+        mode: "full",
+        isCancelled: () => runSignal.aborted,
+      });
+      if (!compiled) throw new Error("AI lint compilation cancelled or unavailable.");
+      const rules = getAiLinterRules(compiled.program);
+      if (rules.length === 0) {
+        throw new Error(
+          "No AI rules are enabled. Configure linter.extends or linter.enable in tspconfig.yaml.",
+        );
+      }
+      const result = await runAiLinter(compiled.program, rules, host.evaluateAi, {
+        signal: runSignal,
+      });
+      const { diagnostics: _, ...report } = result;
+      return { ...report, projectRoot: compiled.program.projectRoot };
+    } finally {
+      aiRuns.delete(controller);
+    }
+  }
   interface DiagnosticIndexEntry {
     readonly diagnostic: Diagnostic;
     readonly fileUri: string;
@@ -246,6 +283,7 @@ export function createServer(
   }
 
   return {
+    aiLint,
     get pendingMessages() {
       return pendingMessages;
     },
@@ -405,6 +443,7 @@ export function createServer(
 
     log({ level: "info", message: `Workspace Folders`, detail: workspaceFolders });
     const customCapacities: ServerCustomCapacities = {
+      aiLint: host.evaluateAi !== undefined,
       getInitProjectContext: true,
       initProject: true,
       validateInitProjectTemplate: true,
@@ -646,6 +685,16 @@ export function createServer(
   }
 
   function watchedFilesChanged(params: DidChangeWatchedFilesParams) {
+    if (
+      params.changes.some(
+        ({ uri, type }) =>
+          type !== FileChangeType.Changed ||
+          !uri.endsWith(".tsp") ||
+          !host.getOpenDocumentByURL(uri),
+      )
+    ) {
+      invalidateAiRuns();
+    }
     fileSystemCache.notify(params.changes);
     npmPackageProvider.notify(params.changes);
   }
@@ -770,6 +819,7 @@ export function createServer(
   }
 
   function checkChange(change: TextDocumentChangeEvent<TextDocument>) {
+    invalidateAiRuns();
     const initVersion = fileService.getOpenDocumentInitVersion(change.document.uri);
     if (!initVersion) {
       // not expected, log something for troubleshooting
@@ -874,6 +924,9 @@ export function createServer(
 
     // Report unused suppressions as hints with faded-out styling
     for (const { directive } of program.suppressionTracker?.getUnusedSuppressions() ?? []) {
+      // Deferred rules have not necessarily run; their suppressions cannot be called unused.
+      const code = program.diagnosticCodeResolver?.resolveCode(directive.code) ?? directive.code;
+      if (getAiLinterRules(program).some(({ rule }) => rule.id === code)) continue;
       const unusedSuppressionDiagnostic: Diagnostic = {
         code: "unused-suppression",
         severity: "warning",
@@ -1539,6 +1592,7 @@ export function createServer(
   }
 
   function documentClosed(change: TextDocumentChangeEvent<TextDocument>) {
+    invalidateAiRuns();
     fileService.notifyDocumentClosed(change);
     // clear diagnostics on file close
     sendDiagnostics(change.document, []);

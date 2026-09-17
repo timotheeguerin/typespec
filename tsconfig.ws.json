@@ -1,5 +1,7 @@
 {
   "references": [
+    { "path": "packages/tspq/tsconfig.build.json" },
+    { "path": "packages/ai-linter/tsconfig.build.json" },
     { "path": "packages/asset-emitter/tsconfig.build.json" },
     { "path": "packages/compiler/tsconfig.build.json" },
     { "path": "packages/versioning/tsconfig.build.json" },

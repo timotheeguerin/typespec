@@ -88,6 +88,8 @@ import { NoTarget, SymbolFlags } from "./types.js";
 export type CompilationStage = "parsing" | "checking" | "validating" | "linting" | "emitting";
 
 export interface Program {
+  /** Experimental deferred rules. Kept on the Program for hosts using a project-local compiler. */
+  readonly aiLinterRules?: readonly import("./types.js").EnabledAiLinterRule[];
   compilerOptions: CompilerOptions;
   /** @internal */
   mainFile?: TypeSpecScriptNode;

@@ -5,6 +5,7 @@ import "./pre-extension-activate.js";
 import type { ExtensionContext } from "vscode";
 import vscode, { commands, TabInputText } from "vscode";
 import { State } from "vscode-languageclient";
+import { registerAiLint } from "./ai-lint.js";
 import { createCodeActionProvider } from "./code-action-provider.js";
 import { setTspLanguageClient, tspLanguageClient } from "./extension-context.js";
 import { ExtensionStateManager } from "./extension-state-manager.js";
@@ -60,6 +61,7 @@ export async function activate(context: ExtensionContext) {
       context.subscriptions.push(createTaskProvider());
 
       context.subscriptions.push(createCodeActionProvider());
+      registerAiLint(context);
 
       context.subscriptions.push(
         commands.registerCommand(CommandName.ShowOutputChannel, () => {

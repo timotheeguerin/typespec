@@ -12,6 +12,7 @@ allowBuilds:
   "@vscode/vsce-sign": false
   esbuild: false
   keytar: false
+  koffi: false
   sharp: false
   tree-sitter-c-sharp: false
   tree-sitter-java: false
@@ -20,6 +21,7 @@ allowBuilds:
   tree-sitter-typescript: false
 
 catalog:
+  "@github/copilot-sdk": "1.0.13"
   "@alloy-js/cli": ^0.25.0
   "@alloy-js/core": ^0.25.0
   "@alloy-js/csharp": ^0.25.0

@@ -1,0 +1,36 @@
+{
+  "name": "Widget",
+  "kind": "Namespace",
+  "origin": "project",
+  "details": {
+    "related": [
+      {
+        "name": "Widget.Widget",
+        "kind": "Model",
+        "description": "Widget model",
+        "origin": "project"
+      },
+      {
+        "name": "Widget.WidgetId",
+        "kind": "Scalar",
+        "origin": "project"
+      },
+      {
+        "name": "Widget.WidgetOps",
+        "kind": "Interface",
+        "origin": "project"
+      },
+      {
+        "name": "Widget.Kind",
+        "kind": "Enum",
+        "description": "Widget enum",
+        "origin": "project"
+      },
+      {
+        "name": "Widget.Choice",
+        "kind": "Union",
+        "origin": "project"
+      }
+    ]
+  }
+}

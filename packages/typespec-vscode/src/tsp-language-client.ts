@@ -6,9 +6,10 @@ import type {
   InitProjectTemplate,
   ServerInitializeResult,
 } from "@typespec/compiler";
+import type { AiEvaluationRequest, AiLintReport } from "@typespec/compiler/experimental";
 import type { InternalCompileResult } from "@typespec/compiler/internals";
 import { inspect } from "util";
-import type { ExtensionContext, LogOutputChannel } from "vscode";
+import type { CancellationToken, ExtensionContext, LogOutputChannel } from "vscode";
 import { commands, RelativePattern, workspace } from "vscode";
 import type {
   CloseHandlerResult,
@@ -19,6 +20,7 @@ import type {
 } from "vscode-languageclient/node";
 import { CloseAction, ErrorAction, LanguageClient } from "vscode-languageclient/node";
 import { TspConfigFileName } from "./const.js";
+import { evaluateAiLint } from "./lm/ai-lint-model.js";
 import { sendLmChatRequest } from "./lm/language-model.js";
 import logger from "./log/logger.js";
 import telemetryClient from "./telemetry/telemetry-client.js";
@@ -36,6 +38,14 @@ import {
 } from "./utils.js";
 
 export class TspLanguageClient {
+  async runAiLint(uri: string, token: CancellationToken): Promise<AiLintReport> {
+    if (!this.initializeResult?.customCapacities?.aiLint) {
+      throw new Error(
+        "This TypeSpec compiler does not support AI lint. Update the project compiler.",
+      );
+    }
+    return this.client.sendRequest("typespec/aiLint", { doc: { uri } }, token);
+  }
   constructor(
     private client: LanguageClient,
     private exe: Executable,
@@ -249,6 +259,7 @@ export class TspLanguageClient {
     const watchers = [
       workspace.createFileSystemWatcher("**/*.tsp"),
       workspace.createFileSystemWatcher(`**/${TspConfigFileName}`),
+      workspace.createFileSystemWatcher("**/*.md"),
       // please be aware that the vscode watch with '**' will honer the files.watcherExclude settings
       // so we won't get notification for those package.json under node_modules
       // if our customers exclude the node_modules folder in files.watcherExclude settings.
@@ -308,6 +319,15 @@ export class TspLanguageClient {
     const name = "TypeSpec";
     const id = "typespec";
     const lc = new LanguageClient(id, name, { run: exe, debug: exe }, options);
+    lc.onRequest(
+      "typespec/aiEvaluate",
+      (params: { id: number; request: AiEvaluationRequest }, token) =>
+        evaluateAiLint(
+          params.request,
+          (call) => lc.sendRequest("typespec/aiQuery", { id: params.id, call }, token),
+          token,
+        ),
+    );
 
     const sendLmChatRequestRequestName: LspClientCustomRequest_ChatComplete_Name =
       "custom/chatCompletion";

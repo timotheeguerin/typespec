@@ -1,0 +1,20 @@
+{
+  "name": "Widget.Kind",
+  "kind": "Enum",
+  "description": "Widget enum",
+  "origin": "project",
+  "details": {
+    "related": [
+      {
+        "name": "Widget.Kind.One",
+        "kind": "EnumMember",
+        "origin": "project"
+      },
+      {
+        "name": "Widget.Kind.Two",
+        "kind": "EnumMember",
+        "origin": "project"
+      }
+    ]
+  }
+}

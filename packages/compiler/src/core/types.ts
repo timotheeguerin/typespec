@@ -2740,14 +2740,45 @@ export interface PackageFlags {}
 
 export interface LinterDefinition {
   rules: LinterRuleDefinition<string, DiagnosticMessages, any>[];
+  /** Experimental rules evaluated only by an explicitly invoked AI lint host. */
+  aiRules?: AiLinterRuleDefinition[];
   ruleSets?: Record<string, LinterRuleSet>;
 }
 
 export interface LinterResolvedDefinition {
   readonly rules: LinterRule<string, DiagnosticMessages, any>[];
+  readonly aiRules?: ResolvedAiLinterRule[];
   readonly ruleSets: {
     [name: string]: LinterRuleSet;
   };
+}
+
+/** Experimental, provider-independent AI rule. Collection never invokes a model. */
+export interface AiLinterRuleDefinition extends LinterRuleDefinitionBase<
+  string,
+  DiagnosticMessages,
+  Record<string, unknown>
+> {
+  readonly revision: string;
+  readonly instructions: string | FileRef;
+  readonly tools?: readonly ("view" | "related")[];
+  create(context: AiLinterRuleContext): SemanticNodeListener;
+}
+
+export interface ResolvedAiLinterRule extends AiLinterRuleDefinition {
+  readonly id: string;
+  readonly libraryRoot?: string;
+}
+
+export interface AiLinterRuleContext {
+  readonly program: Program;
+  readonly options: Record<string, unknown>;
+  addCandidate(candidate: { target: Type; context?: readonly Type[] }): void;
+}
+
+export interface EnabledAiLinterRule {
+  readonly rule: ResolvedAiLinterRule;
+  readonly options: Record<string, unknown>;
 }
 
 interface LinterRuleDefinitionBase<

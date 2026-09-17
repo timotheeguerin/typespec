@@ -1,0 +1,26 @@
+{
+  "name": "Widget.Widget",
+  "kind": "Model",
+  "description": "Widget model",
+  "origin": "project",
+  "details": {
+    "related": [
+      {
+        "name": "Widget.Widget.id",
+        "kind": "ModelProperty",
+        "origin": "project",
+        "details": {
+          "optional": false
+        }
+      },
+      {
+        "name": "Widget.Widget.name",
+        "kind": "ModelProperty",
+        "origin": "project",
+        "details": {
+          "optional": true
+        }
+      }
+    ]
+  }
+}
