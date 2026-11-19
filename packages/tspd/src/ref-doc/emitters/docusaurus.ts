@@ -1,19 +1,14 @@
-import {
+import type {
   DeprecationNotice,
+  LinterRuleRefDoc,
   NamedTypeRefDoc,
   RefDocEntity,
   TypeSpecLibraryRefDoc,
   TypeSpecRefDoc,
   TypeSpecRefDocBase,
 } from "../types.js";
-import {
-  MarkdownDoc,
-  MarkdownSection,
-  codeblock,
-  inlinecode,
-  renderMarkdowDoc,
-  section,
-} from "../utils/markdown.js";
+import type { MarkdownDoc, MarkdownSection } from "../utils/markdown.js";
+import { codeblock, inlinecode, renderMarkdowDoc, section } from "../utils/markdown.js";
 import { MarkdownRenderer, groupByNamespace } from "./markdown.js";
 
 /**
@@ -286,14 +281,8 @@ export class DocusaurusRenderer extends MarkdownRenderer {
     }
   }
 
-  linterRuleLink(url: string) {
-    const homepage = (this.refDoc.packageJson as any).docusaurusWebsite;
-    if (homepage && url.includes(homepage)) {
-      const fromRoot = url.replace(homepage, "");
-      return `${fromRoot}.md`;
-    } else {
-      return url;
-    }
+  linterRuleLink(rule: LinterRuleRefDoc) {
+    return `../rules/${rule.rule.name}.md`;
   }
 
   deprecationNotice(notice: DeprecationNotice): MarkdownDoc {

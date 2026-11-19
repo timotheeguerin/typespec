@@ -1,12 +1,5 @@
-import {
-  CompletionItem,
-  CompletionItemKind,
-  CompletionList,
-  CompletionParams,
-  MarkupKind,
-  Range,
-  TextEdit,
-} from "vscode-languageserver";
+import type { CompletionItem, CompletionList, CompletionParams } from "vscode-languageserver";
+import { CompletionItemKind, MarkupKind, Range, TextEdit } from "vscode-languageserver";
 import { getSymNode } from "../core/binder.js";
 import { getDeprecationDetails } from "../core/deprecation.js";
 import { compilerAssert, getSourceLocation } from "../core/diagnostics.js";
@@ -20,22 +13,20 @@ import {
   hasTrailingDirectorySeparator,
   resolvePath,
 } from "../core/path-utils.js";
-import { Program } from "../core/program.js";
-import {
+import type { Program } from "../core/program.js";
+import type {
   CompilerHost,
   IdentifierNode,
   Node,
-  NodeFlags,
   PositionDetail,
   StringLiteralNode,
   Sym,
-  SymbolFlags,
-  SyntaxKind,
   Type,
   TypeSpecScriptNode,
 } from "../core/types.js";
+import { NodeFlags, SymbolFlags, SyntaxKind } from "../core/types.js";
 
-import { PackageJson } from "../types/package-json.js";
+import type { PackageJson } from "../types/package-json.js";
 import { findProjectRoot, loadFile } from "../utils/io.js";
 import { resolveTspMain } from "../utils/misc.js";
 import { getSymbolDetails } from "./type-details.js";
@@ -100,6 +91,7 @@ function addCompletionByLookingBackward(
       n.kind === SyntaxKind.ScalarStatement ||
       n.kind === SyntaxKind.OperationStatement ||
       n.kind === SyntaxKind.InterfaceStatement ||
+      n.kind === SyntaxKind.UnionStatement ||
       n.kind === SyntaxKind.TemplateParameterDeclaration,
     true /*includeSelf*/,
   );
@@ -121,12 +113,14 @@ function addCompletionByLookingBackwardNode(
     [SyntaxKind.ScalarStatement]: "scalarHeader",
     [SyntaxKind.OperationStatement]: "operationHeader",
     [SyntaxKind.InterfaceStatement]: "interfaceHeader",
+    [SyntaxKind.UnionStatement]: "unionHeader",
   };
   switch (preNode?.kind) {
     case SyntaxKind.ModelStatement:
     case SyntaxKind.ScalarStatement:
     case SyntaxKind.OperationStatement:
     case SyntaxKind.InterfaceStatement:
+    case SyntaxKind.UnionStatement:
       const idEndPos =
         preNode.templateParametersRange.end >= 0
           ? preNode.templateParametersRange.end
@@ -204,6 +198,7 @@ interface KeywordArea {
   templateParameter?: boolean;
   operationHeader?: boolean;
   interfaceHeader?: boolean;
+  unionHeader?: boolean;
 }
 
 const keywords = [
@@ -227,7 +222,13 @@ const keywords = [
   // On model `model Foo <keyword> ...`
   [
     "extends",
-    { modelHeader: true, scalarHeader: true, templateParameter: true, interfaceHeader: true },
+    {
+      modelHeader: true,
+      scalarHeader: true,
+      templateParameter: true,
+      interfaceHeader: true,
+      unionHeader: true,
+    },
   ],
   ["is", { modelHeader: true, operationHeader: true }],
 
@@ -421,20 +422,20 @@ async function addIdentifierCompletion(
     let kind: CompletionItemKind;
     let deprecated = false;
     const symNode = getSymNode(sym);
-    const type = sym.type ?? program.checker.getTypeForNode(symNode);
+    const type = sym.type ?? (symNode ? program.checker.getTypeForNode(symNode) : undefined);
     if (sym.flags & (SymbolFlags.Function | SymbolFlags.Decorator)) {
       kind = CompletionItemKind.Function;
     } else if (
       sym.flags & SymbolFlags.Namespace &&
-      symNode.kind !== SyntaxKind.NamespaceStatement
+      symNode?.kind !== SyntaxKind.NamespaceStatement
     ) {
       kind = CompletionItemKind.Module;
     } else if (symNode?.kind === SyntaxKind.AliasStatement) {
       kind = CompletionItemKind.Variable;
       deprecated = getDeprecationDetails(program, symNode) !== undefined;
     } else {
-      kind = getCompletionItemKind(program, type);
-      deprecated = getDeprecationDetails(program, type) !== undefined;
+      kind = type ? getCompletionItemKind(program, type) : CompletionItemKind.Variable;
+      deprecated = type ? getDeprecationDetails(program, type) !== undefined : false;
     }
     const documentation = await getSymbolDetails(program, sym);
 
@@ -460,16 +461,21 @@ async function addIdentifierCompletion(
       continue;
     }
 
-    if (sym.name.startsWith("$")) {
-      const targetNode = getSourceLocation(node);
-      const lineAndChar = targetNode.file.getLineAndCharacterOfPosition(node.pos);
-      item.textEdit = TextEdit.replace(
-        // Specifying replacement in the current location can avoid the problem of $ duplication
-        Range.create(lineAndChar, lineAndChar),
-        printIdentifier(key) + (suffix ?? ""),
-      );
+    const identifierContext = getIdentifierPrintContext(node);
+    const insertionText = printIdentifier(key, identifierContext) + (suffix ?? "");
+    if (node.pos === node.end) {
+      // Synthetic/missing identifier node — just use insertText
+      item.insertText = insertionText;
     } else {
-      item.insertText = printIdentifier(key) + (suffix ?? "");
+      const targetNode = getSourceLocation(node);
+      const start = targetNode.file.getLineAndCharacterOfPosition(node.pos);
+      const end = targetNode.file.getLineAndCharacterOfPosition(node.end);
+      if (sym.name.startsWith("$")) {
+        // Insert before the identifier to avoid $ duplication
+        item.textEdit = TextEdit.replace(Range.create(start, start), insertionText);
+      } else {
+        item.textEdit = TextEdit.replace(Range.create(start, end), insertionText);
+      }
     }
 
     if (deprecated) {
@@ -504,6 +510,22 @@ async function addIdentifierCompletion(
 
       return declLocation === sourceLocation;
     });
+  }
+}
+
+/**
+ * Determine the print context for an identifier in completion.
+ * In certain positions (model property names, object literal property names, member expressions),
+ * keywords can be used as identifiers without backticks.
+ */
+function getIdentifierPrintContext(node: IdentifierNode): "allow-reserved" | "disallow-reserved" {
+  switch (node.parent?.kind) {
+    case SyntaxKind.MemberExpression:
+    case SyntaxKind.ModelProperty:
+    case SyntaxKind.ObjectLiteralProperty:
+      return "allow-reserved";
+    default:
+      return "disallow-reserved";
   }
 }
 

@@ -4,10 +4,12 @@ import { createRequire } from "module";
 import { dirname, resolve } from "path";
 import { describe, it } from "vitest";
 import vscode_oniguruma from "vscode-oniguruma";
-import vscode_textmate, { IOnigLib, StateStack } from "vscode-textmate";
+import type { IOnigLib, StateStack } from "vscode-textmate";
+import vscode_textmate from "vscode-textmate";
 import { createSourceFile } from "../../src/core/source-file.js";
-import { TypeSpecScope } from "../../src/server/tmlanguage.js";
-import { SemanticToken, SemanticTokenKind } from "../../src/server/types.js";
+import type { TypeSpecScope } from "../../src/server/tmlanguage.js";
+import type { SemanticToken } from "../../src/server/types.js";
+import { SemanticTokenKind } from "../../src/server/types.js";
 import { createTestServerHost } from "../../src/testing/test-server-host.js";
 import { findTestPackageRoot } from "../../src/testing/test-utils.js";
 import { deepEquals } from "../../src/utils/index.js";
@@ -1086,6 +1088,70 @@ function testColorization(description: string, tokenize: Tokenize) {
           Token.identifiers.variable("`north west`"),
           Token.operators.typeAnnotation,
           Token.literals.stringQuoted("North West"),
+          Token.punctuation.closeBrace,
+        ]);
+      });
+
+      it("union with extends", async () => {
+        const tokens = await tokenize("union Foo extends Bar { a: A }");
+        deepStrictEqual(tokens, [
+          Token.keywords.union,
+          Token.identifiers.type("Foo"),
+          Token.keywords.extends,
+          Token.identifiers.type("Bar"),
+          Token.punctuation.openBrace,
+          Token.identifiers.variable("a"),
+          Token.operators.typeAnnotation,
+          Token.identifiers.type("A"),
+          Token.punctuation.closeBrace,
+        ]);
+      });
+
+      it("keeps an object value literal inside the union extends expression", async () => {
+        const tokens = await tokenize(`
+          union Foo extends #{ base: "value" } { value: string }
+          model Bar { value: string }
+        `);
+        deepStrictEqual(tokens, [
+          Token.keywords.union,
+          Token.identifiers.type("Foo"),
+          Token.keywords.extends,
+          Token.punctuation.openHashBrace,
+          Token.identifiers.variable("base"),
+          Token.operators.typeAnnotation,
+          Token.literals.stringQuoted("value"),
+          Token.punctuation.closeBrace,
+          Token.punctuation.openBrace,
+          Token.identifiers.variable("value"),
+          Token.operators.typeAnnotation,
+          Token.identifiers.type("string"),
+          Token.punctuation.closeBrace,
+          Token.keywords.model,
+          Token.identifiers.type("Bar"),
+          Token.punctuation.openBrace,
+          Token.identifiers.variable("value"),
+          Token.operators.typeAnnotation,
+          Token.identifiers.type("string"),
+          Token.punctuation.closeBrace,
+        ]);
+      });
+
+      it("templated union with extends", async () => {
+        const tokens = await tokenize("union Foo<T extends string> extends Bar { a: T }");
+        deepStrictEqual(tokens, [
+          Token.keywords.union,
+          Token.identifiers.type("Foo"),
+          Token.punctuation.typeParameters.begin,
+          Token.identifiers.type("T"),
+          Token.keywords.extends,
+          Token.identifiers.type("string"),
+          Token.punctuation.typeParameters.end,
+          Token.keywords.extends,
+          Token.identifiers.type("Bar"),
+          Token.punctuation.openBrace,
+          Token.identifiers.variable("a"),
+          Token.operators.typeAnnotation,
+          Token.identifiers.type("T"),
           Token.punctuation.closeBrace,
         ]);
       });

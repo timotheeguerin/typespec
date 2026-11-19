@@ -1,4 +1,5 @@
-import { NoTarget, Program } from "@typespec/compiler";
+import type { Program } from "@typespec/compiler";
+import { NoTarget } from "@typespec/compiler";
 import { reportDiagnostic } from "./lib.js";
 import { spawnAsync, trace } from "./utils.js";
 
@@ -37,6 +38,47 @@ export async function validateDependencies(
       if (program && logDiagnostic) {
         reportDiagnostic(program, {
           code: "invalid-java-sdk-dependency",
+          target: NoTarget,
+        });
+      }
+    } else {
+      if (program && logDiagnostic) {
+        reportDiagnostic(program, {
+          code: "unknown-error",
+          format: { errorMessage: error.message },
+          target: NoTarget,
+        });
+      }
+    }
+  }
+
+  // Check Java Runtime and version
+  try {
+    const result = await spawnAsync("java", ["-version"], { stdio: "pipe" });
+    const javaRuntimeVersion =
+      findJavaRuntimeVersion(result.stdout) ?? findJavaRuntimeVersion(result.stderr);
+    if (javaRuntimeVersion) {
+      if (program && logDiagnostic) {
+        trace(program, `Java Runtime in PATH is version ${javaRuntimeVersion}.`);
+      }
+      const javaMajorVersion = getJavaMajorVersion(javaRuntimeVersion);
+      if (javaMajorVersion < 11) {
+        if (program && logDiagnostic) {
+          reportDiagnostic(program, {
+            code: "invalid-java-sdk-dependency",
+            messageId: "javaVersion",
+            format: { javaVersion: javaRuntimeVersion },
+            target: NoTarget,
+          });
+        }
+      }
+    }
+  } catch (error: any) {
+    if (error && "code" in error && error["code"] === "ENOENT") {
+      if (program && logDiagnostic) {
+        reportDiagnostic(program, {
+          code: "invalid-java-sdk-dependency",
+          messageId: "java",
           target: NoTarget,
         });
       }
@@ -111,6 +153,15 @@ export function getJavaMajorVersion(version: string): number {
     }
   }
   return 0;
+}
+
+export function findJavaRuntimeVersion(output: string): string | undefined {
+  // "java version "21.0.3"" or "openjdk version "17.0.11""
+  const matches = output.match(/version "?([\d.]+)"?.*/);
+  if (matches && matches.length > 1) {
+    return matches[1];
+  }
+  return undefined;
 }
 
 function findMavenVersion(output: string): string | undefined {

@@ -14,7 +14,16 @@ const Tester = createTester(resolvePath(import.meta.dirname, "../.."), {
 
 async function generateDecoratorSignatures(code: string) {
   const [{ program }] = await Tester.compileAndDiagnose(code, {
-    compilerOptions: { parseOptions: { comments: true, docs: true } },
+    compilerOptions: {
+      parseOptions: { comments: true, docs: true },
+      configFile: {
+        projectRoot: ".",
+        kind: "project",
+        features: ["auto-decorators"],
+        diagnostics: [],
+        outputDir: "tsp-output",
+      },
+    } as any,
   });
 
   expectDiagnosticEmpty(program.diagnostics.filter((x) => x.code !== "missing-implementation"));
@@ -390,6 +399,35 @@ export type Decorators = {
     });
   });
 
+  describe("function signatures", () => {
+    it("includes @param doc comment", async () => {
+      await expectSignatures({
+        code: `
+  #suppress "experimental-feature"
+  /**
+   * Some doc comment
+   *
+   * @param arg This is the argument
+   */
+  extern fn simple(arg);`,
+        expected: `
+import type { FunctionContext, Type } from "@typespec/compiler";
+
+/**
+ * Some doc comment
+ *
+ * @param arg This is the argument
+ */
+export type SimpleFunctionImplementation = (context: FunctionContext, arg: Type) => Type;
+
+export type Functions = {
+  simple: SimpleFunctionImplementation;
+};
+    `,
+      });
+    });
+  });
+
   it("include @param doc comment", async () => {
     await expectSignatures({
       code: `
@@ -423,3 +461,190 @@ function importLine(imports: string[]) {
   const all = new Set(["DecoratorContext", "DecoratorValidatorCallbacks", ...imports]);
   return `import type { ${[...all].sort().join(", ")} } from "@typespec/compiler";`;
 }
+
+describe("auto decorator accessors", () => {
+  it("generate accessor for no-arg auto decorator (boolean flag)", async () => {
+    await expectSignatures({
+      code: `auto dec myFlag(target: Model);`,
+      expected: `
+import { hasAutoDecorator, type Model, type Program, setAutoDecorator } from "@typespec/compiler";
+
+/** Check if the \`@myFlag\` decorator was applied on the given target. */
+export function isMyFlag(program: Program, target: Model): boolean {
+  return hasAutoDecorator(program, "myFlag", target);
+}
+
+export function setMyFlag(program: Program, target: Model): void {
+  setAutoDecorator(program, "myFlag", target);
+}
+  `,
+    });
+  });
+
+  it("generate accessor for single-arg auto decorator", async () => {
+    await expectSignatures({
+      code: `auto dec myLabel(target: Model, label: valueof string);`,
+      expected: `
+import { getAutoDecoratorValue, type Model, type Program, setAutoDecorator } from "@typespec/compiler";
+
+export function getMyLabel(program: Program, target: Model): string | undefined {
+  return getAutoDecoratorValue(program, "myLabel", target)?.["label"] as any;
+}
+
+export function setMyLabel(program: Program, target: Model, label: string): void {
+  setAutoDecorator(program, "myLabel", target, { label: label });
+}
+  `,
+    });
+  });
+
+  it("generate accessor for single-rest-arg auto decorator unwraps to array", async () => {
+    await expectSignatures({
+      code: `auto dec myTags(target: Model, ...tags: valueof string[]);`,
+      expected: `
+import { getAutoDecoratorValue, type Model, type Program, setAutoDecorator } from "@typespec/compiler";
+
+export function getMyTags(program: Program, target: Model): readonly string[] | undefined {
+  return getAutoDecoratorValue(program, "myTags", target)?.["tags"] as any;
+}
+
+export function setMyTags(program: Program, target: Model, tags: readonly string[]): void {
+  setAutoDecorator(program, "myTags", target, { tags: tags });
+}
+  `,
+    });
+  });
+
+  it("generate accessor for multi-arg auto decorator", async () => {
+    await expectSignatures({
+      code: `auto dec myMeta(target: Model, name: valueof string, version: valueof int32);`,
+      expected: `
+import { getAutoDecoratorValue, type Model, type Program, setAutoDecorator } from "@typespec/compiler";
+
+export function getMyMeta(program: Program, target: Model): { name: string; version: number } | undefined {
+  return getAutoDecoratorValue(program, "myMeta", target) as any;
+}
+
+export function setMyMeta(program: Program, target: Model, value: { name: string; version: number }): void {
+  setAutoDecorator(program, "myMeta", target, value);
+}
+  `,
+    });
+  });
+
+  it("documents accessors with the decorator description, dropping doc tags", async () => {
+    await expectSignatures({
+      code: `
+        /**
+         * Specify the minimum number of instances the array must contain.
+         *
+         * @param value The minimum number of instances.
+         */
+        auto dec myMin(target: Model, value: valueof int32);
+      `,
+      expected: `
+import { getAutoDecoratorValue, type Model, type Program, setAutoDecorator } from "@typespec/compiler";
+
+/** Specify the minimum number of instances the array must contain. */
+export function getMyMin(program: Program, target: Model): number | undefined {
+  return getAutoDecoratorValue(program, "myMin", target)?.["value"] as any;
+}
+
+/** Specify the minimum number of instances the array must contain. */
+export function setMyMin(program: Program, target: Model, value: number): void {
+  setAutoDecorator(program, "myMin", target, { value: value });
+}
+  `,
+    });
+  });
+
+  it("documents `is*` accessors generically instead of with the decorator description", async () => {
+    await expectSignatures({
+      code: `
+        /** Mark the model as a flag. */
+        auto dec myFlag(target: Model);
+      `,
+      expected: `
+import { hasAutoDecorator, type Model, type Program, setAutoDecorator } from "@typespec/compiler";
+
+/** Check if the \`@myFlag\` decorator was applied on the given target. */
+export function isMyFlag(program: Program, target: Model): boolean {
+  return hasAutoDecorator(program, "myFlag", target);
+}
+
+/** Mark the model as a flag. */
+export function setMyFlag(program: Program, target: Model): void {
+  setAutoDecorator(program, "myFlag", target);
+}
+  `,
+    });
+  });
+
+  it("renders a multi line description as a block comment", async () => {
+    const result = await generateDecoratorSignatures(`
+      /**
+       * First line.
+       *
+       * Second line.
+       */
+      auto dec myLabel(target: Model, label: valueof string);
+    `);
+    expect(result).toContain(`/**
+ * First line.
+ *
+ * Second line.
+ */
+export function getMyLabel`);
+  });
+
+  it("generates accessor with fully-qualified name for namespaced auto decorator", async () => {
+    const [{ program }] = await Tester.compileAndDiagnose(
+      `
+      namespace MyLib {
+        auto dec myLabel(target: Model, label: valueof string);
+      }
+    `,
+      {
+        compilerOptions: {
+          parseOptions: { comments: true, docs: true },
+          configFile: {
+            projectRoot: ".",
+            kind: "project",
+            features: ["auto-decorators"],
+            diagnostics: [],
+            outputDir: "tsp-output",
+          },
+        } as any,
+      },
+    );
+    expectDiagnosticEmpty(program.diagnostics.filter((x) => x.code !== "missing-implementation"));
+    const files = await generateExternDecorators(program, "test-lib", {
+      prettierConfig: { printWidth: 160, plugins: [] },
+    });
+    const all = Object.values(files).join("\n");
+    expect(all).toContain(`getAutoDecoratorValue(program, "MyLib.myLabel", target)?.["label"]`);
+  });
+
+  it("does not generate $decorators type for auto decorators", async () => {
+    const result = await generateDecoratorSignatures(`auto dec myFlag(target: Model);`);
+    expect(result).not.toContain("Decorators");
+    expect(result).not.toContain("$myFlag");
+  });
+
+  it("generates both extern and auto decorator outputs when mixed", async () => {
+    const result = await generateDecoratorSignatures(`
+      extern dec externDec(target: Model);
+      auto dec dataFlag(target: Model);
+    `);
+    // Verify extern decorator parts
+    expect(result).toContain("ExternDecDecorator");
+    expect(result).toContain("externDec: ExternDecDecorator");
+    // Verify auto decorator parts
+    expect(result).toContain("isDataFlag");
+    expect(result).toContain("hasAutoDecorator");
+    expect(result).toContain("setDataFlag");
+    expect(result).toContain("setAutoDecorator");
+    // Verify no $decorators type for auto decorators
+    expect(result).not.toContain("dataFlag: ");
+  });
+});

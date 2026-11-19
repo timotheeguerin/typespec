@@ -93,16 +93,12 @@ const anyNumber = `(?:${hexNumber}|${binaryNumber}|${decimalNumber})`;
 
 const expression: IncludeRule = {
   key: "expression",
-  patterns: [
-    /* placeholder filled later due to cycle*/
-  ],
+  patterns: [/* placeholder filled later due to cycle*/],
 };
 
 const statement: IncludeRule = {
   key: "statement",
-  patterns: [
-    /*placeholder filled later due to cycle*/
-  ],
+  patterns: [/*placeholder filled later due to cycle*/],
 };
 
 const booleanLiteral: MatchRule = {
@@ -699,6 +695,17 @@ const unionBody: BeginEndRule = {
   patterns: [namedUnionVariant, token, directive, decorator, expression, punctuationComma],
 };
 
+const unionExtends: BeginEndRule = {
+  key: "union-extends",
+  scope: meta,
+  begin: "\\b(extends)\\b",
+  beginCaptures: {
+    "1": { scope: "keyword.other.tsp" },
+  },
+  end: `((?=\\{)|${universalEndExceptComma})`,
+  patterns: [expression, punctuationComma],
+};
+
 const unionStatement: BeginEndRule = {
   key: "union-statement",
   scope: meta,
@@ -709,7 +716,12 @@ const unionStatement: BeginEndRule = {
     "3": { scope: "entity.name.type.tsp" },
   },
   end: `(?<=\\})|${universalEnd}`,
-  patterns: [token, unionBody],
+  patterns: [
+    token,
+    typeParameters,
+    unionExtends, // before unionBody or `extends` will look like a type name
+    unionBody,
+  ],
 };
 
 const aliasAssignment: BeginEndRule = {

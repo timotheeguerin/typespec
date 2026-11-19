@@ -47,7 +47,8 @@ namespace Microsoft.TypeSpec.Generator.Input
                 isApiVersion: false,
                 defaultValue: null,
                 serializationOptions: null!,
-                encode: null);
+                encode: null,
+                apiVersions: []);
             resolver.AddReference(id, property);
 
             string? kind = null;
@@ -65,12 +66,15 @@ namespace Microsoft.TypeSpec.Generator.Input
             IReadOnlyList<InputDecoratorInfo>? decorators = null;
             InputSerializationOptions? serializationOptions = null;
             string? encodeString = null;
+            bool isExactName = false;
+            IReadOnlyList<string>? apiVersions = null;
 
             while (reader.TokenType != JsonTokenType.EndObject)
             {
                 var isKnownProperty = reader.TryReadReferenceId(ref id)
                     || reader.TryReadString("name", ref name)
                     || reader.TryReadString("kind", ref kind)
+                    || reader.TryReadComplexType("apiVersions", options, ref apiVersions)
                     || reader.TryReadString("summary", ref summary)
                     || reader.TryReadString("doc", ref doc)
                     || reader.TryReadComplexType("type", options, ref propertyType)
@@ -84,7 +88,8 @@ namespace Microsoft.TypeSpec.Generator.Input
                     || reader.TryReadBoolean("isApiVersion", ref isApiVersion)
                     || reader.TryReadComplexType("defaultValue", options, ref defaultValue)
                     || reader.TryReadComplexType("serializationOptions", options, ref serializationOptions)
-                    || reader.TryReadString("encode", ref encodeString);
+                    || reader.TryReadString("encode", ref encodeString)
+                    || reader.TryReadBoolean("isExactName", ref isExactName);
 
                 if (!isKnownProperty)
                 {
@@ -107,6 +112,8 @@ namespace Microsoft.TypeSpec.Generator.Input
             property.IsApiVersion = isApiVersion;
             property.DefaultValue = defaultValue;
             property.Encode = Enum.TryParse<ArrayKnownEncoding>(encodeString, ignoreCase: true, out var encode) ? encode : null;
+            property.IsExactName = isExactName;
+            property.ApiVersions = apiVersions ?? [];
 
             return property;
         }

@@ -1,7 +1,8 @@
 import { isArray, mutate } from "../utils/misc.js";
 import { codePointBefore, isIdentifierContinue, trim } from "./charcode.js";
 import { compilerAssert } from "./diagnostics.js";
-import { CompilerDiagnostics, createDiagnostic } from "./messages.js";
+import type { CompilerDiagnostics } from "./messages.js";
+import { createDiagnostic } from "./messages.js";
 import { modifiersToFlags } from "./modifiers.js";
 import {
   createScanner,
@@ -19,11 +20,12 @@ import {
   TokenDisplay,
   TokenFlags,
 } from "./scanner.js";
-import {
+import type {
   AliasStatementNode,
   AnyKeywordNode,
   ArrayLiteralNode,
   AugmentDecoratorStatementNode,
+  AutoKeywordNode,
   BlockComment,
   BooleanLiteralNode,
   CallExpressionNode,
@@ -57,7 +59,6 @@ import {
   FunctionParameterNode,
   FunctionTypeExpressionNode,
   IdentifierContext,
-  IdentifierKind,
   IdentifierNode,
   ImportStatementNode,
   InterfaceStatementNode,
@@ -70,11 +71,9 @@ import {
   ModelSpreadPropertyNode,
   ModelStatementNode,
   Modifier,
-  ModifierFlags,
   NamespaceStatementNode,
   NeverKeywordNode,
   Node,
-  NodeFlags,
   NumericLiteralNode,
   ObjectLiteralNode,
   ObjectLiteralPropertyNode,
@@ -95,7 +94,6 @@ import {
   StringTemplateSpanNode,
   StringTemplateTailNode,
   Sym,
-  SyntaxKind,
   TemplateArgumentNode,
   TemplateParameterDeclarationNode,
   TextRange,
@@ -109,6 +107,7 @@ import {
   ValueOfExpressionNode,
   VoidKeywordNode,
 } from "./types.js";
+import { IdentifierKind, ModifierFlags, NodeFlags, SyntaxKind } from "./types.js";
 
 /**
  * Callback to parse each element in a delimited list
@@ -461,6 +460,7 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
         case Token.ConstKeyword:
         case Token.ExternKeyword:
         case Token.InternalKeyword:
+        case Token.AutoKeyword:
         case Token.FnKeyword:
         case Token.DecKeyword:
           item = parseDeclaration(pos, decorators, docs, directives);
@@ -532,6 +532,7 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
         case Token.ConstKeyword:
         case Token.ExternKeyword:
         case Token.InternalKeyword:
+        case Token.AutoKeyword:
         case Token.FnKeyword:
         case Token.DecKeyword:
           item = parseDeclaration(pos, decorators, docs, directives);
@@ -703,6 +704,9 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
     const { items: templateParameters, range: templateParametersRange } =
       parseTemplateParameterList();
 
+    expectTokenIsOneOf(Token.OpenBrace, Token.ExtendsKeyword);
+
+    const optionalExtends = parseOptionalUnionExtends();
     const { items: options } = parseList(ListKind.UnionVariants, parseUnionVariant);
 
     return {
@@ -710,12 +714,20 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
       id,
       templateParameters,
       templateParametersRange,
+      extends: optionalExtends,
       decorators,
       modifiers,
       modifierFlags: modifiersToFlags(modifiers),
       options,
       ...finishNode(pos),
     };
+  }
+
+  function parseOptionalUnionExtends() {
+    if (parseOptional(Token.ExtendsKeyword)) {
+      return parseExpression();
+    }
+    return undefined;
   }
 
   function parseIdOrValueForVariant(): Expression {
@@ -1770,6 +1782,15 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
     };
   }
 
+  function parseAutoKeyword(): AutoKeywordNode {
+    const pos = tokenPos();
+    parseExpected(Token.AutoKeyword);
+    return {
+      kind: SyntaxKind.AutoKeyword,
+      ...finishNode(pos),
+    };
+  }
+
   function parseVoidKeyword(): VoidKeywordNode {
     const pos = tokenPos();
     parseExpected(Token.VoidKeyword);
@@ -2090,6 +2111,8 @@ function createParser(code: string | SourceFile, options: ParseOptions = {}): Pa
         return parseExternKeyword();
       case Token.InternalKeyword:
         return parseInternalKeyword();
+      case Token.AutoKeyword:
+        return parseAutoKeyword();
       default:
         return undefined;
     }
@@ -3060,6 +3083,7 @@ export function visitChildren<T>(node: Node, cb: NodeCallback<T>): T | undefined
         visitEach(cb, node.decorators) ||
         visitNode(cb, node.id) ||
         visitEach(cb, node.templateParameters) ||
+        visitNode(cb, node.extends) ||
         visitEach(cb, node.options)
       );
     case SyntaxKind.UnionVariant:
@@ -3167,6 +3191,7 @@ export function visitChildren<T>(node: Node, cb: NodeCallback<T>): T | undefined
     case SyntaxKind.NeverKeyword:
     case SyntaxKind.ExternKeyword:
     case SyntaxKind.InternalKeyword:
+    case SyntaxKind.AutoKeyword:
     case SyntaxKind.UnknownKeyword:
     case SyntaxKind.JsSourceFile:
     case SyntaxKind.JsNamespaceDeclaration:

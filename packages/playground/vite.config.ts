@@ -40,17 +40,15 @@ export default defineConfig({
       formats: ["es"],
     },
 
-    rollupOptions: {
-      external: (id) => externals.some((x) => id.startsWith(x)),
+    rolldownOptions: {
+      external: (id) => !id.endsWith("?worker") && externals.some((x) => id.startsWith(x)),
     },
   },
   assetsInclude: [/\.tsp$/],
   optimizeDeps: {},
   plugins: [
     react({}),
-    dts({
-      logLevel: "silent", // checker reports the errors
-    }),
+    dts({}),
     checker({
       // e.g. use TypeScript check
       typescript: true,

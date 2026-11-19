@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-import {
+import type {
   AccessFlags,
   CollectionFormat,
   DecoratorInfo,
@@ -10,11 +10,11 @@ import {
   SerializationOptions,
   UsageFlags,
 } from "@azure-tools/typespec-client-generator-core";
-import { DateTimeKnownEncoding, DurationKnownEncoding } from "@typespec/compiler";
-import { InputConstant } from "./input-constant.js";
-import { InputParameterScope } from "./input-parameter-scope.js";
-import { InputServiceMethod } from "./input-service-method.js";
-import { RequestLocation } from "./request-location.js";
+import type { DateTimeKnownEncoding, DurationKnownEncoding } from "@typespec/compiler";
+import type { InputConstant } from "./input-constant.js";
+import type { InputParameterScope } from "./input-parameter-scope.js";
+import type { InputServiceMethod } from "./input-service-method.js";
+import type { RequestLocation } from "./request-location.js";
 
 /**
  * External type information for types that map to external library types.
@@ -33,6 +33,7 @@ export interface InputExternalTypeMetadata {
 export interface InputClient extends DecoratedType {
   kind: "client";
   name: string;
+  isExactName?: boolean;
   namespace: string;
   doc?: string;
   summary?: string;
@@ -78,6 +79,7 @@ export type InputType =
   | InputEnumType
   | InputEnumValueType
   | InputArrayType
+  | InputStreamingType
   | InputDictionaryType
   | InputNullableType;
 
@@ -87,6 +89,7 @@ export interface InputPrimitiveType extends InputTypeBase {
   encode?: string; // In TCGC this is required, and when there is no encoding, it just has the same value as kind
   crossLanguageDefinitionId: string;
   baseType?: InputPrimitiveType;
+  isFileType?: boolean;
 }
 
 export interface InputLiteralType extends InputTypeBase {
@@ -97,6 +100,8 @@ export interface InputLiteralType extends InputTypeBase {
   namespace: string;
   valueType: InputPrimitiveType;
   value: string | number | boolean | null;
+  /** Whether the name should be used exactly as-is, without casing transformations. */
+  isExactName?: boolean;
 }
 
 export function isInputLiteralType(type: InputType): type is InputLiteralType {
@@ -135,6 +140,8 @@ export interface InputUnionType extends InputTypeBase {
   name: string;
   variantTypes: InputType[];
   namespace: string;
+  /** Whether the name should be used exactly as-is, without casing transformations. */
+  isExactName?: boolean;
 }
 
 export function isInputUnionType(type: InputType): type is InputUnionType {
@@ -148,6 +155,7 @@ export function isInputUnionType(type: InputType): type is InputUnionType {
 export interface InputModelType extends InputTypeBase {
   kind: "model";
   properties: InputModelProperty[];
+  apiVersions: string[];
   name: string;
   crossLanguageDefinitionId: string;
   access?: AccessFlags;
@@ -159,6 +167,13 @@ export interface InputModelType extends InputTypeBase {
   discriminatorProperty?: InputModelProperty;
   baseModel?: InputModelType;
   serializationOptions: SerializationOptions;
+  /** Whether the name should be used exactly as-is, without casing transformations. */
+  isExactName?: boolean;
+  /**
+   * Whether the type represents a file. Only set on types that can represent a file in TCGC
+   * (the http `File` model); otherwise left undefined.
+   */
+  isFileType?: boolean;
 }
 
 export interface InputPropertyTypeBase extends DecoratedType {
@@ -172,10 +187,13 @@ export interface InputPropertyTypeBase extends DecoratedType {
   crossLanguageDefinitionId: string;
   readOnly: boolean;
   access?: AccessFlags;
+  /** Whether the name should be used exactly as-is, without casing transformations. */
+  isExactName?: boolean;
 }
 
 export interface InputModelProperty extends InputPropertyTypeBase {
   kind: "property";
+  apiVersions: string[];
   discriminator: boolean;
   serializedName: string;
   serializationOptions: SerializationOptions;
@@ -187,10 +205,7 @@ export interface InputModelProperty extends InputPropertyTypeBase {
 export type InputProperty = InputModelProperty | InputParameter;
 
 export type InputHttpParameter =
-  | InputQueryParameter
-  | InputPathParameter
-  | InputHeaderParameter
-  | InputBodyParameter;
+  InputQueryParameter | InputPathParameter | InputHeaderParameter | InputBodyParameter;
 
 export type InputParameter = InputMethodParameter | InputEndpointParameter | InputHttpParameter;
 
@@ -242,6 +257,7 @@ export interface InputBodyParameter extends InputPropertyTypeBase {
   scope: InputParameterScope;
   serializedName: string;
   methodParameterSegments?: InputMethodParameter[];
+  serializationOptions: SerializationOptions;
 }
 
 export interface InputEndpointParameter extends InputPropertyTypeBase {
@@ -256,6 +272,7 @@ export interface InputEndpointParameter extends InputPropertyTypeBase {
 
 export interface InputEnumType extends InputTypeBase {
   kind: "enum";
+  apiVersions: string[];
   name: string;
   crossLanguageDefinitionId: string;
   valueType: InputPrimitiveType;
@@ -265,6 +282,8 @@ export interface InputEnumType extends InputTypeBase {
   usage: UsageFlags;
   access?: AccessFlags;
   namespace: string;
+  /** Whether the name should be used exactly as-is, without casing transformations. */
+  isExactName?: boolean;
 }
 
 export interface InputEnumValueType extends InputTypeBase {
@@ -273,6 +292,8 @@ export interface InputEnumValueType extends InputTypeBase {
   value: string | number;
   enumType: InputEnumType;
   valueType: InputPrimitiveType;
+  /** Whether the name should be used exactly as-is, without casing transformations. */
+  isExactName?: boolean;
 }
 
 export interface InputNullableType extends InputTypeBase {
@@ -285,6 +306,17 @@ export interface InputArrayType extends InputTypeBase {
   kind: "array";
   name: string;
   valueType: InputType;
+  crossLanguageDefinitionId: string;
+}
+
+export interface InputStreamingType extends InputTypeBase {
+  kind: "streaming";
+  name: string;
+  valueType: InputType;
+  streamKind: "jsonl" | "sse";
+  contentTypes: string[];
+  terminalEventType?: string;
+  terminalEventValue?: string;
   crossLanguageDefinitionId: string;
 }
 

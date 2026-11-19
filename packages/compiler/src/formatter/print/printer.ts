@@ -5,7 +5,7 @@ import {
   printIdentifier as printIdentifierString,
   splitLines,
 } from "../../core/helpers/syntax-utils.js";
-import {
+import type {
   AliasStatementNode,
   ArrayExpressionNode,
   ArrayLiteralNode,
@@ -36,7 +36,6 @@ import {
   ModelSpreadPropertyNode,
   ModelStatementNode,
   Node,
-  NodeFlags,
   NumericLiteralNode,
   ObjectLiteralNode,
   ObjectLiteralPropertyNode,
@@ -50,7 +49,6 @@ import {
   StringLiteralNode,
   StringTemplateExpressionNode,
   StringTemplateSpanNode,
-  SyntaxKind,
   TemplateArgumentNode,
   TemplateParameterDeclarationNode,
   TextRange,
@@ -64,10 +62,11 @@ import {
   UsingStatementNode,
   ValueOfExpressionNode,
 } from "../../core/types.js";
-import { FlattenedNamespaceStatementNode } from "../types.js";
+import { NodeFlags, SyntaxKind } from "../../core/types.js";
+import type { FlattenedNamespaceStatementNode } from "../types.js";
 import { commentHandler } from "./comment-handler.js";
 import { needsParens } from "./needs-parens.js";
-import { DecorableNode, PrettierChildPrint, TypeSpecPrettierOptions } from "./types.js";
+import type { DecorableNode, PrettierChildPrint, TypeSpecPrettierOptions } from "./types.js";
 import { util } from "./util.js";
 
 const {
@@ -259,6 +258,8 @@ export function printNode(
       return "extern";
     case SyntaxKind.InternalKeyword:
       return "internal";
+    case SyntaxKind.AutoKeyword:
+      return "auto";
     case SyntaxKind.VoidKeyword:
       return "void";
     case SyntaxKind.NeverKeyword:
@@ -342,7 +343,7 @@ export function printAliasStatement(
   print: PrettierChildPrint,
 ) {
   const id = path.call(print, "id");
-  const template = printTemplateParameters(path, options, print, "templateParameters");
+  const template = printTemplateParameterDeclarations(path, options, print, "templateParameters");
   return [
     printModifiers(path, options, print),
     "alias ",
@@ -382,24 +383,92 @@ export function printCallExpression(
   return [path.call(print, "target"), args];
 }
 
-function printTemplateParameters<T extends Node>(
+/**
+ * Print a template argument list (e.g. `<string, T = int32>`).
+ *
+ * A single argument is hugged (`Foo<{...}>`) so object-like arguments and long unions stay attached to the reference.
+ */
+function printTemplateArguments<T extends Node>(
   path: AstPath<T>,
   options: TypeSpecPrettierOptions,
   print: PrettierChildPrint,
   propertyName: keyof T,
 ) {
   const node = path.node;
-  const args = node[propertyName] as any as TemplateParameterDeclarationNode[];
-  if ((args as any).length === 0) {
+  const args = node[propertyName] as any as TemplateArgumentNode[];
+  if (args.length === 0) {
     return "";
   }
 
-  const shouldHug = (args as any).length === 1;
+  const shouldHug = args.length === 1;
   if (shouldHug) {
     return ["<", join(", ", path.map(print, propertyName as any)), ">"];
   } else {
     const body = indent([softline, join([", ", softline], path.map(print, propertyName as any))]);
     return group(["<", body, softline, ">"]);
+  }
+}
+
+/**
+ * Print a template parameter declaration list (e.g. `<T extends string, U = int32>`).
+ *
+ * A single parameter is hugged (`Foo<T extends string>`) as long as it cannot break by itself. When the
+ * parameter has a breakable constraint or default (union, model expression, ...) the list breaks instead,
+ * so the parameter never gets split while the `<` and `>` stay glued to the surrounding code.
+ */
+function printTemplateParameterDeclarations<T extends Node>(
+  path: AstPath<T>,
+  options: TypeSpecPrettierOptions,
+  print: PrettierChildPrint,
+  propertyName: keyof T,
+) {
+  const node = path.node;
+  const params = node[propertyName] as any as TemplateParameterDeclarationNode[];
+  if (params.length === 0) {
+    return "";
+  }
+
+  if (params.length === 1 && isUnbreakableTemplateParameter(params[0])) {
+    return ["<", join(", ", path.map(print, propertyName as any)), ">"];
+  }
+
+  const body = indent([softline, join([",", line], path.map(print, propertyName as any))]);
+  return group(["<", body, softline, ">"]);
+}
+
+/** Check the template parameter declaration will always be printed on a single line. */
+function isUnbreakableTemplateParameter(node: TemplateParameterDeclarationNode): boolean {
+  return isUnbreakableType(node.constraint) && isUnbreakableType(node.default);
+}
+
+/** Check the type expression has no line break opportunity and so will always be printed on a single line. */
+function isUnbreakableType(node: Node | undefined): boolean {
+  if (node === undefined) {
+    return true;
+  }
+  switch (node.kind) {
+    case SyntaxKind.Identifier:
+    case SyntaxKind.MemberExpression:
+    case SyntaxKind.StringLiteral:
+    case SyntaxKind.NumericLiteral:
+    case SyntaxKind.BooleanLiteral:
+    case SyntaxKind.VoidKeyword:
+    case SyntaxKind.NeverKeyword:
+    case SyntaxKind.UnknownKeyword:
+      return true;
+    case SyntaxKind.TypeReference:
+      // A single argument is hugged (see `printTemplateArguments`) so it only breaks if the argument itself does.
+      return (
+        node.arguments.length === 0 ||
+        (node.arguments.length === 1 && isUnbreakableType(node.arguments[0].argument))
+      );
+    case SyntaxKind.ArrayExpression:
+      return isUnbreakableType(node.elementType);
+    case SyntaxKind.ValueOfExpression:
+    case SyntaxKind.TypeOfExpression:
+      return isUnbreakableType(node.target);
+    default:
+      return false;
   }
 }
 
@@ -565,7 +634,7 @@ function printAugmentDecoratorArgs(
     group([
       indent(
         join(", ", [
-          path.call(print, "targetType"),
+          [softline, path.call(print, "targetType")],
           ...path.map((arg) => [softline, print(arg)], "arguments"),
         ]),
       ),
@@ -740,13 +809,15 @@ export function printUnionStatement(
 ) {
   const id = path.call(print, "id");
   const { decorators } = printDecorators(path, options, print, { tryInline: false });
-  const generic = printTemplateParameters(path, options, print, "templateParameters");
+  const generic = printTemplateParameterDeclarations(path, options, print, "templateParameters");
+  const heritage = printHeritageClause(path, print, "extends", "extends");
   return [
     decorators,
     printModifiers(path, options, print),
     "union ",
     id,
     generic,
+    heritage,
     " ",
     printUnionVariantsBlock(path, options, print),
   ];
@@ -758,11 +829,15 @@ export function printUnionVariantsBlock(
   print: PrettierChildPrint,
 ) {
   const node = path.node;
-  if (node.options.length === 0) {
+  const nodeHasComments = hasComments(node, CommentCheckFlags.Dangling);
+  if (node.options.length === 0 && !nodeHasComments) {
     return "{}";
   }
 
-  const body = joinMembersInBlock(path, "options", options, print, ",", hardline);
+  const body = [joinMembersInBlock(path, "options", options, print, ",", hardline)];
+  if (nodeHasComments) {
+    body.push(printDanglingComments(path, options, { sameIndent: true }));
+  }
   return group(["{", indent(body), hardline, "}"]);
 }
 
@@ -786,7 +861,7 @@ export function printInterfaceStatement(
 ) {
   const id = path.call(print, "id");
   const { decorators } = printDecorators(path, options, print, { tryInline: false });
-  const generic = printTemplateParameters(path, options, print, "templateParameters");
+  const generic = printTemplateParameterDeclarations(path, options, print, "templateParameters");
   const extendList = printInterfaceExtends(path, options, print);
 
   return [
@@ -1043,6 +1118,31 @@ export function printArrayLiteral(
   ]);
 }
 
+// When the base is a multi-argument template, its argument list breaks on its
+// own, so keep `is`/`extends` inline instead of breaking the keyword too (#11009).
+function printHeritageClause<T extends Node>(
+  path: AstPath<T>,
+  print: PrettierChildPrint,
+  keyword: string,
+  propertyName: keyof T,
+): Doc {
+  const ref = path.node[propertyName] as Node | undefined;
+  if (!ref) {
+    return "";
+  }
+  const printed = [`${keyword} `, path.call(print, propertyName as any)];
+  if (isMultiArgTemplateReference(ref)) {
+    return [" ", printed];
+  }
+  return group(indent([ifBreak(line, " "), printed]));
+}
+
+function isMultiArgTemplateReference(node: Node): boolean {
+  return (
+    node.kind === SyntaxKind.TypeReference && (node as TypeReferenceNode).arguments.length >= 2
+  );
+}
+
 export function printModelStatement(
   path: AstPath<ModelStatementNode>,
   options: TypeSpecPrettierOptions,
@@ -1050,11 +1150,9 @@ export function printModelStatement(
 ) {
   const node = path.node;
   const id = path.call(print, "id");
-  const heritage = node.extends
-    ? [ifBreak(line, " "), "extends ", path.call(print, "extends")]
-    : "";
-  const isBase = node.is ? [ifBreak(line, " "), "is ", path.call(print, "is")] : "";
-  const generic = printTemplateParameters(path, options, print, "templateParameters");
+  const heritage = printHeritageClause(path, print, "extends", "extends");
+  const isBase = printHeritageClause(path, print, "is", "is");
+  const generic = printTemplateParameterDeclarations(path, options, print, "templateParameters");
   const nodeHasComments = hasComments(node, CommentCheckFlags.Dangling);
   const shouldPrintBody = nodeHasComments || !(node.properties.length === 0 && node.is);
   const body = shouldPrintBody ? [" ", printModelPropertiesBlock(path, options, print)] : ";";
@@ -1064,7 +1162,8 @@ export function printModelStatement(
     "model ",
     id,
     generic,
-    group(indent(["", heritage, isBase])),
+    heritage,
+    isBase,
     body,
   ];
 }
@@ -1086,9 +1185,11 @@ function printModelPropertiesBlock(
   }
   const tryInline = path.getParentNode()?.kind === SyntaxKind.TemplateParameterDeclaration;
   const lineDoc = tryInline ? softline : hardline;
-  const seperator = isModelAValue(path) ? "," : ";";
+  const rawSeparator: string = isModelAValue(path) ? "," : ";";
+  // When inlined the line between the properties collapses so the separator needs to provide the space itself.
+  const separator: Doc = tryInline ? ifBreak(rawSeparator, `${rawSeparator} `) : rawSeparator;
 
-  const body = [joinMembersInBlock(path, "properties", options, print, seperator, lineDoc)];
+  const body = [joinMembersInBlock(path, "properties", options, print, separator, lineDoc)];
   if (nodeHasComments) {
     body.push(printDanglingComments(path, options, { sameIndent: true }));
   }
@@ -1238,11 +1339,9 @@ function printScalarStatement(
 ) {
   const node = path.node;
   const id = path.call(print, "id");
-  const template = printTemplateParameters(path, options, print, "templateParameters");
+  const template = printTemplateParameterDeclarations(path, options, print, "templateParameters");
 
-  const heritage = node.extends
-    ? [ifBreak(line, " "), "extends ", path.call(print, "extends")]
-    : "";
+  const heritage = printHeritageClause(path, print, "extends", "extends");
   const nodeHasComments = hasComments(node, CommentCheckFlags.Dangling);
   const shouldPrintBody = nodeHasComments || !(node.members.length === 0);
 
@@ -1253,7 +1352,7 @@ function printScalarStatement(
     "scalar ",
     id,
     template,
-    group(indent(["", heritage])),
+    heritage,
     members,
   ];
 }
@@ -1340,7 +1439,12 @@ export function printOperationStatement(
   print: PrettierChildPrint,
 ) {
   const inInterface = (path.getParentNode()?.kind as any) === SyntaxKind.InterfaceStatement;
-  const templateParams = printTemplateParameters(path, options, print, "templateParameters");
+  const templateParams = printTemplateParameterDeclarations(
+    path,
+    options,
+    print,
+    "templateParameters",
+  );
   const { decorators } = printDecorators(path as AstPath<DecorableNode>, options, print, {
     tryInline: true,
   });
@@ -1403,31 +1507,38 @@ export function printUnion(
   options: TypeSpecPrettierOptions,
   print: PrettierChildPrint,
 ) {
-  const node = path.node;
-  const shouldHug = shouldHugType(node);
+  // A union that is one of several template arguments must not add its own
+  // leading line + indent: the argument list already provides them, so stacking
+  // both yields a blank line and an extra indent level for the variants.
+  // The per-variant align(2) is always kept though (matching prettier's union
+  // printer): it accounts for the "| " prefix so a variant that breaks (e.g. a
+  // nested template) stays aligned under its content.
+  // https://github.com/microsoft/typespec/issues/11009
+  const inMultiTemplateArgumentList = isInMultiTemplateArgumentList(path);
+  const types = path.map((typePath) => align(2, print(typePath)), "options");
 
-  const types = path.map((typePath) => {
-    let printedType: string | Doc = print(typePath);
-    if (!shouldHug) {
-      printedType = align(2, printedType);
-    }
-    return printedType;
-  }, "options");
-
-  if (shouldHug) {
-    return join(" | ", types);
-  }
-
-  const shouldAddStartLine = true;
+  const shouldAddStartLine = !inMultiTemplateArgumentList;
   const code = [ifBreak([shouldAddStartLine ? line : "", "| "], ""), join([line, "| "], types)];
-  return group(indent(code));
+  return inMultiTemplateArgumentList ? group(code) : group(indent(code));
 }
 
-function shouldHugType(node: Node) {
-  if (node.kind === SyntaxKind.UnionExpression || node.kind === SyntaxKind.IntersectionExpression) {
-    return node.options.length < 4;
+/** Whether the node is a direct argument of a template reference with more than one argument. */
+function isInMultiTemplateArgumentList(path: AstPath<Node>): boolean {
+  // A `TemplateArgument` only ever lives in `TypeReference.arguments`, so the
+  // owning `TypeReference` is always the next node ancestor.
+  const argument = path.getParentNode();
+  if (argument?.kind !== SyntaxKind.TemplateArgument) {
+    return false;
   }
-  return false;
+  // Named arguments (`Name = <union>`) print the union after `Name = `, so the
+  // argument list's line break + indent does not apply to the union variants.
+  // The union must therefore provide its own line break + indent like a
+  // standalone union. https://github.com/microsoft/typespec/issues/11092
+  if (argument.name !== undefined) {
+    return false;
+  }
+  const reference = path.getParentNode(1);
+  return reference?.kind === SyntaxKind.TypeReference && reference.arguments.length > 1;
 }
 
 export function printTypeReference(
@@ -1436,7 +1547,7 @@ export function printTypeReference(
   print: PrettierChildPrint,
 ): Doc {
   const type = path.call(print, "target");
-  const template = printTemplateParameters(path, options, print, "arguments");
+  const template = printTemplateArguments(path, options, print, "arguments");
   return [type, template];
 }
 

@@ -10,7 +10,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, "package.json")).toString());
 const dependencies = Object.keys(packageJson.dependencies);
-const externals = ["url", ...dependencies];
+const peerDependencies = Object.keys(packageJson.peerDependencies ?? {});
+const externals = ["url", ...dependencies, ...peerDependencies];
 
 export default defineConfig({
   build: {
@@ -24,14 +25,13 @@ export default defineConfig({
       cssFileName: "style",
       formats: ["es"],
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: (id) => externals.some((x) => id.startsWith(x)),
     },
   },
   plugins: [
     react(),
     dts({
-      logLevel: "silent", // checker reports the errors
       tsconfigPath: "./tsconfig.build.json",
     }),
     checker({

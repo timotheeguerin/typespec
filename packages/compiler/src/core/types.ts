@@ -1,6 +1,7 @@
 import type { JSONSchemaType as AjvJSONSchemaType } from "ajv";
 import type { ModuleResolutionResult } from "../module-resolver/index.js";
 import type { YamlPathTarget, YamlScript } from "../yaml/types.js";
+import type { FileRef } from "./file-ref.js";
 import type { Numeric } from "./numeric.js";
 import type { Program } from "./program.js";
 import type { TokenFlags } from "./scanner.js";
@@ -29,15 +30,7 @@ export interface DecoratorArgument {
    * Marshalled value for use in Javascript.
    */
   jsValue:
-    | Type
-    | Value
-    | Record<string, unknown>
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | Numeric
-    | null;
+    Type | Value | Record<string, unknown> | unknown[] | string | number | boolean | Numeric | null;
   node?: Node;
 }
 
@@ -154,6 +147,7 @@ export type Type =
   | StringTemplate
   | StringTemplateSpan
   | TemplateParameter
+  | TemplateParameterAccess
   | Tuple
   | Union
   | UnionVariant;
@@ -682,6 +676,25 @@ export interface Union extends BaseType, DecoratedType, TemplatedTypeBase {
   expression: boolean;
 
   /**
+   * Type declared with the `extends` clause of a union statement. Union variants are
+   * constrained to be assignable to this model, scalar, enum, or union; violations are
+   * reported as diagnostics.
+   *
+   * Validation is deferred for uninstantiated template declarations because their variants
+   * can contain unresolved template parameters. Each template instance is validated instead.
+   *
+   * This is only set for named unions declared with an `extends` clause. It documents a
+   * constraint: it does **not** imply a subclassing relationship, it does **not** mean the
+   * union is extensible, and it has no interaction with `@discriminator`.
+   *
+   * Emitters should not require this to be present: a union with the same variants and no
+   * `extends` clause should ideally be handled the same way.
+   *
+   * @experimental
+   */
+  baseType?: Model | Scalar | Enum | Union;
+
+  /**
    * Late-bound symbol of this interface type.
    * @internal
    */
@@ -713,6 +726,42 @@ export interface TemplateParameter extends BaseType {
   default?: Type | Value | IndeterminateEntity;
 }
 
+/**
+ * This is a type you should never see in the program.
+ * If you do you might be missing a `isTemplateDeclaration` check to exclude that type.
+ * Working with template declarations is not something that is currently supported.
+ *
+ * `TemplateParameterAccess` represents a member or meta-member access rooted in a template
+ * parameter inside a template declaration, such as `T.id` or `T::returnType`.
+ *
+ * @experimental
+ */
+export interface TemplateParameterAccess extends BaseType {
+  kind: "TemplateParameterAccess";
+  /** @internal */
+  node: MemberExpressionNode;
+  /**
+   * The base of this template parameter access, which could be another template parameter access for chained accesses like `T.id.name`.
+   *
+   * @internal
+   */
+  base: TemplateParameter | TemplateParameterAccess;
+  /**
+   * Valid source-form access path like `T.id`, `T::returnType`, or `T.\`model\`::type`.
+   *
+   * @internal
+   */
+  path: string;
+  /**
+   * The type or value constraint of this template parameter access.
+   *
+   * The constraint is used to determine assignability in template declarations.
+   *
+   * @internal
+   */
+  constraint?: MixedParameterConstraint;
+}
+
 export interface Decorator extends BaseType {
   kind: "Decorator";
   node?: DecoratorDeclarationStatementNode;
@@ -721,6 +770,8 @@ export interface Decorator extends BaseType {
   target: MixedFunctionParameter;
   parameters: MixedFunctionParameter[];
   implementation: (ctx: DecoratorContext, target: Type, ...args: unknown[]) => void;
+  /** How this decorator was declared. */
+  declarationKind: "extern" | "auto";
 }
 
 /**
@@ -1175,6 +1226,7 @@ export enum SyntaxKind {
   CallExpression,
   ScalarConstructor,
   InternalKeyword,
+  AutoKeyword,
   FunctionTypeExpression,
 }
 
@@ -1475,11 +1527,7 @@ export type Expression =
 export type ParenthesizedExpression = Expression & { readonly parenthesized: true };
 
 export type ReferenceExpression =
-  | TypeReferenceNode
-  | MemberExpressionNode
-  | IdentifierNode
-  | VoidKeywordNode
-  | NeverKeywordNode;
+  TypeReferenceNode | MemberExpressionNode | IdentifierNode | VoidKeywordNode | NeverKeywordNode;
 
 export interface MemberExpressionNode extends BaseNode {
   readonly kind: SyntaxKind.MemberExpression;
@@ -1500,6 +1548,16 @@ export interface UsingStatementNode extends BaseNode {
   readonly kind: SyntaxKind.UsingStatement;
   readonly name: IdentifierNode | MemberExpressionNode;
   readonly parent?: TypeSpecScriptNode | NamespaceStatementNode;
+
+  /**
+   * Namespace this using statement is scoped to.
+   * Set by the binder.
+   *
+   * This is the enclosing namespace for a using declared inside a namespace block, or the file(blockless) namespace
+   * if the using is declared after it. It is `undefined` when the using is declared at the file level, before any
+   * blockless namespace declaration, in which case its name resolves from the global namespace.
+   */
+  readonly scopeNamespace?: NamespaceStatementNode;
 }
 
 export interface OperationSignatureDeclarationNode extends BaseNode {
@@ -1514,8 +1572,7 @@ export interface OperationSignatureReferenceNode extends BaseNode {
 }
 
 export type OperationSignature =
-  | OperationSignatureDeclarationNode
-  | OperationSignatureReferenceNode;
+  OperationSignatureDeclarationNode | OperationSignatureReferenceNode;
 
 export interface OperationStatementNode extends BaseNode, DeclarationNode, TemplateDeclarationNode {
   readonly kind: SyntaxKind.OperationStatement;
@@ -1562,6 +1619,15 @@ export interface InterfaceStatementNode extends BaseNode, DeclarationNode, Templ
 export interface UnionStatementNode extends BaseNode, DeclarationNode, TemplateDeclarationNode {
   readonly kind: SyntaxKind.UnionStatement;
   readonly options: readonly UnionVariantNode[];
+  /**
+   * Type that every variant of this union must be assignable to.
+   *
+   * This is a constraint only, it does not imply any subtyping relationship between
+   * the union and the base type beyond the one that already exists structurally.
+   *
+   * @experimental
+   */
+  readonly extends?: Expression;
   readonly decorators: readonly DecoratorExpressionNode[];
   readonly parent?: TypeSpecScriptNode | NamespaceStatementNode;
 }
@@ -1741,6 +1807,10 @@ export interface InternalKeywordNode extends BaseNode {
   readonly kind: SyntaxKind.InternalKeyword;
 }
 
+export interface AutoKeywordNode extends BaseNode {
+  readonly kind: SyntaxKind.AutoKeyword;
+}
+
 export interface VoidKeywordNode extends BaseNode {
   readonly kind: SyntaxKind.VoidKeyword;
 }
@@ -1797,11 +1867,12 @@ export const enum ModifierFlags {
   None,
   Extern = 1 << 1,
   Internal = 1 << 2,
+  Auto = 1 << 3,
 
-  All = Extern | Internal,
+  All = Extern | Internal | Auto,
 }
 
-export type Modifier = ExternKeywordNode | InternalKeywordNode;
+export type Modifier = ExternKeywordNode | InternalKeywordNode | AutoKeywordNode;
 
 /**
  * Represent a decorator declaration
@@ -2048,6 +2119,13 @@ export interface LibraryLocationContext {
 
   /** Module definition */
   readonly flags?: PackageFlags;
+
+  /**
+   * Compiler features enabled for this library, as declared in the library's own
+   * `tspconfig.yaml` `features`. Used to gate experimental features (e.g. `auto-decorators`)
+   * for the library's own source files, independently of the consuming project's config.
+   */
+  readonly features?: readonly string[];
 }
 
 export interface LibraryInstance {
@@ -2311,6 +2389,39 @@ export type SemanticNodeListener = {
 } & TypeListeners &
   ValueListeners;
 
+/**
+ * Extra information about a type contributed by a library through `$provideTypeInfo`. Used to
+ * enrich IDE hover documentation and to answer queries (e.g. from AI agents/tooling).
+ */
+export interface TypeInfo {
+  /** Markdown content describing this information, e.g. ``"`HTTP Route`: `GET /pets/{id}`"``. */
+  readonly content: string;
+}
+
+/**
+ * Context passed to a library's `$provideTypeInfo` provider. Additional properties may be added
+ * over time.
+ */
+export interface TypeInfoContext {
+  /** The current program. */
+  readonly program: Program;
+  /** The type the information is being requested for. */
+  readonly target: Type;
+}
+
+/**
+ * Provides extra information about a given type.
+ *
+ * A library registers one by exporting a `$provideTypeInfo` function (typically via
+ * {@link defineTypeInfoProvider}). Unlike the `$onValidate` lifecycle hook, a provider is never
+ * run during compilation and must not mutate the type graph. It is invoked lazily and on demand
+ * (e.g. by the language server when computing hover documentation, or by tooling querying
+ * {@link Program.getTypeInfo}).
+ *
+ * Providers are gated behind the experimental `type-info-provider` compiler feature.
+ */
+export type TypeInfoProvider = (context: TypeInfoContext) => TypeInfo | undefined;
+
 export type DiagnosticReportWithoutTarget<
   T extends { [code: string]: DiagnosticMessages },
   C extends keyof T,
@@ -2365,6 +2476,12 @@ export interface DiagnosticDefinition<M extends DiagnosticMessages> {
   readonly description?: string;
   /** Specifies the URL at which the full documentation can be accessed. */
   readonly url?: string;
+  /**
+   * Extended documentation for this diagnostic. Surfaced both in generated reference
+   * documentation and in editor tooling (e.g. completion and hover). Either raw markdown,
+   * or a {@link FileRef} pointing to a markdown file (recommended).
+   */
+  readonly docs?: string | FileRef;
 }
 
 export interface DiagnosticMessages {
@@ -2436,6 +2553,14 @@ export interface TypeSpecLibraryDef<
    */
   readonly name: string;
 
+  /**
+   * Optional short alias for this library used in diagnostic and linter rule codes.
+   * When provided, diagnostic/linter codes can be referenced as `${alias}/${code}`
+   * in addition to the full `${name}/${code}` form (e.g. `tcgc/no-foo`).
+   * Overrides the automatically scope-stripped short name.
+   */
+  readonly alias?: string;
+
   /** Optional registration of capabilities the library/emitter provides */
   readonly capabilities?: TypeSpecLibraryCapabilities;
 
@@ -2488,18 +2613,22 @@ export interface FunctionImplementations {
 export interface PackageFlags {}
 
 export interface LinterDefinition {
-  rules: LinterRuleDefinition<string, DiagnosticMessages>[];
+  rules: LinterRuleDefinition<string, DiagnosticMessages, any>[];
   ruleSets?: Record<string, LinterRuleSet>;
 }
 
 export interface LinterResolvedDefinition {
-  readonly rules: LinterRule<string, DiagnosticMessages>[];
+  readonly rules: LinterRule<string, DiagnosticMessages, any>[];
   readonly ruleSets: {
     [name: string]: LinterRuleSet;
   };
 }
 
-interface LinterRuleDefinitionBase<N extends string, DM extends DiagnosticMessages> {
+interface LinterRuleDefinitionBase<
+  N extends string,
+  DM extends DiagnosticMessages,
+  Options extends Record<string, unknown> = Record<string, never>,
+> {
   /** Rule name (without the library name) */
   name: N;
   /** Rule default severity. */
@@ -2508,62 +2637,103 @@ interface LinterRuleDefinitionBase<N extends string, DM extends DiagnosticMessag
   description: string;
   /** Specifies the URL at which the full documentation can be accessed. */
   url?: string;
+  /**
+   * Extended documentation for this rule. Surfaced both in generated reference
+   * documentation and in editor tooling (e.g. completion and hover). Either raw markdown,
+   * or a {@link FileRef} pointing to a markdown file (recommended).
+   */
+  docs?: string | FileRef;
   /** Messages that can be reported with the diagnostic. */
   messages: DM;
+  /**
+   * JSON Schema for the rule options.
+   * When provided, options will be validated against this schema before the rule runs.
+   */
+  optionSchema?: Record<string, unknown>;
+  /** Default options for the rule, used when enabled with `true` and no options are specified. */
+  defaultOptions?: Options;
 }
 
 interface LinterRuleDefinitionSync<
   N extends string,
   DM extends DiagnosticMessages,
-> extends LinterRuleDefinitionBase<N, DM> {
+  Options extends Record<string, unknown> = Record<string, never>,
+> extends LinterRuleDefinitionBase<N, DM, Options> {
   /** Whether this is an async rule. Default is false */
   async?: false;
   /** Creator */
   create(
-    context: LinterRuleContext<DM>,
+    context: LinterRuleContext<DM, Options>,
   ): SemanticNodeListener & { exit?: (context: Program) => void | undefined };
 }
 
 interface LinterRuleDefinitionAsync<
   N extends string,
   DM extends DiagnosticMessages,
-> extends LinterRuleDefinitionBase<N, DM> {
+  Options extends Record<string, unknown> = Record<string, never>,
+> extends LinterRuleDefinitionBase<N, DM, Options> {
   /** Whether this is an async rule. Default is false */
   async: true;
   /** Creator */
   create(
-    context: LinterRuleContext<DM>,
+    context: LinterRuleContext<DM, Options>,
   ): SemanticNodeListener & { exit?: (context: Program) => Promise<void | undefined> };
 }
 
-export type LinterRuleDefinition<N extends string, DM extends DiagnosticMessages> =
-  | LinterRuleDefinitionSync<N, DM>
-  | LinterRuleDefinitionAsync<N, DM>;
+export type LinterRuleDefinition<
+  N extends string,
+  DM extends DiagnosticMessages,
+  Options extends Record<string, unknown> = Record<string, never>,
+> = LinterRuleDefinitionSync<N, DM, Options> | LinterRuleDefinitionAsync<N, DM, Options>;
 
 /** Resolved instance of a linter rule that will run. */
-export type LinterRule<N extends string, DM extends DiagnosticMessages> = LinterRuleDefinition<
-  N,
-  DM
-> & {
+export type LinterRule<
+  N extends string,
+  DM extends DiagnosticMessages,
+  Options extends Record<string, unknown> = Record<string, never>,
+> = LinterRuleDefinition<N, DM, Options> & {
   /** Expanded rule id in format `<library-name>:<rule-name>` */
   id: string;
 };
 
 /** Reference to a rule. In this format `<library name>:<rule/ruleset name>` */
 export type RuleRef = `${string}/${string}`;
+
+/**
+ * Reference to a ruleset defined in a yaml file. In this format `file:<path to the yaml file>`.
+ * A relative path is resolved relative to the file declaring it (`tspconfig.yaml` or another ruleset file).
+ * Only valid in `tspconfig.yaml` or in another ruleset file, not in a ruleset defined by a library.
+ */
+export type RuleSetFileRef = `file:${string}`;
+
+/** Reference to a ruleset. Either a ruleset defined in a library or one defined in a local yaml file. */
+export type RuleSetRef = RuleRef | RuleSetFileRef;
+
+/**
+ * Value for enabling a linter rule.
+ * - `true` enables the rule with default options.
+ * - An object enables the rule with the specified options.
+ */
+export type LinterRuleEnableValue = boolean | Record<string, unknown>;
+
 export interface LinterRuleSet {
   /** Other ruleset this ruleset extends */
-  extends?: RuleRef[];
+  extends?: RuleSetRef[];
 
   /** Rules to enable/configure */
-  enable?: Record<RuleRef, boolean>;
+  enable?: Record<RuleRef, LinterRuleEnableValue>;
 
   /** Rules to disable. A rule CANNOT be in enable and disable map. */
   disable?: Record<RuleRef, string>;
 }
 
-export interface LinterRuleContext<DM extends DiagnosticMessages> {
+export interface LinterRuleContext<
+  DM extends DiagnosticMessages,
+  Options extends Record<string, unknown> = Record<string, never>,
+> {
   readonly program: Program;
+  /** Options configured for this rule. */
+  readonly options: Options;
   reportDiagnostic<M extends keyof DM>(diag: LinterRuleDiagnosticReport<DM, M>): void;
 }
 
